@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Umrovia design tokens (Spec §4 — design behavior; Source of truth: brand
+   tokens terpusat. Tenant logo tidak menggantikan identitas legal Umrovia.)
+   ========================================================================== */
+:root {
+  /* Brand */
+  --brand-primary: #0e6b5c;
+  --brand-primary-hover: #0a564a;
+  --brand-accent: #c9a227;
+  --brand-ink: #10221f;
+  --brand-muted: #5b6b67;
+
+  /* Surface & border */
+  --background: #f7f9f8;
+  --surface: #ffffff;
+  --border: #e2e8e6;
+
+  /* Status (semantic) */
+  --status-success: #15803d;
+  --status-warning: #b45309;
+  --status-danger: #b91c1c;
+  --status-info: #1d4ed8;
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* Radius & shadow */
+  --radius: 0.5rem;
+  --shadow-card: 0 1px 2px rgb(16 34 31 / 0.06), 0 1px 3px rgb(16 34 31 / 0.08);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-accent: var(--brand-accent);
+  --color-ink: var(--brand-ink);
+  --color-muted: var(--brand-muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--brand-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Komponen dasar */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.btn-primary {
+  background: var(--brand-primary);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover {
+  background: var(--brand-primary-hover);
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+}
+.input:focus {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 1px;
+}
