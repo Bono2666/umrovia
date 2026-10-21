@@ -1,0 +1,10 @@
+# Direct dependencies — backend (Django/DRF modular monolith)
+# Versi di-lock penuh di requirements.lock (pip freeze) untuk reproduktifitas CI/deploy.
+Django>=5.2,<5.3
+djangorestframework>=3.15,<3.17
+drf-spectacular>=0.28,<0.29
+dj-database-url>=2.2,<3
+psycopg[binary]>=3.2,<4
+django-cors-headers>=4.6,<5
+gunicorn>=23,<24
+whitenoise>=6.8,<7

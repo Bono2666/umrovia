@@ -1,0 +1,46 @@
+# docker-compose - alternatif menjalankan aplikasi + MySQL secara lokal/VPS
+# Pemakaian:
+#   cp deploy/env.example .env   # lalu isi kredensial
+#   docker compose up -d --build
+services:
+  web:
+    build: .
+    container_name: umrovia-web
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: ${SECRET_KEY:?isi SECRET_KEY di .env}
+      ALLOWED_HOSTS: "umrovia.ksisolusi.com,www.umrovia.ksisolusi.com,localhost,127.0.0.1"
+      DB_NAME: ${DB_NAME:-umrovia}
+      DB_USER: ${DB_USER:-umrovia}
+      DB_PASSWORD: ${DB_PASSWORD:?isi DB_PASSWORD di .env}
+      DB_HOST: db
+      DB_PORT: "3306"
+    volumes:
+      - media_data:/app/apps/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: umrovia-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-umrovia}
+      MYSQL_USER: ${DB_USER:-umrovia}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?isi DB_PASSWORD di .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  media_data:
+  db_data:

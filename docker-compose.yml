@@ -1,46 +1,71 @@
-# docker-compose - alternatif menjalankan aplikasi + MySQL secara lokal/VPS
-# Pemakaian:
-#   cp deploy/env.example .env   # lalu isi kredensial
-#   docker compose up -d --build
-services:
-  web:
-    build: .
-    container_name: umrovia-web
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      DEBUG: "False"
-      SECRET_KEY: ${SECRET_KEY:?isi SECRET_KEY di .env}
-      ALLOWED_HOSTS: "umrovia.ksisolusi.com,www.umrovia.ksisolusi.com,localhost,127.0.0.1"
-      DB_NAME: ${DB_NAME:-umrovia}
-      DB_USER: ${DB_USER:-umrovia}
-      DB_PASSWORD: ${DB_PASSWORD:?isi DB_PASSWORD di .env}
-      DB_HOST: db
-      DB_PORT: "3306"
-    volumes:
-      - media_data:/app/apps/media
-    depends_on:
-      db:
-        condition: service_healthy
+# Umrovia — local/staging stack (Spec §19.4 T03: one command start + health checks)
+# Local tanpa Docker: lihat README (Postgres lokal + runserver + npm run dev).
 
+name: umrovia
+
+services:
   db:
-    image: mysql:8.0
-    container_name: umrovia-db
-    restart: unless-stopped
+    image: postgres:17-alpine
     environment:
-      MYSQL_DATABASE: ${DB_NAME:-umrovia}
-      MYSQL_USER: ${DB_USER:-umrovia}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?isi DB_PASSWORD di .env}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      POSTGRES_USER: ${POSTGRES_USER:-umrovia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-umrovia}
+      POSTGRES_DB: ${POSTGRES_DB:-umrovia}
+    ports:
+      - "5432:5432"
     volumes:
-      - db_data:/var/lib/mysql
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-umrovia} -d ${POSTGRES_DB:-umrovia}"]
+      interval: 5s
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      DATABASE_URL: postgres://${POSTGRES_USER:-umrovia}:${POSTGRES_PASSWORD:-umrovia}@db:5432/${POSTGRES_DB:-umrovia}
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_HOSTS: localhost,127.0.0.1,api
+      DEBUG: ${DEBUG:-True}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+
 volumes:
-  media_data:
-  db_data:
+  pgdata:

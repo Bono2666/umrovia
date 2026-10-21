@@ -92,11 +92,21 @@ __pycache__/
 
 # Hasil collectstatic (build output) - jangan di-commit, biar selalu dibuat
 # ulang oleh `manage.py collectstatic` saat deploy
-apps/staticfiles/
+backend/staticfiles/
+legacy/apps/staticfiles/
 
 # Upload media (ditulis runtime, jangan di-commit)
-apps/media/*
-!apps/media/.gitkeep
+backend/media/*
+!backend/media/.gitkeep
+legacy/apps/media/*
+!legacy/apps/media/.gitkeep
+
+### Node / Next.js ###
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
 
 # Editor / IDE
 .idea/
