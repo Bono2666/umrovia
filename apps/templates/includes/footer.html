@@ -1,0 +1,12 @@
+{% load user_agents %}
+<footer class="footer w-100 py-3 {% if request|is_mobile %}mt-3{% else %}mt-2{% endif %}">
+  <div class="container-fluid">
+    <div class="row align-items-center justify-content-lg-between">
+      <div class="col-lg-12 mb-lg-0 mb-4">
+        <div class="copyright text-center text-sm text-muted text-lg-start">
+          Copyright &copy; {% now 'Y' %} <a href="#" class="text-muted" target="_blank">Umrovia</a>.{% if request|is_mobile %}<br>{% else %} {% endif %}Hak Cipta Dilindungi Undang-Undang.
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

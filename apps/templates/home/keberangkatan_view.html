@@ -1,0 +1,165 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Keberangkatan {{ data.kode_keberangkatan }} {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'keberangkatan-update' data.keberangkatan_id %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h4 class="mb-2">Keberangkatan: {{ data.kode_keberangkatan }}</h4>
+                            </div>
+                            <div class="col-6 text-end">
+                                <a href="{% if crud == 'view' %}{% url 'keberangkatan-index' %}{% else %}{% url 'keberangkatan-view' data.keberangkatan_id %}{% endif %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;{% if crud == 'view' %}Kembali{% else %}Batal{% endif %}</a>
+                                <a href="{% url 'keberangkatan-update' data.keberangkatan_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}" {% if crud == 'update' %}hidden{% endif %}><i class="fas fa-edit"></i>&nbsp;&nbsp;Ubah</a>
+                                <button type="submit" class="btn btn-sm bg-gradient-dark mb-0" {% if crud == 'view' %}hidden{% endif %}><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                                <button type="button" class="btn btn-sm bg-gradient-danger mb-0 {% if not btn.delete and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}" data-bs-toggle="modal" data-bs-target="#confirm-{{ data.keberangkatan_id }}"><i class="fas fa-trash"></i>&nbsp;&nbsp;Hapus</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal fade" id="confirm-{{ data.keberangkatan_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                </div>
+                                <div class="modal-body border-bottom-0">
+                                    Anda yakin ingin menghapus keberangkatan <strong>{{ data.kode_keberangkatan }}</strong>?
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-sm bg-gradient-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <a href="{% url 'keberangkatan-delete' data.keberangkatan_id %}" role="button" class="btn btn-sm bg-gradient-danger text-white">Hapus</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if message %}
+                        <div class="alert alert-danger text-white" role="alert">
+                            {{ message }}
+                        </div>
+                        {% endif %}
+                        <div class="alert alert-secondary text-dark py-2 text-sm mb-4" role="alert">
+                            Kapasitas {{ data.kapasitas }} | Terpakai {{ data.kursi_terpakai }} | Tersedia {{ data.kursi_tersedia }}
+                        </div>
+                        <div class="pl-lg-0">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.kode_keberangkatan.label_tag }}{{ form.kode_keberangkatan }}
+                                        <div class="text-sm text-danger">{{ form.kode_keberangkatan.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.paket.label_tag }}{{ form.paket }}
+                                        <div class="text-sm text-danger">{{ form.paket.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tanggal_berangkat.label_tag }}{{ form.tanggal_berangkat }}
+                                        <div class="text-sm text-danger">{{ form.tanggal_berangkat.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tanggal_kembali.label_tag }}{{ form.tanggal_kembali }}
+                                        <div class="text-sm text-danger">{{ form.tanggal_kembali.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.kota_asal.label_tag }}{{ form.kota_asal }}
+                                        <div class="text-sm text-danger">{{ form.kota_asal.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.kapasitas.label_tag }}{{ form.kapasitas }}
+                                        <div class="text-sm text-danger">{{ form.kapasitas.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.kuota_blokir.label_tag }}{{ form.kuota_blokir }}
+                                        <div class="text-sm text-danger">{{ form.kuota_blokir.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.batas_pendaftaran.label_tag }}{{ form.batas_pendaftaran }}
+                                        <div class="text-sm text-danger">{{ form.batas_pendaftaran.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.status.label_tag }}{{ form.status }}
+                                        <div class="text-sm text-danger">{{ form.status.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.catatan.label_tag }}{{ form.catatan }}
+                                        <div class="text-sm text-danger">{{ form.catatan.errors }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card mb-4 p-4">
+                <div class="row mb-4">
+                    <div class="col-6 d-flex align-items-center">
+                        <h5 class="mb-0">Daftar Jamaah</h5>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table hover align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">No. Booking</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Jamaah</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Agen</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Harga</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in bookings %}
+                                <tr data-href="{% url 'booking-view' item.booking_id %}" class="cursor-pointer">
+                                    <td><h6 class="mb-0 text-sm">{{ item.nomor_booking }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.jamaah.nama }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.agen.nama_agen|default:'-' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.harga }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.get_status_display }}</h6></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-sm py-3">Belum ada jamaah terdaftar.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

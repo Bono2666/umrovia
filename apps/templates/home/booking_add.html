@@ -1,0 +1,82 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Tambah Booking {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'booking-add' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h4 class="mb-2">Tambah Booking</h4>
+                            </div>
+                            <div class="col-6 text-end">
+                                <button type="submit" class="btn btn-sm bg-gradient-primary mb-0"><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                                <a href="{% url 'booking-index' %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;Batal</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="pl-lg-0">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tanggal_booking.label_tag }}{{ form.tanggal_booking }}
+                                        <div class="text-sm text-danger">{{ form.tanggal_booking.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.keberangkatan.label_tag }}{{ form.keberangkatan }}
+                                        <div class="text-sm text-danger">{{ form.keberangkatan.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.jamaah.label_tag }}{{ form.jamaah }}
+                                        <div class="text-sm text-danger">{{ form.jamaah.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.agen.label_tag }}{{ form.agen }}
+                                        <div class="text-sm text-danger">{{ form.agen.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.harga.label_tag }}{{ form.harga }}
+                                        <div class="text-sm text-danger">{{ form.harga.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.status.label_tag }}{{ form.status }}
+                                        <div class="text-sm text-danger">{{ form.status.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.catatan.label_tag }}{{ form.catatan }}
+                                        <div class="text-sm text-danger">{{ form.catatan.errors }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

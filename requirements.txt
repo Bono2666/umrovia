@@ -1,0 +1,12 @@
+django==5.0.6
+# gunicorn
+# python-dotenv
+# whitenoise
+pillow
+pymysql
+django-crum
+dj-database-url
+django-auto-logout
+pytz
+# pip install pyyaml ua-parser user-agents <-- install these packages first for django-user-agents
+django-user-agents

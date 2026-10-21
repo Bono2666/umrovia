@@ -1,0 +1,152 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Agen {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'agen-update' data.agen_id %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h4 class="mb-2">Agen: {{ data.agen_id }}</h4>
+                            </div>
+                            <div class="col-6 text-end">
+                                <a href="{% if crud == 'view' %}{% url 'agen-index' %}{% else %}{% url 'agen-view' data.agen_id %}{% endif %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;{% if crud == 'view' %}Kembali{% else %}Batal{% endif %}</a>
+                                <a href="{% url 'agen-update' data.agen_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}" {% if crud == 'update' %}hidden{% endif %}><i class="fas fa-edit"></i>&nbsp;&nbsp;Ubah</a>
+                                <button type="submit" class="btn btn-sm bg-gradient-dark mb-0" {% if crud == 'view' %}hidden{% endif %}><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                                <button type="button" class="btn btn-sm bg-gradient-danger mb-0 {% if not btn.delete and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}" data-bs-toggle="modal" data-bs-target="#confirm-{{ data.agen_id }}"><i class="fas fa-trash"></i>&nbsp;&nbsp;Hapus</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal fade" id="confirm-{{ data.agen_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                </div>
+                                <div class="modal-body border-bottom-0">
+                                    Anda yakin ingin menghapus agen <strong>{{ data.nama_agen }}</strong>?
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-sm bg-gradient-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <a href="{% url 'agen-delete' data.agen_id %}" role="button" class="btn btn-sm bg-gradient-danger text-white">Hapus</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if message %}
+                        <div class="alert alert-danger text-white" role="alert">
+                            {{ message }}
+                        </div>
+                        {% endif %}
+                        <div class="pl-lg-0">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {% if crud == 'view' %}
+                                            {{ form.agen_id.label_tag }}{{ form.agen_id }}
+                                            <div class="text-sm text-danger">{{ form.agen_id.errors }}</div>
+                                        {% else %}
+                                            <label class="form-label">Kode Agen</label>
+                                            <input type="text" class="form-control-sm" value="{{ data.agen_id }}" readonly>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.nama_agen.label_tag }}{{ form.nama_agen }}
+                                        <div class="text-sm text-danger">{{ form.nama_agen.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.telepon.label_tag }}{{ form.telepon }}
+                                        <div class="text-sm text-danger">{{ form.telepon.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.email.label_tag }}{{ form.email }}
+                                        <div class="text-sm text-danger">{{ form.email.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.alamat.label_tag }}{{ form.alamat }}
+                                        <div class="text-sm text-danger">{{ form.alamat.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.komisi_persen.label_tag }}{{ form.komisi_persen }}
+                                        <div class="text-sm text-danger">{{ form.komisi_persen.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.status.label_tag }}{{ form.status }}
+                                        <div class="text-sm text-danger">{{ form.status.errors }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <div class="card mb-4 p-4">
+                <div class="row mb-4">
+                    <div class="col-6 d-flex align-items-center">
+                        <h4 class="mb-2">Riwayat Booking</h4>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table hover align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">No. Booking</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tanggal</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Keberangkatan</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Jamaah</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in bookings %}
+                                <tr data-href="{% url 'booking-view' item.booking_id %}" class="cursor-pointer">
+                                    <td><h6 class="mb-0 text-sm">{{ item.nomor_booking }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.tanggal_booking|date:'d-m-Y' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.keberangkatan.kode_keberangkatan }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.jamaah.nama }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.get_status_display }}</h6></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5"><h6 class="mb-0 text-sm">Belum ada booking.</h6></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

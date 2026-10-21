@@ -1,0 +1,152 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Paket {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'paket-update' data.paket_id %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h4 class="mb-2">Paket: {{ data.paket_id }}</h4>
+                            </div>
+                            <div class="col-6 text-end">
+                                <a href="{% if crud == 'view' %}{% url 'paket-index' %}{% else %}{% url 'paket-view' data.paket_id %}{% endif %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;{% if crud == 'view' %}Kembali{% else %}Batal{% endif %}</a>
+                                <a href="{% url 'paket-update' data.paket_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}" {% if crud == 'update' %}hidden{% endif %}><i class="fas fa-edit"></i>&nbsp;&nbsp;Ubah</a>
+                                <button type="submit" class="btn btn-sm bg-gradient-dark mb-0" {% if crud == 'view' %}hidden{% endif %}><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                                <button type="button" class="btn btn-sm bg-gradient-danger mb-0 {% if not btn.delete and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}" data-bs-toggle="modal" data-bs-target="#confirm-{{ data.paket_id }}"><i class="fas fa-trash"></i>&nbsp;&nbsp;Hapus</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal fade" id="confirm-{{ data.paket_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                </div>
+                                <div class="modal-body border-bottom-0">
+                                    Anda yakin ingin menghapus paket <strong>{{ data.nama_paket }}</strong>?
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-sm bg-gradient-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <a href="{% url 'paket-delete' data.paket_id %}" role="button" class="btn btn-sm bg-gradient-danger text-white">Hapus</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if message %}
+                        <div class="alert alert-danger text-white" role="alert">
+                            {{ message }}
+                        </div>
+                        {% endif %}
+                        <div class="pl-lg-0">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {% if crud == 'view' %}
+                                            {{ form.paket_id.label_tag }}{{ form.paket_id }}
+                                            <div class="text-sm text-danger">{{ form.paket_id.errors }}</div>
+                                        {% else %}
+                                            <label class="form-label">Kode Paket</label>
+                                            <input type="text" class="form-control-sm" value="{{ data.paket_id }}" readonly>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.nama_paket.label_tag }}{{ form.nama_paket }}
+                                        <div class="text-sm text-danger">{{ form.nama_paket.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.jenis.label_tag }}{{ form.jenis }}
+                                        <div class="text-sm text-danger">{{ form.jenis.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.deskripsi.label_tag }}{{ form.deskripsi }}
+                                        <div class="text-sm text-danger">{{ form.deskripsi.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.durasi_hari.label_tag }}{{ form.durasi_hari }}
+                                        <div class="text-sm text-danger">{{ form.durasi_hari.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.harga.label_tag }}{{ form.harga }}
+                                        <div class="text-sm text-danger">{{ form.harga.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.status.label_tag }}{{ form.status }}
+                                        <div class="text-sm text-danger">{{ form.status.errors }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <div class="card mb-4 p-4">
+                <div class="row mb-4">
+                    <div class="col-6 d-flex align-items-center">
+                        <h4 class="mb-2">Riwayat Keberangkatan</h4>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table hover align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Kode</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tanggal Berangkat</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Kota Asal</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Kapasitas</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in keberangkatans %}
+                                <tr data-href="{% url 'keberangkatan-view' item.keberangkatan_id %}" class="cursor-pointer">
+                                    <td><h6 class="mb-0 text-sm">{{ item.kode_keberangkatan }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.tanggal_berangkat|date:'d-m-Y' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.kota_asal }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.kapasitas }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.get_status_display }}</h6></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5"><h6 class="mb-0 text-sm">Belum ada keberangkatan.</h6></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

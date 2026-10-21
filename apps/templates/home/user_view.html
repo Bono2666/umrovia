@@ -1,0 +1,501 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} View User {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'user-update' data.user_id %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-4 d-flex align-items-center">
+                                <h4 class="mb-2">User ID: {{ data.user_id }}</h4>
+                            </div>
+                            <div class="col-8 text-end">
+                                <a href="{% if crud == 'view' %}{% url 'user-index' %}{% else %}{% url 'user-view' data.user_id %}{% endif %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;{% if crud == 'view' %}Back{% else %}Batal{% endif %}</a>
+                                <a href="{% url 'user-update' data.user_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}" {% if crud == 'update' %}hidden{% endif %}><i class="fas fa-edit"></i>&nbsp;&nbsp;Edit</a>
+                                <button type="submit" class="btn btn-sm bg-gradient-dark mb-0" {% if crud == 'view' %}hidden{% endif %}><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                                <a href="{% url 'set-password' data.user_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}"><i class="fas fa-lock"></i>&nbsp;&nbsp;Ubah Password</a>
+                                <button type="button" class="btn btn-sm bg-gradient-danger mb-0 {% if not btn.delete and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}" data-bs-toggle="modal" data-bs-target="#confirm-{{ data.user_id }}"><i class="fas fa-trash"></i>&nbsp;&nbsp;Hapus</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal fade" id="confirm-{{ data.user_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                </div>
+                                <div class="modal-body border-bottom-0">
+                                    Anda yakin akan menghapus user <strong>{{ data.username }}</strong>?
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-sm bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+                                    <a href="{% url 'user-delete' data.user_id %}" role="button" class="btn btn-sm bg-gradient-primary text-white">Hapus
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="pl-lg-0">
+                            {% if message %}
+                            <div class="alert text-danger text-sm text-bg-light" role="alert">
+                                {{ message }}
+                            </div>
+                            {% endif %}
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="shadow-none">
+                                        {{ form.username.label_tag }}{{ form.username }}
+                                        <div class="text-danger text-sm">
+                                        {{ form.username.errors }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="shadow-none">
+                                        {{ form.email.label_tag }}{{ form.email }}
+                                        <div class="text-danger text-sm">
+                                            {{ form.email.errors }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="shadow-none">
+                                        {{ form.position.label_tag }}{{ form.position }}
+                                        <div class="text-danger text-sm">
+                                            {{ form.position.errors }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="shadow-none">
+                                        {{ form.signature.label_tag }}
+                                    </div>
+                                    <div class="input-group input-group-alternative">
+                                        <a {% if data.signature %}href="{{ data.signature.url }}"{% endif %} target="_blank" class="form-control form-control-sm border">{% if data.signature %}{{ data.signature }}{% else %}No signature available for this user{% endif %}</a>
+                                        <span class="input-group-text bg-transparent end-0 pe-3 py-2 {% if crud == 'update' %}cursor-pointer{% endif %} text-body {% if crud == 'view' %}disabled{% endif %} z-index-0" data-bs-toggle="modal" {% if crud == 'update' %}data-bs-target="#delete-sign"{% endif %}><i class="fas fa-times-circle"></i></span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="shadow-none">
+                                        <label class="pb-3"></label>
+                                        {{ form.signature }}
+                                        <div class="text-danger text-sm">
+                                        {{ form.signature.errors }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal fade" id="delete-sign" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                                    aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                            </div>
+                                            <div class="modal-body border-bottom-0">
+                                                Anda yakin akan menghapus tanda tangan ini?
+                                            </div>
+                                            <div class="modal-footer border-0">
+                                                <button role="button" class="btn bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+                                                <a href="{% url 'remove-signature' data.user_id %}" role="button" class="btn bg-gradient-primary text-white">Hapus
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="container-fluid py-2">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4 p-4">
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link text-sm text-body {% if tab == 'auth' %}active{% endif %}" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth-tab-pane" type="button"
+                            role="tab" aria-controls="auth-tab-pane" aria-selected="true">Otorisasi</button>
+                    </li>
+                    <!-- <li class="nav-item" role="presentation">
+                        <button class="nav-link text-sm text-body {% if tab == 'area' %}active{% endif %}" id="area-tab" data-bs-toggle="tab" data-bs-target="#area-tab-pane" type="button"
+                            role="tab" aria-controls="area-tab-pane" aria-selected="false">Cabang</button>
+                    </li> -->
+                </ul>
+                <div class="tab-content" id="myTabContent">
+                    <div class="tab-pane fade {% if tab == 'auth' %}show active{% endif %}" id="auth-tab-pane" role="tabpanel" aria-labelledby="auth-tab" tabindex="0">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h5 class="mb-0"></h5>
+                            </div>
+                            <div class="col-6 text-end">
+                                <button id="myBtn" type="button" class="btn btn-sm bg-gradient-primary mb-0" data-bs-toggle="modal" data-bs-target="#dialog-popup" {% if not btn.edit and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}><i class="fas fa-plus"></i>&nbsp;&nbsp;Tambah Menu</button>
+                            </div>
+                        </div>
+                        <div class="modal fade" id="dialog-popup" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                            aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="ModalLabel">Pilih Menu</h5>
+                                    </div>
+                                    <form method="post" action="{% url 'user-view' data.user_id %}" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        <div class="modal-body border-bottom-0">
+                                            <div class="table-responsive p-0">
+                                                <table class="table align-items-center mb-0" id="menuTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                                Nama Menu</th>
+                                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in menu %}
+                                                        <tr>
+                                                            <td>
+                                                                <div class="d-flex pe-2 py-0">
+                                                                    <div class="d-flex flex-column justify-content-center">
+                                                                        <h6 class="mb-0 text-sm">{{ item.1 }}</h6>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <input type="checkbox" class="cursor-pointer border" name="checks[]" value="{{ item.0 }}" {% if item.2 %}checked{% endif %}/>                                                    
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-0">
+                                            <button type="button" class="btn btn-sm bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+                                            <button type="submit" class="btn btn-sm bg-gradient-primary text-white">Simpan
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body px-0 pt-0 pb-2">
+                            <div class="table-responsive p-0">
+                                <table class="table {% if crud == 'view' %}hover{% endif %} align-items-center mb-0" id="tabTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                Nama Menu</th>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                Tambah</th>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                Ubah</th>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                Hapus</th>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in auth %}
+                                        <tr {% if crud == 'view' %}class="cursor-pointer" data-bs-toggle="modal" data-bs-target="#confirm-{{ item.menu_id }}"{% endif %}>
+                                            <td>
+                                                <div class="d-flex pe-2 py-0">
+                                                    <div class="d-flex flex-column justify-content-center">
+                                                        <h6 class="mb-0 text-sm">{{ item.menu }}</h6>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <input type="checkbox" class="border mt-1" disabled name="checks[]" value="{{ item.add }}" {% if item.add %}checked{% endif %}/>                   
+                                            </td>
+                                            <td>
+                                                <input type="checkbox" class="border mt-1" disabled name="checks[]" value="{{ item.edit }}" {% if item.edit %}checked{% endif %}/>
+                                            </td>
+                                            <td>
+                                                <input type="checkbox" class="border mt-1" disabled name="checks[]" value="{{ item.delete }}" {% if item.delete %}checked{% endif %}/>
+                                            </td>
+                                            <td>
+                                                <button class="btn-icon-only text-dark bg-transparent border-0" data-bs-toggle="modal" {% if btn.edit or request.user.is_superuser %}data-bs-target="#delete-{{ item.menu_id }}"{% else %}disabled{% endif %} {% if crud == 'update' %}disabled{% endif %}><i class="fas fa-times-circle"></i></button>
+                                            </td>
+                                            <div class="modal fade" id="delete-{{ item.menu_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                                                aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                                        </div>
+                                                        <div class="modal-body border-bottom-0">
+                                                            Anda yakin akan menghapus menu <strong>{{ item.menu }}</strong>?
+                                                        </div>
+                                                        <div class="modal-footer border-0">
+                                                            <button role="button" class="btn bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+                                                            <a href="{% url 'auth-delete' item.user_id item.menu_id %}" role="button" class="btn bg-gradient-primary text-white">Hapus
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </tr>
+                                        <div class="modal fade" id="confirm-{{ item.menu_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                                            aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered" role="document">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="ModalLabel">Menu: {{ item.menu }}</h5>
+                                                    </div>
+                                                    <form method="post" action="{% url 'auth-update' item.user_id item.menu_id %}" enctype="multipart/form-data">
+                                                        {% csrf_token %}
+                                                        <div class="modal-body border-bottom-0">
+                                                            <div class="pl-lg-0">
+                                                                <div class="row">
+                                                                    <div class="col-md-3">
+                                                                        <div class="form-group shadow-none">
+                                                                            <input type="checkbox" class="border mt-1" name="add" value="{{ item.add }}" {% if item.add %}checked{% endif %}/>&nbsp;&nbsp;<label class="form-control-label">Tambah</label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row">
+                                                                    <div class="col-md-3">
+                                                                        <div class="form-group shadow-none">
+                                                                            <input type="checkbox" class="border mt-1" name="edit" value="{{ item.edit }}" {% if item.edit %}checked{% endif %}/>&nbsp;&nbsp;<label class="form-control-label">Ubah</label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row">
+                                                                    <div class="col-md-3">
+                                                                        <div class="form-group shadow-none">
+                                                                            <input type="checkbox" class="border mt-1" name="delete" value="{{ item.delete }}" {% if item.delete %}checked{% endif %}/>&nbsp;&nbsp;<label class="form-control-label">Hapus</label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer border-0">
+                                                            <button type="button" class="btn bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+                                                            <button type="submit" class="btn bg-gradient-primary text-white {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}">Simpan</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>                        
+                    </div>
+                    <div class="tab-pane fade {% if tab == 'area' %}show active{% endif %}" id="area-tab-pane" role="tabpanel" aria-labelledby="area-tab" tabindex="0">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h5 class="mb-0"></h5>
+                            </div>
+                            <div class="col-6 text-end">
+                                <button id="myBtn" type="button" class="btn btn-sm bg-gradient-primary mb-0" data-bs-toggle="modal" data-bs-target="#dialog-popup2" {% if not btn.edit and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}><i class="fas fa-plus"></i>&nbsp;&nbsp;Tambah Cabang</button>
+                            </div>
+                        </div>
+                        <div class="modal fade" id="dialog-popup2" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                            aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="ModalLabel">Pilih Cabang</h5>
+                                    </div>
+                                    <form method="post" action="" enctype="multipart/form-data">
+                                        {% csrf_token %}
+                                        <div class="modal-body border-bottom-0">
+                                            <div class="table-responsive p-0">
+                                                <table class="table align-items-center mb-0" id="areaTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                                Cabang</th>
+                                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in item_area %}
+                                                        <tr>
+                                                            <td>
+                                                                <div class="d-flex pe-2 py-0">
+                                                                    <div class="d-flex flex-column justify-content-center">
+                                                                        <h6 class="mb-0 text-sm">{{ item.1 }}</h6>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <input type="checkbox" class="cursor-pointer border" name="area[]" value="{{ item.0 }}" {% if item.2 %}checked{% endif %}/>                                                    
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-0">
+                                            <button type="button" class="btn btn-sm bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+                                            <button type="submit" class="btn btn-sm bg-gradient-primary text-white">Simpan
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body px-0 pt-0 pb-2">
+                            <div class="table-responsive p-0">
+                                <table class="table align-items-center mb-0" id="tabTable2">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+                                                Cabang</th>
+                                            <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in area %}
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex pe-2 py-0">
+                                                    <div class="d-flex flex-column justify-content-center">
+                                                        <h6 class="mb-0 text-sm">{{ item.area }}</h6>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button class="btn-icon-only text-dark bg-transparent border-0" data-bs-toggle="modal" {% if btn.edit or request.user.is_superuser %}data-bs-target="#delete-{{ item.area_id }}"{% else %}disabled{% endif %} {% if crud == 'update' %}disabled{% endif %}><i class="fas fa-times-circle py-0"></i></button>
+                                            </td>
+                                            <div class="modal fade" id="delete-{{ item.area_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                                                aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered" role="document">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                                        </div>
+                                                        <div class="modal-body border-bottom-0">
+                                                            Anda yakin akan menghapus cabang <strong>{{ item.area }}</strong>?
+                                                        </div>
+                                                        <div class="modal-footer border-0">
+                                                            <a role="button" class="btn bg-gradient-dark" data-bs-dismiss="modal">Batal</a>
+                                                            <a href="{% url 'area-user-delete' item.user_id item.area_id %}" role="button" class="btn bg-gradient-primary text-white">Hapus
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+<style>
+    .dataTables_wrapper .dataTables_filter input {
+        min-width: 150px;
+    }
+</style>
+<script>
+    $(document).ready( function () {
+        $('#tabTable').DataTable({
+            'pageLength': 10,
+            'lengthMenu': [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+            'language': {
+                'search': 'Cari: ',
+                'info': 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+                'lengthMenu': 'Tampilkan _MENU_ data',
+                'infoEmpty': '',
+                'zeroRecords': 'Tidak ada data',
+                'paginate': {
+                    'next': 'Selanjutnya',
+                    'previous': 'Sebelumnya'
+                }
+            }
+        });
+
+        $('#tabTable2').DataTable({
+            'pageLength': 10,
+            'lengthMenu': [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+            'filter': false,
+            'language': {
+                'search': 'Cari: ',
+                'info': 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+                'lengthMenu': 'Tampilkan _MENU_ data',
+                'infoEmpty': '',
+                'zeroRecords': 'Tidak ada data',
+                'paginate': {
+                    'next': 'Selanjutnya',
+                    'previous': 'Sebelumnya'
+                }
+            }
+        });
+
+        $('#areaTable').DataTable({
+            'language': {
+                'search': 'Cari: ',
+                'info': 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+                'lengthMenu': 'Tampilkan _MENU_ data',
+                'infoEmpty': '',
+                'zeroRecords': 'Tidak ada data',
+                'paginate': {
+                    'next': 'Selanjutnya',
+                    'previous': 'Sebelumnya'
+                }
+            }
+        });
+
+        // Inisialisasi menuTable saat modal pertama kali ditampilkan
+        // (DataTable di dalam modal harus diinisialisasi setelah modal visible)
+        var menuTableInit = false;
+        $('#dialog-popup').on('shown.bs.modal', function () {
+            if (!menuTableInit) {
+                $('#menuTable').DataTable({
+                    'info': false,
+                    'language': {
+                        'search': 'Cari: ',
+                        'lengthMenu': 'Tampilkan _MENU_ data',
+                        'infoEmpty': '',
+                        'zeroRecords': 'Tidak ada data',
+                        'paginate': {
+                            'next': 'Selanjutnya',
+                            'previous': 'Sebelumnya'
+                        }
+                    }
+                });
+                menuTableInit = true;
+            }
+        });
+
+        let btn = document.getElementsByClassName('paginate_button');
+        for (const button of btn) {
+            button.classList.add('border-radius-top-start-circle', 'border-radius-bottom-end-circle', 'border-radius-top-end-circle', 'border-radius-bottom-start-circle');
+        }
+
+        let btn2 = document.getElementsByClassName('paginate_button next', 'paginate_button previous');
+        for (const button of btn2) {
+            button.hover(function() {
+                $(this).css('background-color', 'transparent');
+            });
+        }
+    } );
+</script>
+{% endblock javascripts %}

@@ -1,0 +1,32 @@
+  {% load static %}
+  {% load user_agents %}
+  <!-- Navbar -->
+  <nav class="{% if request|is_mobile %}navbar-main{% else %}navbar{% endif %} navbar-expand-lg blur {% if request|is_mobile %}rounded-3{% else %}blur-rounded{% endif %} top-0 z-index-3 shadow position-absolute my-3 py-0 start-0 end-0 mx-4">
+    <div class="container-fluid pe-0">
+      <a class="navbar-brand font-weight-bolder ms-lg-0 {% if request|is_mobile %}col-10 py-1{% else %}ms-3{% endif %}" href="/">
+        <img src="{% static 'img/logo.png' %}" class="navbar-brand-img {% if request|is_mobile %}w-10{% else %}w-3{% endif %} py-3" alt="main_logo">
+        <span class="ms-4">Umrovia</span>
+      </a>
+      <button class="navbar-toggler shadow-none ms-7 {% if request|is_mobile %}col-2 pe-3 text-end{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#navigation" aria-controls="navigation" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon mt-2">
+            <span class="navbar-toggler-bar bar1"></span>
+            <span class="navbar-toggler-bar bar2"></span>
+            <span class="navbar-toggler-bar bar3"></span>
+          </span>
+      </button>
+      <div class="collapse navbar-collapse" id="navigation">
+        <ul class="navbar-nav mt-2 ms-xl-auto">
+
+          <li class="nav-item">
+            <label for="theme-switch" class="nav-link d-flex align-items-center me-2 cursor-pointer">
+              <i class="fa fa-sun px-1" id="theme-indicator"></i>
+              Theme
+            </label>
+            <input type="checkbox" class="d-none" id="theme-switch"/>
+          </li>
+          
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <!-- End Navbar -->

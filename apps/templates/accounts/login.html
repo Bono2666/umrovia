@@ -1,0 +1,104 @@
+{% extends 'layouts/base-fullscreen.html' %}
+{% load static %}
+
+{% block content %}
+
+  {% include 'includes/navigation-fullscreen.html' %}
+  
+  <main class="main-content  mt-0">
+    <section>
+      <div class="page-header min-vh-75">
+        <div class="container">
+          <div class="row">
+            <div class="col-xl-4 col-lg-5 col-md-6 d-flex flex-column mx-auto">
+              <div class="card card-plain mt-8">
+                <div class="card-header pb-0 text-left bg-transparent">
+                  <h3 class="font-weight-bolder text-primary">
+                    Sign In  
+                  </h3>
+                  <p class="mb-0">
+                    {% if msg %}
+                      <span class="text-danger">{{ msg | safe }}</span>
+                    {% else %}
+                      Masukkan User ID dan Password Anda
+                    {% endif %}                      
+                  </p>
+                </div>
+                <div class="card-body">
+                  <form role="form" method="post" action="#">
+                    {% if form.non_field_errors %}
+                      {% for error in form.non_field_errors %}
+                        <span class="text-danger">{{ error }}</span>
+                      {% endfor %}
+                    {% endif %}
+                    {% for message in messages %}
+                    <div class="message text-sm text-danger">
+                      {{ message }}
+                    </div>
+                    {% endfor %}
+                    {% csrf_token %}
+                    <label for="username">User ID</label>
+                    <div class="mb-3">
+                      {{ form.user_id }}
+                    </div>
+                    <label for="password">Password</label>
+                    <div class="mb-3">
+                      <div class="input-group input-group-merge input-group-alternative">
+                        {{ form.password }}
+                        <span class="input-group-text bg-transparent end-0 pe-3 py-2 cursor-pointer text-body" id="show-hide-pass"><i class="fas fa-eye-slash my-1"></i></span>
+                      </div>
+                    </div>
+
+                    <div class="text-center">
+                      <button type="submit" class="btn btn-sm bg-gradient-primary w-100 mt-1 mb-0 text-white">Sign in</button>
+                    </div>
+
+                  </form>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="oblique position-absolute top-0 h-100 d-md-block d-none me-n8">
+                <div class="oblique-image bg-cover position-absolute fixed-top ms-auto h-100 z-index-0 ms-n6" style="background-image:url('{% static 'img/curved-images/mosque.jpg' %}')"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  {% include 'includes/footer-fullscreen.html' %}
+
+{% endblock content %}
+
+{% block extrascript %}
+    <script type="application/javascript">
+        {% if form.username.errors %}
+            notification.danger("{{ form.username.errors }}", 'top', 'right');
+        {% endif %}
+        {% if form.password.errors %}
+            notification.danger("{{ form.password.errors }}", 'top', 'right');
+        {% endif %}
+
+        {% if user.is_authenticated %}
+            var msg = "You are authenticated as {{ username }}, but are not authorized to " +
+                "access this page.Would you like to login to a different account ?"
+            notification.warning(msg, 'top', 'right');
+        {% endif %}
+
+        {% if form.errors and not form.non_field_errors %}
+            {% if form.errors.items|length == 1 %}
+                notification.warning("Please correct the error below.", 'top', 'right');
+            {% else %}
+                notification.warning("Please correct the errors below.", 'top', 'right');
+            {% endif %}
+        {% endif %}
+
+        {% if form.non_field_errors %}
+            {% for error in form.non_field_errors %}
+                notification.warning("{{ error }}", 'top', 'right');
+            {% endfor %}
+        {% endif %}
+    </script>
+{% endblock %}

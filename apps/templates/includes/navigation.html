@@ -1,0 +1,124 @@
+{% load static %}
+{% load user_agents %}
+<!-- Navbar -->
+<nav class="navbar navbar-main navbar-expand-lg px-0 mx-4 shadow-none border-radius-xl" id="navbarBlur" navbar-scroll="true" style="z-index: 1050;">
+  <div class="container-fluid py-1 px-3">
+    <nav aria-label="app">
+      <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
+        <li class="text-sm font-weight-bold text-dark active" aria-current="page">
+          Umrovia
+        </li>
+      </ol>
+    </nav>
+    <div class="collapse navbar-collapse mt-sm-0 mt-2 me-md-0 me-sm-4" id="navbar">
+      <ul class="navbar-nav  ms-xl-auto {% if request|is_mobile %}justify-content-end{% endif %}">
+        <li class="nav-item d-flex align-items-center">
+          <div class="nav-link text-body font-weight-bold px-0">
+            <i class="fa fa-user me-sm-1"></i>
+            <span class="d-sm-inline me-3">{% if request|is_mobile %}&nbsp;{{ request.user.username|truncatechars:10 }}{% else %}{{ request.user.username }}{% endif %}</span>
+          </div>
+        </li>
+        
+        <button class="font-weight-bold button text-body text-sm ps-4 border-0 bg-transparent" data-bs-toggle="modal" {% if crud != 'add' and crud != 'update' %}data-bs-target="#confirm"{% endif %}>
+          Logout
+        </button>
+
+        <li class="nav-item pe-0 px-3 d-flex align-items-center">
+          <a {% if crud != 'add' and crud != 'update' %}href="{% url 'change-password' %}"{% endif %} class="nav-link button text-body p-0 m-0" data-tooltip="Ubah Password">
+            <i class="fa fa-lock fixed-plugin-button-nav cursor-pointer"></i>
+          </a>
+        </li>
+        <li class="nav-item pe-2 px-3 d-flex align-items-center">
+          <label for="theme-switch" class="nav-link text-body p-0 m-0" data-tooltip="Theme">
+            <i class="fa fa-sun fixed-plugin-button-nav cursor-pointer" id="theme-indicator"></i>
+          </label>
+          <input type="checkbox" class="d-none" id="theme-switch"/>
+        </li>
+
+        <li class="nav-item d-none d-xl-flex ps-3 d-flex align-items-center">
+          <a href="javascript:;" class="nav-link text-body p-0 m-0" id="sidebarCollapseBtn" data-tooltip="Perkecil Sidebar">
+            <div class="sidenav-toggler-inner">
+              <i class="fa-solid fa-bars" id="sidebarCollapseIcon"></i>
+            </div>
+          </a>
+        </li>
+
+        {% if request|is_mobile %}
+        <li class="nav-item d-xl-none ps-3 d-flex align-items-center">
+          <a href="javascript:;" class="nav-link text-body p-0 m-0" id="iconNavbarSidenav">
+            <div class="sidenav-toggler-inner position-relative">
+              {% if notif > 0 %}
+              <span class="position-absolute top-0 start-100 translate-middle p-1 bg-gradient-danger border border-light rounded-circle z-index-1">
+                <span class="visually-hidden">New alerts</span>
+              </span>
+              {% endif %}
+              <i class="sidenav-toggler-line"></i>
+              <i class="sidenav-toggler-line"></i>
+              <i class="sidenav-toggler-line"></i>
+            </div>
+          </a>
+        </li>
+        {% endif %}
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+<!-- End Navbar -->
+<div class="modal fade" id="confirm" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+      </div>
+      <div class="modal-body border-bottom-0">
+        Anda yakin ingin keluar dari aplikasi?
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-sm bg-gradient-dark" data-bs-dismiss="modal">Batal</button>
+        <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+          <button type="submit" role="button" class="btn btn-sm bg-gradient-primary text-white">Ya
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <img src="{% static 'img/logo.png' %}" alt="Umrovia" class="position-fixed h-100 w-30 d-lg-block top-0 {% if request|is_mobile %}w-80 translate-middle-x{% else %}w-30 d-none ms-n7{% endif %} start-50 opacity-2" style="object-fit: contain;">
+</div>
+
+<script>
+(function() {
+  function initNavTooltips() {
+    document.querySelectorAll('[data-tooltip]').forEach(function(el) {
+      if (el._tipInit) return;
+      el._tipInit = true;
+      var tip = null;
+      el.addEventListener('mouseenter', function() {
+        tip = document.createElement('div');
+        tip.textContent = el.getAttribute('data-tooltip');
+        tip.style.cssText = 'position:fixed;z-index:99999;background:#333;color:#fff;padding:4px 10px;border-radius:4px;font-size:12px;pointer-events:none;white-space:nowrap;';
+        document.body.appendChild(tip);
+        var rect = el.getBoundingClientRect();
+        tip.style.left = (rect.left + rect.width / 2 - tip.offsetWidth / 2) + 'px';
+        tip.style.top = (rect.top - tip.offsetHeight - 6) + 'px';
+        setTimeout(function() { if (tip && tip.parentNode) tip.remove(); tip = null; }, 2000);
+      });
+      el.addEventListener('mouseleave', function() {
+        if (tip && tip.parentNode) tip.remove();
+        tip = null;
+      });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNavTooltips);
+  } else {
+    initNavTooltips();
+  }
+})();
+</script>
+
+{{ redirect_to_login_immediately }}

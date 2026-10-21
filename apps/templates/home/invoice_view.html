@@ -1,0 +1,124 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Invoice {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'invoice-update' data.invoice_id %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h4 class="mb-2">Invoice: {{ data.nomor_invoice }}</h4>
+                            </div>
+                            <div class="col-6 text-end">
+                                <a href="{% if crud == 'view' %}{% url 'invoice-index' %}{% else %}{% url 'invoice-view' data.invoice_id %}{% endif %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;{% if crud == 'view' %}Kembali{% else %}Batal{% endif %}</a>
+                                <a href="{% url 'invoice-update' data.invoice_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}" {% if crud == 'update' %}hidden{% endif %}><i class="fas fa-edit"></i>&nbsp;&nbsp;Ubah</a>
+                                <button type="submit" class="btn btn-sm bg-gradient-dark mb-0" {% if crud == 'view' %}hidden{% endif %}><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if message %}
+                        <div class="alert alert-danger text-white" role="alert">
+                            {{ message }}
+                        </div>
+                        {% endif %}
+                        <div class="mb-3">
+                            <span class="text-sm font-weight-bold text-uppercase">Total Rp {{ data.total }}</span>
+                            <span class="text-sm text-secondary mx-1">|</span>
+                            <span class="text-sm font-weight-bold text-uppercase">Terbayar Rp {{ data.total_terbayar }}</span>
+                            <span class="text-sm text-secondary mx-1">|</span>
+                            <span class="text-sm font-weight-bold text-uppercase">Sisa Rp {{ data.sisa_tagihan }}</span>
+                        </div>
+                        <div class="pl-lg-0">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tanggal_invoice.label_tag }}{{ form.tanggal_invoice }}
+                                        <div class="text-sm text-danger">{{ form.tanggal_invoice.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.jatuh_tempo.label_tag }}{{ form.jatuh_tempo }}
+                                        <div class="text-sm text-danger">{{ form.jatuh_tempo.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.total.label_tag }}{{ form.total }}
+                                        <div class="text-sm text-danger">{{ form.total.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.status.label_tag }}{{ form.status }}
+                                        <div class="text-sm text-danger">{{ form.status.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.catatan.label_tag }}{{ form.catatan }}
+                                        <div class="text-sm text-danger">{{ form.catatan.errors }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <div class="card mb-4 p-4">
+                <div class="row mb-4">
+                    <div class="col-6 d-flex align-items-center">
+                        <h4 class="mb-2">Pembayaran</h4>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table hover align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">No. Kwitansi</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tanggal</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Metode</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Nominal</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in payments %}
+                                <tr data-href="{% url 'pembayaran-view' item.pembayaran_id %}" class="cursor-pointer">
+                                    <td><h6 class="mb-0 text-sm">{{ item.nomor_kwitansi }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.tanggal_bayar|date:'d-m-Y' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.get_metode_display }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.nominal }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.get_status_display }}</h6></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5"><h6 class="mb-0 text-sm">Belum ada pembayaran.</h6></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

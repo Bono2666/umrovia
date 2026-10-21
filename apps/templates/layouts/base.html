@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+{% load static %}
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="canonical" href="https://appseed.us/admin-dashboards/django-dashboard-argon">
+  
+  <title>
+    Umrovia
+  </title>
+
+  <!-- Favicon - loaded as static -->
+  <link rel="icon" href="{% static 'img/brand/favicon.png' %}" type="image/png">
+  <!-- Fonts -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700">
+  <!-- Icons -->
+  <link rel="stylesheet" href="{% static 'vendor/nucleo/css/nucleo.css' %}" type="text/css">
+  <script src="https://kit.fontawesome.com/16c0b83026.js" crossorigin="anonymous"></script>
+  <!-- Page plugins -->
+  <!-- Soft UI Dashboard -->
+  <link id="pagestyle" href="{% static 'css/soft-ui-dashboard.css' %}" rel="stylesheet" />
+  <link id="pagestyle_dark" href="{% static 'css/dark-theme-core.css' %}" rel="stylesheet" />
+  <!-- DataTables -->
+  <link rel="stylesheet" href="//cdn.datatables.net/1.13.5/css/jquery.dataTables.min.css" type="text/css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css" type="text/css">
+  <!-- CSS jQuery UI -->
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  
+  <style>
+    .dataTables_wrapper .dataTables_length label,
+    .dataTables_wrapper .dataTables_filter label {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      white-space: normal;
+    }
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_filter input {
+      border-radius: 0.75rem !important;
+    }
+    .dataTables_wrapper .dataTables_filter input {
+      min-width: 220px;
+    }
+    .dataTables_wrapper .dataTables_length select {
+      min-width: 5rem;
+    }
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter {
+      margin-bottom: 0.5rem;
+    }
+    /* Pagination styling */
+    .dataTables_wrapper .dataTables_paginate .pagination .page-link {
+      border-radius: 0 !important;
+      background-color: transparent !important;
+      color: inherit !important;
+      border: none !important;
+      padding: .25em !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .pagination .page-link:hover,
+    .dataTables_wrapper .dataTables_paginate .pagination .page-link:focus {
+      border-radius: 0 !important;
+      background-color: transparent !important;
+      color: inherit !important;
+      border: none !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover,
+    .dataTables_wrapper .dataTables_paginate .pagination .page-link:hover,
+    .dataTables_wrapper .dataTables_paginate .pagination .page-item:hover .page-link {
+      background-color: transparent !important;
+      background: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+      border-color: transparent !important;
+      color: inherit !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .pagination .page-item.active .page-link {
+      background-color: #035a21 !important;
+      border-color: #035a21 !important;
+      color: #fff !important;
+      border: none !important;
+      border-radius: 50% !important;
+    }
+    /* Override form label text-transform */
+    label, .form-label {
+      text-transform: none !important;
+    }
+    /* Alert bergradien: gradient diulang pada area border (background-origin
+       padding-box + background-clip border-box) sehingga muncul garis 1px
+       dengan warna ujung gradient di tepi kiri/kanan. */
+    .alert[class*="bg-gradient-"] {
+      background-origin: border-box;
+      background-repeat: no-repeat;
+    }
+  </style>
+
+  <!-- Collapsed sidebar styles — handled by JS in base.html bottom script -->
+
+  <!-- Specific CSS goes HERE -->
+  {% block stylesheets %}{% endblock stylesheets %}
+
+  {{ form.media }}
+</head>
+
+<body class="g-sidenav-show">
+
+  {% include "includes/sidebar.html" %}
+  
+  <div class="main-content position-relative min-vh-100 pb-4" style="display: flex; flex-direction: column;">
+    
+      {% include 'includes/navigation.html' %}
+    
+    <div class="mb-3" style="flex: 1;">
+      {% block content %}{% endblock content %}
+    </div>
+
+    {% include 'includes/footer.html' %}
+
+  </div>
+
+  {% include "includes/scripts.html" %}
+
+  <!-- DataTables -->
+  <script src="//cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+  <!-- JavaScript jQuery UI -->
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+  <!-- Specific JS goes HERE --> 
+  {% block javascripts %}{% endblock javascripts %}
+
+  <script>
+    // Sidebar collapse (icon-only) — persist via Cookies (aligned with argon.js)
+    (function () {
+      var collapseBtn = document.getElementById('sidebarCollapseBtn');
+      if (collapseBtn) {
+        collapseBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var isHidden = document.body.classList.toggle('g-sidenav-hidden');
+          document.body.classList.toggle('g-sidenav-show', !isHidden);
+          Cookies.set('sidenav-state', isHidden ? 'unpinned' : 'pinned');
+          if (isHidden) {
+            document.body.classList.remove('g-sidenav-pinned');
+          }
+          applyCollapsedStyles();
+        });
+      }
+
+      function applyCollapsedStyles() {
+        var isHidden = document.body.classList.contains('g-sidenav-hidden');
+        var isWide = window.innerWidth >= 1200;
+        var apply = isHidden && isWide;
+
+        // Group header: hide text + mini-letter, show only icon centered
+        document.querySelectorAll('.sidebar-group-title').forEach(function(btn) {
+          var txt = btn.querySelector('.nav-link-text');
+          var mini = btn.querySelector('.sidenav-mini-icon');
+          var iconShape = btn.querySelector('.icon');
+          if (txt) { txt.style.display = apply ? 'none' : ''; }
+          if (mini) { mini.style.display = apply ? 'none' : ''; }
+          if (iconShape) {
+            if (apply) {
+              iconShape.classList.remove('me-2');
+            } else {
+              iconShape.classList.add('me-2');
+            }
+          }
+          btn.style.display = apply ? 'flex' : '';
+          btn.style.justifyContent = apply ? 'center' : '';
+          btn.style.alignItems = apply ? 'center' : '';
+          btn.style.width = apply ? '100%' : '';
+          btn.style.padding = apply ? '0.5rem 0' : '';
+        });
+
+        // Hide the > arrow toggle button
+        document.querySelectorAll('.sidebar-group-toggle').forEach(function(el) {
+          el.style.display = apply ? 'none' : '';
+        });
+        document.querySelectorAll('.sidebar-group-header').forEach(function(el) {
+          el.style.display = apply ? 'flex' : '';
+          el.style.justifyContent = apply ? 'center' : '';
+          el.style.padding = apply ? '0' : '';
+          el.style.alignItems = apply ? 'center' : '';
+        });
+
+        // Multi-level container: remove indent
+        document.querySelectorAll('.multi-level').forEach(function(el) {
+          if (apply) {
+            el.classList.remove('ms-5');
+            el.style.marginLeft = '0';
+            el.style.paddingLeft = '0';
+            el.style.width = '100%';
+          } else {
+            el.classList.add('ms-5');
+            el.style.marginLeft = '';
+            el.style.paddingLeft = '';
+            el.style.width = '';
+          }
+        });
+
+        // Submenu: hide text + mini-letter, show only dot
+        document.querySelectorAll('.multi-level .nav-link').forEach(function(el) {
+          var txt = el.querySelector('.nav-link-text');
+          var mini = el.querySelector('.sidenav-mini-icon');
+          if (txt) { txt.style.display = apply ? 'none' : ''; }
+          if (mini) { mini.style.display = apply ? 'none' : ''; }
+          var dot = el.querySelector('.collapsed-dot');
+          var isActive = el.closest('.nav-item') && el.closest('.nav-item').classList.contains('active');
+          if (apply) {
+            if (!dot) {
+              dot = document.createElement('span');
+              dot.className = 'collapsed-dot';
+              el.appendChild(dot);
+            }
+            dot.textContent = '';
+            dot.style.cssText = 'width:' + (isActive ? '8px' : '6px') + ';height:' + (isActive ? '8px' : '6px') + ';border-radius:50%;display:inline-block;background:' + (isActive ? '#1d6f42' : '#adb5bd') + ';';
+          } else if (dot) {
+            dot.style.display = 'none';
+          }
+          el.style.display = apply ? 'block' : '';
+          el.style.textAlign = apply ? 'center' : '';
+          el.style.alignItems = apply ? '' : '';
+          el.style.padding = apply ? '0.2rem 0' : '';
+          el.style.minHeight = apply ? '1.5rem' : '';
+          el.style.lineHeight = apply ? '1.5rem' : '';
+        });
+
+        // Hide all <hr> separators
+        document.querySelectorAll('.multi-level hr').forEach(function(el) {
+          el.style.display = apply ? 'none' : '';
+        });
+
+        // Submenu list — reset all padding/margin so dots align with icons
+        document.querySelectorAll('.multi-level .nav, .multi-level .nav-item, .multi-level .list-unstyled').forEach(function(el) {
+          if (apply) {
+            el.style.paddingLeft = '0';
+            el.style.marginLeft = '0';
+            el.style.listStyle = 'none';
+          } else {
+            el.style.paddingLeft = '';
+            el.style.marginLeft = '';
+            el.style.listStyle = '';
+          }
+        });
+
+        // Toggle hamburger icon: fa-bars (expand) ↔ fa-bars-staggered (collapse)
+        var collapseIcon = document.getElementById('sidebarCollapseIcon');
+        var collapseBtn = document.getElementById('sidebarCollapseBtn');
+        if (collapseIcon) {
+          if (apply) {
+            collapseIcon.classList.remove('fa-bars');
+            collapseIcon.classList.add('fa-bars-staggered');
+          } else {
+            collapseIcon.classList.remove('fa-bars-staggered');
+            collapseIcon.classList.add('fa-bars');
+          }
+        }
+        if (collapseBtn) {
+          var newTitle = apply ? 'Perluas Sidebar' : 'Perkecil Sidebar';
+          collapseBtn.setAttribute('title', newTitle);
+          collapseBtn.setAttribute('data-original-title', newTitle);
+        }
+      }
+
+      applyCollapsedStyles();
+
+      // Re-apply when body class changes (argon.js may change it after we load)
+      var observer = new MutationObserver(function() { applyCollapsedStyles(); });
+      observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+      window.addEventListener('resize', applyCollapsedStyles);
+    })();
+
+    var win = navigator.platform.indexOf('Win') > -1;
+    if (win && document.querySelector('#sidenav-scrollbar')) {
+      var options = {
+        damping: '0.5'
+      }
+      Scrollbar.init(document.querySelector('#sidenav-scrollbar'), options);
+    }
+    
+    let crud = "{{ crud }}";
+    if (crud == 'update' || crud == 'add') {
+        let my_button = document.getElementsByClassName('button');
+        for (const button of my_button) {
+          button.addEventListener('click', function() {
+            alert('Simpan data terlebih dahulu sebelum keluar dari halaman ini');
+          });
+        }
+    }
+  </script>
+
+  <!-- Argon JS -->
+  <!-- <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script> -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script> -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script> -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script> -->
+  <script src="{% static 'js/argon.js' %}?v=1.2.1"></script>
+  <!-- DataTables -->
+  <!-- Control Center for Soft Dashboard: parallax effects, scripts for the example pages etc -->
+  <script src="{% static 'js/soft-ui-dashboard.min.js' %}"></script>
+  <script src="{% static 'js/scripts.js' %}"></script>
+  <!-- Bootstrap Bundle -->
+</body>
+
+</html>

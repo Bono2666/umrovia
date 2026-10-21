@@ -1,0 +1,200 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Jamaah {{ data.kode_jamaah }} {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <form action="{% url 'jamaah-update' data.jamaah_id %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="row">
+                            <div class="col-6 d-flex align-items-center">
+                                <h4 class="mb-2">Jamaah: {{ data.kode_jamaah }} — {{ data.nama }}</h4>
+                            </div>
+                            <div class="col-6 text-end">
+                                <a href="{% if crud == 'view' %}{% url 'jamaah-index' %}{% else %}{% url 'jamaah-view' data.jamaah_id %}{% endif %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;{% if crud == 'view' %}Kembali{% else %}Batal{% endif %}</a>
+                                <a href="{% url 'jamaah-update' data.jamaah_id %}" class="btn btn-sm bg-gradient-dark mb-0 {% if not btn.edit and not request.user.is_superuser %}disabled{% endif %}" {% if crud == 'update' %}hidden{% endif %}><i class="fas fa-edit"></i>&nbsp;&nbsp;Ubah</a>
+                                <button type="submit" class="btn btn-sm bg-gradient-dark mb-0" {% if crud == 'view' %}hidden{% endif %}><i class="fas fa-save"></i>&nbsp;&nbsp;Simpan</button>
+                                <button type="button" class="btn btn-sm bg-gradient-danger mb-0 {% if not btn.delete and not request.user.is_superuser %}disabled{% else %}{% if crud == 'update' %}disabled{% endif %}{% endif %}" data-bs-toggle="modal" data-bs-target="#confirm-{{ data.jamaah_id }}"><i class="fas fa-trash"></i>&nbsp;&nbsp;Hapus</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal fade" id="confirm-{{ data.jamaah_id }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
+                        aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="ModalLabel">Konfirmasi</h5>
+                                </div>
+                                <div class="modal-body border-bottom-0">
+                                    Anda yakin ingin menghapus jamaah <strong>{{ data.nama }}</strong>?
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-sm bg-gradient-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <a href="{% url 'jamaah-delete' data.jamaah_id %}" role="button" class="btn btn-sm bg-gradient-danger text-white">Hapus</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if message %}
+                        <div class="alert alert-danger text-white" role="alert">
+                            {{ message }}
+                        </div>
+                        {% endif %}
+                        <div class="pl-lg-0">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.kode_jamaah.label_tag }}{{ form.kode_jamaah }}
+                                        <div class="text-sm text-danger">{{ form.kode_jamaah.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.nama.label_tag }}{{ form.nama }}
+                                        <div class="text-sm text-danger">{{ form.nama.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.nik.label_tag }}{{ form.nik }}
+                                        <div class="text-sm text-danger">{{ form.nik.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.jenis_kelamin.label_tag }}{{ form.jenis_kelamin }}
+                                        <div class="text-sm text-danger">{{ form.jenis_kelamin.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tempat_lahir.label_tag }}{{ form.tempat_lahir }}
+                                        <div class="text-sm text-danger">{{ form.tempat_lahir.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tanggal_lahir.label_tag }}{{ form.tanggal_lahir }}
+                                        <div class="text-sm text-danger">{{ form.tanggal_lahir.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.alamat.label_tag }}{{ form.alamat }}
+                                        <div class="text-sm text-danger">{{ form.alamat.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.telepon.label_tag }}{{ form.telepon }}
+                                        <div class="text-sm text-danger">{{ form.telepon.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.email.label_tag }}{{ form.email }}
+                                        <div class="text-sm text-danger">{{ form.email.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.nomor_paspor.label_tag }}{{ form.nomor_paspor }}
+                                        <div class="text-sm text-danger">{{ form.nomor_paspor.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.paspor_terbit.label_tag }}{{ form.paspor_terbit }}
+                                        <div class="text-sm text-danger">{{ form.paspor_terbit.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.paspor_kedaluwarsa.label_tag }}{{ form.paspor_kedaluwarsa }}
+                                        <div class="text-sm text-danger">{{ form.paspor_kedaluwarsa.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.tempat_paspor.label_tag }}{{ form.tempat_paspor }}
+                                        <div class="text-sm text-danger">{{ form.tempat_paspor.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.kontak_darurat.label_tag }}{{ form.kontak_darurat }}
+                                        <div class="text-sm text-danger">{{ form.kontak_darurat.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.telepon_darurat.label_tag }}{{ form.telepon_darurat }}
+                                        <div class="text-sm text-danger">{{ form.telepon_darurat.errors }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="shadow-none">
+                                        {{ form.catatan.label_tag }}{{ form.catatan }}
+                                        <div class="text-sm text-danger">{{ form.catatan.errors }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="card mb-4 p-4">
+                <div class="row mb-4">
+                    <div class="col-6 d-flex align-items-center">
+                        <h5 class="mb-0">Riwayat Booking</h5>
+                    </div>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table hover align-items-center mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">No. Booking</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Tanggal</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Keberangkatan</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Berangkat</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Agen</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in bookings %}
+                                <tr data-href="{% url 'booking-view' item.booking_id %}" class="cursor-pointer">
+                                    <td><h6 class="mb-0 text-sm">{{ item.nomor_booking }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.tanggal_booking|date:'d-m-Y' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.keberangkatan.kode_keberangkatan }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.keberangkatan.tanggal_berangkat|date:'d-m-Y' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.agen.nama_agen|default:'-' }}</h6></td>
+                                    <td><h6 class="mb-0 text-sm">{{ item.get_status_display }}</h6></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-sm py-3">Belum ada booking.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

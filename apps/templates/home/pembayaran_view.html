@@ -1,0 +1,105 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %} Pembayaran {% endblock title %}
+
+{% block content %}
+
+<div class="container-fluid mt-0">
+    <div class="row">
+        <div class="col-xl-12 order-xl-1">
+            <div class="card">
+                <div class="card-header">
+                    <div class="row">
+                        <div class="col-6 d-flex align-items-center">
+                            <h4 class="mb-2">Pembayaran: {{ data.nomor_kwitansi }}</h4>
+                        </div>
+                        <div class="col-6 text-end">
+                            <a href="{% url 'pembayaran-index' %}" class="btn btn-sm bg-gradient-dark mb-0"><i class="fas fa-reply"></i>&nbsp;&nbsp;Kembali</a>
+                            {% if data.status == 'PENDING' and btn.edit or request.user.is_superuser %}
+                            <a href="{% url 'pembayaran-verify' data.pembayaran_id %}" role="button" class="btn btn-sm bg-gradient-success mb-0"><i class="fas fa-check"></i>&nbsp;&nbsp;Verifikasi</a>
+                            <a href="{% url 'pembayaran-reject' data.pembayaran_id %}" role="button" class="btn btn-sm bg-gradient-danger mb-0"><i class="fas fa-times"></i>&nbsp;&nbsp;Tolak</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if message %}
+                    <div class="alert alert-danger text-white" role="alert">
+                        {{ message }}
+                    </div>
+                    {% endif %}
+                    <div class="pl-lg-0">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.invoice.label_tag }}{{ form.invoice }}
+                                    <div class="text-sm text-danger">{{ form.invoice.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.tanggal_bayar.label_tag }}{{ form.tanggal_bayar }}
+                                    <div class="text-sm text-danger">{{ form.tanggal_bayar.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.metode.label_tag }}{{ form.metode }}
+                                    <div class="text-sm text-danger">{{ form.metode.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.nominal.label_tag }}{{ form.nominal }}
+                                    <div class="text-sm text-danger">{{ form.nominal.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.referensi.label_tag }}{{ form.referensi }}
+                                    <div class="text-sm text-danger">{{ form.referensi.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.bukti_bayar.label_tag }}{{ form.bukti_bayar }}
+                                    <div class="text-sm text-danger">{{ form.bukti_bayar.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    {{ form.catatan.label_tag }}{{ form.catatan }}
+                                    <div class="text-sm text-danger">{{ form.catatan.errors }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    <label class="form-label">Status</label>
+                                    <input type="text" class="form-control-sm" value="{{ data.get_status_display }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    <label class="form-label">Diverifikasi Oleh</label>
+                                    <input type="text" class="form-control-sm" value="{{ data.verified_by|default:'-' }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="shadow-none">
+                                    <label class="form-label">Diverifikasi Pada</label>
+                                    <input type="text" class="form-control-sm" value="{{ data.verified_at|date:'d-m-Y H:i'|default:'-' }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+
+{% endblock javascripts %}

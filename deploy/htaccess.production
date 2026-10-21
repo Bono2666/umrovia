@@ -1,0 +1,37 @@
+# Deploy target: https://umrovia.ksisolusi.com  (docroot: ~/public_html/umrovia)
+# Berkas ini menggantikan .htaccess pada docroot subdomain.
+
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/ksis7654/apps/umrovia"
+PassengerBaseURI "/"
+PassengerPython "/home/ksis7654/virtualenv/apps/umrovia/3.10/bin/python"
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN
+<IfModule Litespeed>
+SetEnv ALLOWED_HOSTS "umrovia.ksisolusi.com,www.umrovia.ksisolusi.com,localhost,127.0.0.1"
+SetEnv DEBUG "False"
+SetEnv SECRET_KEY "<GANTI_DENGAN_SECRET_KEY_PRODUKSI>"
+SetEnv DB_NAME "<DB_NAME>"
+SetEnv DB_USER "<DB_USER>"
+SetEnv DB_PASSWORD "<DB_PASSWORD>"
+SetEnv DB_HOST "localhost"
+SetEnv DB_PORT "3306"
+</IfModule>
+# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END
+
+<IfModule mod_headers.c>
+Header set X-Content-Type-Options "nosniff"
+Header set X-Frame-Options "SAMEORIGIN"
+Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType application/javascript "access plus 1 year"
+ExpiresByType image/png "access plus 1 year"
+ExpiresByType image/jpeg "access plus 1 year"
+ExpiresByType image/svg+xml "access plus 1 year"
+ExpiresByType image/x-icon "access plus 1 year"
+</IfModule>

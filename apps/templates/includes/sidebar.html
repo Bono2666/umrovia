@@ -1,0 +1,260 @@
+{% load static %}
+{% load user_agents %}
+<style>
+  .sidebar-group-header {
+    padding-right: 0.5rem;
+    gap: 0.5rem;
+  }
+  .sidebar-group-title {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    color: inherit;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0;
+  }
+  .sidebar-group-title:hover,
+  .sidebar-group-title:focus {
+    color: inherit;
+  }
+  .sidebar-group-toggle {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: #ced4da;
+    padding: 0 0.25rem;
+    display: flex;
+    align-items: center;
+  }
+  .sidebar-group-toggle::before {
+    display: inline-block;
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 700;
+    content: "\f105";
+    transition: all 0.15s ease;
+  }
+  .sidebar-group-toggle[aria-expanded="true"]::before {
+    color: black;
+    transform: rotate(90deg);
+  }
+  body.dark-page .sidebar-group-toggle {
+    color: #d7d7d7 !important;
+  }
+  body.dark-page .sidebar-group-toggle[aria-expanded="true"]::before {
+    color: #d7d7d7 !important;
+  }
+  .sidebar-group-header.active .icon svg {
+    stroke: #ffffff;
+  }
+</style>
+<aside class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 fixed-start ms-3 bg-default {% if request|is_mobile %}z-index-3{% endif %}" id="sidenav-main">
+  <div class="sidenav-header">
+    <i class="fas fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute end-0 top-0 d-none d-xl-none" aria-hidden="true" id="iconSidenav"></i>
+    <a class="navbar-brand button cursor-pointer m-0 pt-4" {% if crud != 'add' and crud != 'update' %}href="{% url 'home' %}"{% endif %}>
+      <img src="{% static 'img/logo.png' %}" class="navbar-brand-img w-25" alt="umrovia_logo">
+    </a>
+  </div>
+  <hr class="horizontal default mt-2">
+  <div class="collapse navbar-collapse  w-auto mb-4 " id="sidenav-collapse-main">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a href="{% url 'home' %}" class="nav-link {% if 'index' in segment %} active {% endif %}">
+          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </div>
+          <span class="nav-link-text ms-1">Dashboard</span>
+        </a>
+      </li>
+
+      <!-- Data Master -->
+      <li class="nav-item">
+        <div class="nav-link sidebar-group-header {% if 'master' in group_segment %}active{% endif %}">
+          <button class="sidebar-group-title" type="button" data-sidebar-target="#master-menu" aria-controls="master-menu" aria-expanded="{% if 'master' in group_segment %}true{% else %}false{% endif %}">
+          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+            </div>
+          <span class="nav-link-text ms-1">Data Master</span>
+          </button>
+          <button class="sidebar-group-toggle {% if 'master' not in group_segment %}collapsed{% endif %}" type="button" data-sidebar-target="#master-menu" aria-controls="master-menu" aria-expanded="{% if 'master' in group_segment %}true{% else %}false{% endif %}"></button>
+        </div>
+
+        <div class="multi-level ms-5 collapse {% if 'master' in group_segment %}show{% endif %}" role="list" id="master-menu" aria-expanded="{% if 'master' in group_segment %}true{% else %}false{% endif %}">
+          <ul class="flex-column nav">
+            <li class="nav-item {% if 'user' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'USER' not in role and not request.user.is_superuser %}d-none{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'user-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'USER' not in role and not request.user.is_superuser %}d-none{% endif %}">Pengguna</span>
+              </a>
+            </li>
+            <li class="nav-item {% if 'position' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'POSITION' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'position-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'POSITION' not in role and not request.user.is_superuser %}disabled{% endif %}">Posisi</span>
+              </a>
+            </li>
+            <li class="nav-item {% if 'menu' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'MENU' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'menu-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'MENU' not in role and not request.user.is_superuser %}disabled{% endif %}">Menu</span>
+              </a>
+            </li>
+            <hr class="horizontal default mt-2">
+            <li class="nav-item {% if 'agen' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'AGEN' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'agen-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'AGEN' not in role and not request.user.is_superuser %}disabled{% endif %}">Agen</span>
+              </a>
+            </li>
+            <li class="nav-item {% if 'paket' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'PAKET' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'paket-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'PAKET' not in role and not request.user.is_superuser %}disabled{% endif %}">Paket Umrah</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Operasional -->
+      <li class="nav-item">
+        <div class="nav-link sidebar-group-header {% if 'operasional' in group_segment %}active{% endif %}">
+          <button class="sidebar-group-title" type="button" data-sidebar-target="#operasional-menu" aria-controls="operasional-menu" aria-expanded="{% if 'operasional' in group_segment %}true{% else %}false{% endif %}">
+          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>
+            </svg>
+            </div>
+          <span class="nav-link-text ms-1">Operasional</span>
+          </button>
+          <button class="sidebar-group-toggle {% if 'operasional' not in group_segment %}collapsed{% endif %}" type="button" data-sidebar-target="#operasional-menu" aria-controls="operasional-menu" aria-expanded="{% if 'operasional' in group_segment %}true{% else %}false{% endif %}"></button>
+        </div>
+
+        <div class="multi-level ms-5 collapse {% if 'operasional' in group_segment %}show{% endif %}" role="list" id="operasional-menu" aria-expanded="{% if 'operasional' in group_segment %}true{% else %}false{% endif %}">
+          <ul class="flex-column nav">
+            <li class="nav-item {% if 'jamaah' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'JAMAAH' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'jamaah-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'JAMAAH' not in role and not request.user.is_superuser %}disabled{% endif %}">Jamaah</span>
+              </a>
+            </li>
+            <li class="nav-item {% if 'keberangkatan' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'KEBERANGKATAN' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'keberangkatan-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'KEBERANGKATAN' not in role and not request.user.is_superuser %}disabled{% endif %}">Keberangkatan</span>
+              </a>
+            </li>
+            <li class="nav-item {% if 'booking' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'BOOKING' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'booking-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'BOOKING' not in role and not request.user.is_superuser %}disabled{% endif %}">Booking</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+
+      <!-- Keuangan -->
+      <li class="nav-item">
+        <div class="nav-link sidebar-group-header {% if 'keuangan' in group_segment %}active{% endif %}">
+          <button class="sidebar-group-title" type="button" data-sidebar-target="#keuangan-menu" aria-controls="keuangan-menu" aria-expanded="{% if 'keuangan' in group_segment %}true{% else %}false{% endif %}">
+          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            </div>
+          <span class="nav-link-text ms-1">Keuangan</span>
+          </button>
+          <button class="sidebar-group-toggle {% if 'keuangan' not in group_segment %}collapsed{% endif %}" type="button" data-sidebar-target="#keuangan-menu" aria-controls="keuangan-menu" aria-expanded="{% if 'keuangan' in group_segment %}true{% else %}false{% endif %}"></button>
+        </div>
+
+        <div class="multi-level ms-5 collapse {% if 'keuangan' in group_segment %}show{% endif %}" role="list" id="keuangan-menu" aria-expanded="{% if 'keuangan' in group_segment %}true{% else %}false{% endif %}">
+          <ul class="flex-column nav">
+            <li class="nav-item {% if 'invoice' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'INVOICE' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'invoice-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'INVOICE' not in role and not request.user.is_superuser %}disabled{% endif %}">Invoice</span>
+              </a>
+            </li>
+            <li class="nav-item {% if 'pembayaran' in segment %}active{% endif %} list-unstyled">
+              <a class="nav-link button cursor-pointer {% if 'PEMBAYARAN' not in role and not request.user.is_superuser %}disabled{% endif %}" {% if crud != 'add' and crud != 'update' %}href="{% url 'pembayaran-index' %}"{% endif %}>
+                <span class="nav-link-text ms-1 {% if 'PEMBAYARAN' not in role and not request.user.is_superuser %}disabled{% endif %}">Pembayaran</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
+    </ul>
+  </div>
+</aside>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const toggles = document.querySelectorAll('.sidebar-group-toggle[data-sidebar-target]');
+    const titleTriggers = document.querySelectorAll('.sidebar-group-title[data-sidebar-target]');
+
+    function handleSidebarToggle(targetSelector, stateElement) {
+      const targetElement = document.querySelector(targetSelector);
+
+      if (!targetElement) {
+        return;
+      }
+
+      const storageKey = 'sidebar-collapse:' + targetElement.id;
+      const nextExpandedState = !targetElement.classList.contains('show');
+      targetElement.classList.toggle('show', nextExpandedState);
+      targetElement.setAttribute('aria-expanded', nextExpandedState ? 'true' : 'false');
+
+      document.querySelectorAll('[data-sidebar-target="' + targetSelector + '"]').forEach(function (triggerElement) {
+        triggerElement.setAttribute('aria-expanded', nextExpandedState ? 'true' : 'false');
+        triggerElement.classList.toggle('collapsed', !nextExpandedState);
+      });
+
+      sessionStorage.setItem(storageKey, nextExpandedState ? 'expanded' : 'collapsed');
+    }
+
+    toggles.forEach(function (toggleButton) {
+      const targetSelector = toggleButton.getAttribute('data-sidebar-target');
+      const targetElement = document.querySelector(targetSelector);
+
+      if (!targetElement) {
+        return;
+      }
+
+      const storageKey = 'sidebar-collapse:' + targetElement.id;
+
+      function syncToggleState(isExpanded) {
+        toggleButton.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        toggleButton.classList.toggle('collapsed', !isExpanded);
+        targetElement.classList.toggle('show', isExpanded);
+        targetElement.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        document.querySelectorAll('.sidebar-group-title[data-sidebar-target="' + targetSelector + '"]').forEach(function (titleElement) {
+          titleElement.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        });
+      }
+
+      const savedState = sessionStorage.getItem(storageKey);
+      if (savedState === 'collapsed') {
+        syncToggleState(false);
+      } else if (savedState === 'expanded') {
+        syncToggleState(true);
+      } else {
+        syncToggleState(targetElement.classList.contains('show'));
+      }
+
+      toggleButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleSidebarToggle(targetSelector, toggleButton);
+      });
+    });
+
+    titleTriggers.forEach(function (titleButton) {
+      titleButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        handleSidebarToggle(titleButton.getAttribute('data-sidebar-target'), titleButton);
+      });
+    });
+  });
+</script>
