@@ -1,0 +1,25 @@
+[project]
+name = "umrovia-backend"
+version = "0.1.0"
+description = "Umrovia SaaS backend — Django/DRF modular monolith"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["backend"]
+extend-exclude = ["legacy", "venv", ".venv"]
+
+[tool.ruff.lint]
+# Dasar: pencegahan bug + kebersihan; format gaya legacy tidak dipakai di backend baru.
+select = ["E", "F", "W", "I", "B", "UP", "N"]
+ignore = ["E501"]  # line-length ditangani formatter; jangan gagalkan logika panjang
+
+[tool.ruff.lint.per-file-ignores]
+"**/migrations/*" = ["E501", "I001"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.local"
+python_files = ["test_*.py"]
+testpaths = ["backend/tests"]
+addopts = "-q --strict-markers"
