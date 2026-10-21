@@ -39,4 +39,7 @@ migrasi baseline berhasil ✓ · `pytest` 16/16 ✓ · `ruff` clean ✓
 - `TenantScopedManager` fail-closed otomatis; bypass `without_tenant_guard()` hanya
   jalur sah (provisioning, middleware resolution, job berkonteks, support elevated).
 - Local dev tanpa Docker: Postgres Homebrew + `runserver` + `npm run dev`.
+- **Docker lokal (22 Okt 2026):** pasang Colima + Docker CLI via Homebrew; stack
+  `docker compose up --build` terbukti jalan penuh (api healthy + health 200, web 200,
+  db/redis healthy). `.dockerignore` ditambahkan; entrypoint api pakai `DATABASE_URL` langsung.
 - RLS PostgreSQL dan host/slug resolver dikerjakan di S03 (butuh test koneksi PG di CI).
