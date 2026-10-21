@@ -4,14 +4,15 @@ set -e
 
 echo "api: menunggu database..."
 python - <<'PY'
+import os
 import time
-import dj_database_url
+
 import psycopg
 
-dsn = dj_database_url.config(conn_max_age=0)
+dsn = os.environ["DATABASE_URL"]
 for attempt in range(30):
     try:
-        with psycopg.connect(dsn.dsn) as conn:
+        with psycopg.connect(dsn) as conn:
             conn.execute("SELECT 1")
         break
     except psycopg.OperationalError:
