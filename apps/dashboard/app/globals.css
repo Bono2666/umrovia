@@ -31,6 +31,8 @@
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
 
+  /* Font utama: Poppins (di-set via variable next/font di layout.tsx) */
+
   /* Radius & shadow */
   --radius: 0.5rem;
   --shadow-card: 0 1px 2px rgb(16 34 31 / 0.06), 0 1px 3px rgb(16 34 31 / 0.08);
@@ -45,14 +47,14 @@
   --color-accent: var(--brand-accent);
   --color-ink: var(--brand-ink);
   --color-muted: var(--brand-muted);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--brand-ink);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-poppins), system-ui, sans-serif;
 }
 
 /* Komponen dasar */
