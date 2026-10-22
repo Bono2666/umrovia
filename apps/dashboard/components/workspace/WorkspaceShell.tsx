@@ -161,64 +161,20 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface p-4">
-        <Link
-          href="/dashboard"
-          className="text-lg font-semibold tracking-tight text-ink"
-        >
-          Umrovia<span className="text-primary">.</span>
-        </Link>
-        <div className="mt-1 truncate text-xs text-muted" title={active.tenant.display_name}>
-          {active.tenant.display_name}
-        </div>
-        <nav className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-          {NAV_GROUPS.map((group) => {
-            const items = group.items.filter(
-              (item) => !item.permission || hasPermission(permissions, item.permission),
-            );
-            if (items.length === 0) return null;
-            return (
-              <div key={group.title}>
-                <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
-                  {group.title}
-                </p>
-                <div className="mt-1 flex flex-col gap-0.5">
-                  {items.map((item) =>
-                    item.soon ? (
-                      <span
-                        key={item.href}
-                        className="flex items-center justify-between px-2 py-1.5 text-sm text-muted/60"
-                        title={`Modul ${item.label} menyusul ${item.soon}`}
-                      >
-                        {item.label}
-                        <span className="text-[0.6rem] font-semibold">{item.soon}+</span>
-                      </span>
-                    ) : (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`px-2 py-1.5 text-sm font-medium ${
-                          pathname === item.href
-                            ? "bg-primary/10 text-primary"
-                            : "text-ink hover:bg-background"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    ),
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </nav>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">{active.tenant.display_name}</span>
+    <div className="min-h-screen">
+      {/* Navbar atas (sticky): identitas brand + konteks workspace + akun/keluar */}
+      <header className="sticky top-0 z-30 border-b border-border bg-surface">
+        <div className="flex h-14 items-center gap-3 px-4">
+          <Link
+            href="/dashboard"
+            className="text-lg font-semibold tracking-tight text-ink"
+          >
+            Umrovia<span className="text-primary">.</span>
+          </Link>
+          <div className="flex items-center gap-2 border-l border-border pl-3">
+            <span className="max-w-48 truncate text-sm font-semibold" title={active.tenant.display_name}>
+              {active.tenant.display_name}
+            </span>
             <StatusBadge tone={environment.tone}>{environment.label}</StatusBadge>
           </div>
           {activeList.length > 1 ? (
@@ -244,14 +200,63 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             <span className="hidden text-sm text-muted sm:inline">{me.email}</span>
             <LogoutButton />
           </div>
-        </header>
+        </div>
+      </header>
 
-        <TrialBanner
-          canConvert={hasPermission(permissions, "trial.convert")}
-          onConverted={loadMe}
-        />
+      <div className="flex">
+        {/* Sidebar navigasi (sticky, scroll sendiri): tinggi = viewport − navbar */}
+        <aside className="sticky top-14 -mt-px h-[calc(100vh-3.5rem)] w-60 shrink-0 self-start overflow-y-auto border-r border-border bg-surface p-4">
+          <nav className="flex flex-col gap-4">
+            {NAV_GROUPS.map((group) => {
+              const items = group.items.filter(
+                (item) => !item.permission || hasPermission(permissions, item.permission),
+              );
+              if (items.length === 0) return null;
+              return (
+                <div key={group.title}>
+                  <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
+                    {group.title}
+                  </p>
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {items.map((item) =>
+                      item.soon ? (
+                        <span
+                          key={item.href}
+                          className="flex items-center justify-between px-2 py-1.5 text-sm text-muted/60"
+                          title={`Modul ${item.label} menyusul ${item.soon}`}
+                        >
+                          {item.label}
+                          <span className="text-[0.6rem] font-semibold">{item.soon}+</span>
+                        </span>
+                      ) : (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`px-2 py-1.5 text-sm font-medium ${
+                            pathname === item.href
+                              ? "bg-primary/10 text-primary"
+                              : "text-ink hover:bg-background"
+                          }`}
+                        >
+                          {item.label}
+                        </Link>
+                      ),
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </nav>
+        </aside>
 
-        <main className="flex-1 p-6">{children}</main>
+        {/* Konten halaman */}
+        <main className="min-w-0 flex-1 space-y-4 p-6">
+          <TrialBanner
+            canConvert={hasPermission(permissions, "trial.convert")}
+            onConverted={loadMe}
+          />
+          {children}
+        </main>
       </div>
     </div>
   );
