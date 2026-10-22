@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Btn,
   EmptyState,
   ErrorState,
   FormField,
   LoadingState,
   StatusBadge,
-  BTN_SECONDARY,
 } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type BankAccount } from "@/lib/api";
 
@@ -155,13 +155,9 @@ export default function RekeningPage() {
                 <StatusBadge tone={account.active ? "success" : "neutral"}>
                   {account.active ? "AKTIF" : "NONAKTIF"}
                 </StatusBadge>
-                <button
-                  type="button"
-                  className={`${BTN_SECONDARY} ml-auto`}
-                  onClick={() => onToggle(account)}
-                >
+                <Btn variant="tint" className="ml-auto" onClick={() => onToggle(account)}>
                   {account.active ? "Nonaktifkan" : "Aktifkan"}
-                </button>
+                </Btn>
               </li>
             ))}
           </ul>
@@ -208,9 +204,9 @@ export default function RekeningPage() {
             />
           </FormField>
           <div className="flex items-end sm:col-span-2">
-            <button type="submit" className="btn btn--solid" disabled={busy}>
+            <Btn type="submit" disabled={busy}>
               {busy ? "Menyimpan…" : "Tambah rekening"}
-            </button>
+            </Btn>
           </div>
           {formErrors.form ? (
             <p className="text-xs text-danger sm:col-span-2" role="alert">

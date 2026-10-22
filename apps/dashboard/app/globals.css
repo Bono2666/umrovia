@@ -78,133 +78,382 @@
   box-shadow: none;
 }
 
-/* --------------------------------------------------------------------------
-   Tombol — mengikuti sistem `.btn` web_template (tema light):
-   - pill (template: border-radius 60px), tinggi 30px (sm 25px), padding-x 16px
-   - font-weight 400, letter-spacing -0.04em, line-height 1
-   - efek khas "slide-fill": lapisan warna naik dari BAWAH ke seluruh bidang
-     saat hover (template: ::before translateY(101%) → 0, 0.6s) — di sini
-     direplikasi dengan background-gradient agar label teks polos ikut
-     benar tanpa perlu pembungkus elemen.
-   - template light: `--primary` = tint black-10 + teks hitam → hover hitam
-     penuh + teks putih; `--secondary` = pill hitam pekat + teks putih.
-     Nama kelas kita dipetakan SEMANTIK: --solid = CTA (template secondary),
-     --tint = aksi sekunder (template primary).
-   - fokus: ring ganda (gap surface + ink) supaya terlihat di semua varian;
-     disabled: opacity 40% + cursor default.
-   -------------------------------------------------------------------------- */
+/* ==========================================================================
+   Tombol — PORT 1:1 dari sistem `.btn` web_template (global.css, tema light).
+   Fakta sumber yang dipetakan persis:
+   - html{font-size:62.5%} → 1rem template = 10px:
+     default .btn = tinggi 30px, font 1.6× = 16px, padding-x (inner) 16px,
+     border-radius 60px (pill), font-weight 400, letter-spacing -.04em,
+     line-height 1em, border:0 (border 1px hanya di @media print)
+   - animasi: ::before transform translateY(101%) → 0 (slide-fill naik dari
+     bawah), ::after lapisan statis (tint/solid); transisi transform+color
+     .6s cubic-bezier(.25,.74,.22,.99); teks "berguling" lewat dua
+     .btn__content (template meng-klon via JS → class btn--cloned; kita
+     render duplikatnya statis + aria-hidden)
+   - warna: --c-black #191b1d = --brand-ink kita, --c-black-10
+     rgba(25,27,29,.1), hover teks #fff, disabled 30% alpha, fokus ring
+     2px var(--t-text)
+   - varian kitа dipetakan ke kelas template:
+     "solid" = template --secondary (CTA pill hitam pekat),
+     "tint" = template --primary (tint + slide-fill + teks→putih),
+     "danger" = adaptasi nada danger dengan mekanisme identik
+   - skala fluid (100vw) dipakai pada viewport kecil/pendek — media asli
+   ========================================================================== */
 @layer components {
   .btn {
+    --btn-scale-px: 1px;
+    --btn-scale-rem: 10px; /* setara 1rem template (html 62.5%) */
+    --lh: 1em;
+    font-weight: 400;
+    font-size: calc(var(--btn-scale-rem) * 1.6);
+    letter-spacing: -0.04em;
+    line-height: var(--lh);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    height: 1.875rem; /* 30px — tinggi default template */
-    padding: 0 1rem; /* 16px */
-    border: 1px solid var(--brand-ink);
-    border-radius: 9999px; /* pill */
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    border-radius: calc(var(--btn-scale-px) * 60);
     background-color: transparent;
-    background-image: linear-gradient(
-      var(--btn-fill, transparent),
-      var(--btn-fill, transparent)
-    );
-    background-repeat: no-repeat;
-    background-position: bottom;
-    background-size: 100% 0%;
-    color: var(--brand-ink);
-    font-family: inherit;
-    font-size: 0.875rem;
-    font-weight: 400;
-    letter-spacing: -0.04em;
-    line-height: 1;
+    box-shadow: none;
+    text-align: center;
     white-space: nowrap;
-    cursor: pointer;
+    vertical-align: middle;
+    -webkit-user-select: none;
     user-select: none;
     touch-action: manipulation;
-    transition:
-      background-size 0.6s var(--ease-editorial),
-      color 0.6s var(--ease-editorial),
-      border-color 0.6s var(--ease-editorial),
-      opacity 0.3s var(--ease-editorial);
+    cursor: pointer;
+    --button-height: calc(var(--btn-scale-px) * 30);
+    height: calc(var(--btn-scale-px) * 30);
+    transition-property: color;
+    transition-duration: 0.6s;
+    transition-timing-function: var(--ease-editorial);
   }
 
-  /* Slide-fill naik dari bawah saat hover (desktop) */
-  @media (hover: hover) {
-    .btn:hover:not(:disabled) {
-      background-size: 100% 100%;
-      color: var(--btn-hover-fg, #fff);
+  /* Lapisan pseudo — sama seperti sumber: ::before yang bergerak (z-index 1,
+     sebelum konten di DOM → konten .btn__content (z-index 1) menutupinya) */
+  .btn::before,
+  .btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    transition-property: transform;
+    transition-duration: 0.6s;
+    transition-timing-function: var(--ease-editorial);
+  }
+  .btn::before {
+    z-index: 1;
+    transform: translateY(101%);
+  }
+  .btn::after {
+    pointer-events: none;
+  }
+
+  /* Struktur DOM persis template: .btn > .btn__inner > .btn__content > .btn__text */
+  .btn__inner {
+    display: flex;
+    height: 100%;
+    position: relative;
+    width: 100%;
+    overflow: clip;
+    overflow: hidden;
+    padding: 0 calc(var(--btn-scale-px) * 16);
+  }
+  .btn__content {
+    display: flex;
+    height: 100%;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    min-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    z-index: 1;
+  }
+  .btn__content ~ .btn__content {
+    contain: content;
+    position: absolute;
+    top: 100%;
+    visibility: hidden;
+  }
+  .btn__text {
+    position: relative;
+  }
+  .btn__text > svg {
+    display: block;
+  }
+
+  /* Leading-trim teks (no-op pada lh 1em; dimatikan oleh --animated-content,
+     persis sumber) */
+  .btn__text::before,
+  .btn__text::after {
+    content: "";
+    display: block;
+    height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .btn__text::before {
+    margin-bottom: calc((var(--lh) - 1em) / -2);
+  }
+  .btn__text::after {
+    margin-top: calc((var(--lh) - 1em) / -2);
+  }
+  .btn--animated-content .btn__text::before,
+  .btn--animated-content .btn__text::after {
+    display: none;
+  }
+
+  /* Konten ganda (statis, menggantikan clone runtime JS template):
+     duplikat di bawah, berguling masuk saat hover */
+  .btn--animated-content .btn__inner {
+    overflow: clip;
+    overflow: hidden;
+  }
+  .btn--animated-content .btn__content:nth-child(2) {
+    left: 0;
+    position: absolute;
+  }
+  .btn--cloned .btn__content {
+    transform: translateY(0);
+    visibility: visible;
+    will-change: transform;
+    transition-property: transform;
+    transition-duration: 0.6s;
+    transition-timing-function: var(--ease-editorial);
+  }
+  .btn--cloned .btn__text {
+    transition-property: transform;
+    transition-duration: 0.6s;
+    transition-timing-function: var(--ease-editorial);
+  }
+
+  /* Ukuran — base (mobile-first) persis sumber */
+  .btn--xs {
+    --button-height: calc(var(--btn-scale-px) * 25);
+    font-size: calc(var(--btn-scale-rem) * 1.2);
+    height: calc(var(--btn-scale-px) * 25);
+  }
+  .btn--xs > .btn__inner {
+    padding: 0 calc(var(--btn-scale-px) * 11);
+  }
+  .btn--xs > .btn__content {
+    height: calc(var(--btn-scale-px) * 25);
+  }
+  .btn--sm {
+    --button-height: calc(var(--btn-scale-px) * 20);
+    font-size: calc(var(--btn-scale-rem) * 1.2);
+    height: calc(var(--btn-scale-px) * 20);
+  }
+  .btn--sm > .btn__inner {
+    padding: 0 calc(var(--btn-scale-px) * 6);
+  }
+  .btn--sm > .btn__content {
+    height: calc(var(--btn-scale-px) * 20);
+  }
+  .btn--md {
+    --button-height: calc(var(--btn-scale-px) * 20);
+    font-size: calc(var(--btn-scale-rem) * 1.2);
+    height: calc(var(--btn-scale-px) * 20);
+  }
+  .btn--md > .btn__inner {
+    padding: 0 calc(var(--btn-scale-px) * 6);
+  }
+  .btn--md > .btn__content {
+    height: calc(var(--btn-scale-px) * 20);
+  }
+  .btn--lg {
+    --button-height: calc(var(--btn-scale-px) * 36);
+    font-size: calc(var(--btn-scale-rem) * 1.8);
+    height: calc(var(--btn-scale-px) * 36);
+  }
+  .btn--lg > .btn__inner {
+    padding: 0 calc(var(--btn-scale-px) * 8);
+  }
+  .btn--lg > .btn__content {
+    height: calc(var(--btn-scale-px) * 36);
+  }
+  .btn--circle-xs {
+    --button-height: calc(var(--btn-scale-px) * 30);
+    height: calc(var(--btn-scale-px) * 30);
+    width: calc(var(--btn-scale-px) * 30);
+  }
+  .btn--circle-xs,
+  .btn--circle-xs::before,
+  .btn--circle-xs::after {
+    border-radius: 50%;
+  }
+  .btn--circle-xs > .btn__inner {
+    padding: 0 calc(var(--btn-scale-px) * 9);
+  }
+  .btn--circle-xs > .btn__content {
+    height: calc(var(--btn-scale-px) * 30);
+  }
+
+  /* Skala fluid viewport kecil/pendek — media query asli template */
+  @media (min-width: 568px) and (max-aspect-ratio: 13/9) and (max-height: 499px),
+    (min-width: 568px) and (max-aspect-ratio: 13/9) and (max-width: 1199px),
+    (min-width: 668px) and (min-height: 416px) and (max-height: 499px),
+    (min-width: 668px) and (min-height: 416px) and (max-width: 1199px),
+    (min-width: 980px) and (max-height: 499px),
+    (min-width: 980px) and (max-width: 1199px) {
+    .btn {
+      --btn-scale-px: max(
+        0.5px,
+        min(1px, calc(0.5px + 0.5 * ((100vw - 720px) / 480)))
+      );
+      --btn-scale-rem: max(
+        5px,
+        min(10px, calc(5px + 5 * ((100vw - 720px) / 480)))
+      );
     }
   }
 
-  .btn:focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--background),
-      0 0 0 4px var(--brand-ink);
-  }
-  .btn:disabled {
-    cursor: default;
-    opacity: 0.4;
+  /* Pembesaran ukuran desktop — media query asli template */
+  @media (min-width: 568px) and (max-aspect-ratio: 13/9),
+    (min-width: 668px) and (min-height: 416px),
+    (min-width: 980px) {
+    .btn--xs {
+      --button-height: calc(var(--btn-scale-px) * 30);
+      height: calc(var(--btn-scale-px) * 30);
+    }
+    .btn--xs > .btn__inner {
+      padding: 0 calc(var(--btn-scale-px) * 19);
+    }
+    .btn--xs > .btn__content {
+      height: calc(var(--btn-scale-px) * 30);
+    }
+    .btn--md {
+      --button-height: calc(var(--btn-scale-px) * 30);
+    }
+    .btn--md,
+    .btn--md > .btn__content {
+      height: calc(var(--btn-scale-px) * 30);
+    }
+    .btn--lg {
+      --button-height: calc(var(--btn-scale-px) * 64);
+      font-size: calc(var(--btn-scale-rem) * 2);
+      height: calc(var(--btn-scale-px) * 64);
+    }
+    .btn--lg > .btn__inner {
+      padding: 0 calc(var(--btn-scale-px) * 22);
+    }
+    .btn--lg > .btn__content {
+      height: calc(var(--btn-scale-px) * 64);
+    }
   }
 
-  /* CTA utama: pill ink pekat, teks putih (template --secondary light) */
-  .btn--solid {
-    --btn-fill: rgb(255 255 255 / 0.14);
-    background-color: var(--brand-ink);
-    color: #fff;
-  }
-
-  /* Aksi sekunder: tint hairline + slide-fill ink (template --primary light) */
-  .btn--tint {
-    --btn-fill: var(--brand-ink);
-    background-color: rgb(25 27 29 / 0.1);
+  /* Varian — warna persis tema light template
+     (--t-text #191b1d, --c-black-10 rgba(25,27,29,.1), hover #fff) */
+  .btn--primary {
     color: var(--brand-ink);
   }
+  .btn--primary::after {
+    background-color: rgb(25 27 29 / 0.1);
+  }
+  .btn--primary::before {
+    background-color: var(--brand-ink);
+  }
+  .btn--primary:disabled {
+    color: rgb(25 27 29 / 0.3);
+  }
 
-  /* Aksi destruktif: adaptasi danger dengan mekanisme sama */
+  .btn--secondary {
+    color: #fff;
+  }
+  .btn--secondary::after {
+    background-color: var(--brand-ink);
+  }
+  .btn--secondary::before {
+    border-color: hsla(0, 0%, 100%, 0.4); /* tanpa border-width → iner, persis sumber */
+  }
+  .btn--secondary:disabled {
+    color: rgb(255 255 255 / 0.3);
+  }
+
+  /* Adaptasi danger dengan mekanisme identik (tint + slide-fill) */
   .btn--danger {
-    --btn-fill: var(--status-danger);
-    border-color: rgb(180 35 24 / 0.4);
-    background-color: rgb(180 35 24 / 0.08);
     color: var(--status-danger);
   }
-
-  /* Ukuran (template xs/sm 25px, lg besar) */
-  .btn--sm {
-    height: 1.5rem; /* 24px */
-    padding: 0 0.75rem;
-    font-size: 0.75rem;
+  .btn--danger::after {
+    background-color: rgb(180 35 24 / 0.1);
   }
-  .btn--lg {
-    height: 2.5rem; /* 40px */
-    padding: 0 1.5rem;
-    font-size: 0.9375rem;
+  .btn--danger::before {
+    background-color: var(--status-danger);
+  }
+  .btn--danger:disabled {
+    color: rgb(180 35 24 / 0.3);
   }
 
-  /* Ikon saja — lingkaran (template btn--circle-xs); fill ikut ink agar
-     hover slide-fill + ikon putih berlaku seperti tombol lain */
-  .btn--icon {
-    --btn-fill: var(--brand-ink);
-    width: 2rem;
-    height: 2rem;
-    padding: 0;
-    border-radius: 50%;
+  .btn:disabled {
+    cursor: default;
   }
 
-  /* Tautan-bergaya (template btn--link/underline) */
+  /* Hover — template memakai kelas .has-hover; padanan kami media (hover:hover) */
+  @media (hover: hover) {
+    .btn--primary:hover:not(:disabled) {
+      color: #fff;
+    }
+    .btn--danger:hover:not(:disabled) {
+      color: #fff;
+    }
+    .btn--cloned:hover:not(:disabled) .btn__content {
+      transform: translateY(-100%);
+    }
+  }
+
+  /* Fokus — persis template: ring 2px var(--t-text) */
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--brand-ink);
+  }
+
+  /* Link (template btn--link): tanpa lapisan, radius 0, rata kiri */
   .btn--link {
-    height: auto;
-    padding: 0;
-    border: 0;
-    background: none;
-    font-size: inherit;
-    letter-spacing: -0.02em;
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+    border-radius: 0;
+    overflow: visible;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .btn--link::before,
+  .btn--link::after {
+    display: none;
+  }
+  .btn--link > .btn__inner {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .btn--link > .btn__content {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  .btn--link:focus-visible {
+    box-shadow: none;
+    outline: 1px auto currentColor;
+    outline-offset: 1px;
   }
 
-  @media (prefers-reduced-motion: reduce) {
+  /* Cetak — persis template (satu-satunya tempat .btn punya border) */
+  @media print {
     .btn {
+      border: 1px solid #000 !important;
+      color: var(--brand-ink) !important;
+    }
+  }
+
+  /* Aksesibilitas gerak (template tidak punya; netral visual bagi pengguna
+     normal) */
+  @media (prefers-reduced-motion: reduce) {
+    .btn,
+    .btn::before,
+    .btn::after,
+    .btn--cloned .btn__content,
+    .btn--cloned .btn__text {
       transition-duration: 0.01ms;
     }
   }

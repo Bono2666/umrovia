@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
+import { Btn, BtnLink } from "@/components/workspace/ui";
 
 type ResetResponse = { status: string };
 
@@ -37,9 +38,9 @@ function ResetPasswordInner() {
         <p className="text-sm text-danger">
           Tautan reset tidak memiliki token. Minta tautan baru.
         </p>
-        <Link href="/forgot-password" className="btn btn--solid btn--lg block w-full text-center">
+        <BtnLink href="/forgot-password" className="w-full">
           Minta tautan baru
-        </Link>
+        </BtnLink>
       </div>
     );
   }
@@ -50,9 +51,9 @@ function ResetPasswordInner() {
         <p className="text-sm text-success">
           Password berhasil diperbarui. Silakan masuk dengan password baru.
         </p>
-        <Link href="/login" className="btn btn--solid btn--lg block w-full text-center">
+        <BtnLink href="/login" className="w-full">
           Lanjut masuk
-        </Link>
+        </BtnLink>
       </div>
     );
   }
@@ -74,9 +75,9 @@ function ResetPasswordInner() {
           placeholder="Minimal 8 karakter"
         />
       </div>
-      <button type="submit" className="btn btn--solid btn--lg w-full" disabled={busy}>
+      <Btn type="submit" className="w-full" disabled={busy}>
         {busy ? "Menyimpan…" : "Simpan password baru"}
-      </button>
+      </Btn>
       {message && <p className="text-sm text-danger">{message}</p>}
     </form>
   );

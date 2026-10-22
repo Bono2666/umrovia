@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
+import { Btn, BtnLink } from "@/components/workspace/ui";
 
 type VerifyResponse = { status: string; email?: string };
 type ResendResponse = { status: string; message?: string };
@@ -63,9 +64,9 @@ function VerifyEmailInner() {
             <p className="text-sm text-success">
               Email terverifikasi — workspace travel Anda sudah aktif.
             </p>
-            <Link href="/login" className="btn btn--solid btn--lg block w-full text-center">
+            <BtnLink href="/login" className="w-full">
               Lanjut masuk
-            </Link>
+            </BtnLink>
           </div>
         )}
 
@@ -86,9 +87,9 @@ function VerifyEmailInner() {
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder="nama@travelanda.com"
                 />
-                <button type="submit" className="btn btn--solid btn--lg w-full">
+                <Btn type="submit" className="w-full">
                   Kirim ulang link
-                </button>
+                </Btn>
               </form>
             ) : (
               <p className="text-sm text-muted">

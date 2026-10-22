@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, problemMessage, type TrialStatus } from "@/lib/api";
 import { formatDate, formatRemaining } from "@/lib/format";
+import { Btn } from "@/components/workspace/ui";
 
 /**
  * Banner masa uji coba (S06, Spec §4.3 + §8.7): countdown absolut ke
@@ -74,14 +75,14 @@ export function TrialBanner({
           Pengguna internal: {status.internal_users_used}/{status.internal_users_limit}
         </p>
         {canConvert ? (
-          <button
-            type="button"
+          <Btn
+            variant="solid"
             onClick={onConvert}
             disabled={busy || !status.can_convert_now}
-            className="btn btn--solid ml-auto"
+            className="ml-auto"
           >
             {busy ? "Mengonversi…" : "Konversi ke Produksi"}
-          </button>
+          </Btn>
         ) : null}
       </div>
       {error ? (

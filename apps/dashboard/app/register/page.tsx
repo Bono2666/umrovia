@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
+import { Btn } from "@/components/workspace/ui";
 
 type RegisterResponse = {
   status: string;
@@ -128,9 +129,9 @@ export default function RegisterPage() {
             />
             Saya menyetujui Syarat Layanan dan Kebijakan Privasi Umrovia.
           </label>
-          <button type="submit" className="btn btn--solid btn--lg w-full" disabled={busy}>
+          <Btn type="submit" className="w-full" disabled={busy}>
             {busy ? "Membuat workspace…" : "Buat workspace"}
-          </button>
+          </Btn>
         </form>
         {message && (
           <div className="mt-4 border border-border p-3 text-sm">
