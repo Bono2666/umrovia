@@ -126,6 +126,39 @@ sudah jalan via verifikasi email); baca audit (`GET /audit-events`)/export →
 S07+/S16; kas/bank cash-movement & payment gateway → sprint finance/PMT
 (launcher TBD); `branch_id` multi-cabang di memberships menyusul F04.
 
+## Sprint S06 — Minggu 6 — Tenant dashboard, config, template basics (F04)
+
+**Goal:** "Tenant admin demo accepted" (M2: trial-ready — workspace usable
+tanpa charge) — shell dashboard travel (guard, tenant header + badge
+DEMO/PRODUCTION, banner trial countdown, switcher), halaman config
+(Pengguna & Role, Profil Travel, Kas & Bank), dan fondasi template
+dokumen invoice/kuitansi (Roadmap S06; Spec §4.1–4.4, §5.1, §5.3, §8.7,
+§10.2).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S06-01 | `GET /me` aditif: `active_tenant_slug` (null = fallback membership pertama — klien memakai fallback sama; ADR-0006 §1) | §8.1 | DONE | `MeView`; `test_me_reports_active_tenant_slug` (null → switch → slug) |
+| S06-02 | App `modules.documents`: renderer `render_invoice`/`render_receipt` (field §10.2), escape anti-XSS, `TemplateContextError` untuk konteks wajib hilang | §10.2 | DONE | `modules/documents/render.py`; `test_document_templates.py` (injection, field hilang) |
+| S06-03 | Format dokumen: nominal integer rupiah `Rp50.000`, nomor demo prefix `DEMO-` + watermark jelas, `TEMPLATE_VERSION` di footer, instruksi bayar hanya `account_masked` | §4.4, POL-09, TR05 | DONE | test format_idr, DEMO/watermark, masked-only |
+| S06-04 | `WorkspaceShell`: guard `/me` → /login (401/403), blok tanpa-workspace, sidebar §4.1 lengkap (modul menyusul = non-link bertanda sprint), header nama tenant + **badge teks DEMO/PRODUCTION** (TRIAL→DEMO, ACTIVE→PRODUCTION), switcher bila >1 membership ACTIVE | §4.1, §4.3 | DONE | `components/workspace/WorkspaceShell.tsx`; build lint ✓ |
+| S06-05 | `TrialBanner`: countdown absolut ke `ends_at` + used/limit booking & pengguna (§8.7), tombol konversi Owner-only (`trial.convert`) + konfirmasi, auto-hide 403/terkonversi | §4.3, §8.7 | DONE | `components/workspace/TrialBanner.tsx` |
+| S06-06 | Halaman Ringkasan live: tile staf/peran/rekening (403 → disembunyikan) + trial card + quick-start | UI-02/UI-03 | DONE | `app/(workspace)/dashboard/page.tsx` |
+| S06-07 | Halaman Pengguna & Role: daftar membership, undang staf (invite → verifikasi email), ganti role (PATCH), cabut akses (DELETE), daftar role + permission; tombol berbasis `memberships.write/.manage`, tanpa akses → state khusus | §4.1, §8.1 | DONE | `dashboard/pengguna/page.tsx` |
+| S06-08 | Halaman Profil Travel: GET/PATCH `/tenant/settings`, 3 bagian JSON (branding/invoice/rules), validasi JSON inline + ≤16KB, simpan per-bagian, mode baca tanpa `tenant.settings.write` | §4.1, §5.1 | DONE | `dashboard/profil/page.tsx` |
+| S06-09 | Halaman Kas & Bank: daftar masked, tambah (nomor write-only), toggle aktif; tanpa `bank_accounts.*` → state tanpa akses | §4.1, §5.3 | DONE | `dashboard/rekening/page.tsx` |
+| S06-10 | Komponen dasar §4.2: Loading/Empty/Error state, StatusBadge (teks), FormField + error inline; `lib/format.ts` (rupiah integer, tanggal id-ID) | §4.2, §4.4 | DONE | `components/workspace/ui.tsx`, `lib/format.ts` |
+
+**Exit gate S06:** `pytest` 113/113 ✓ (8 baru: template + `/me`) · `ruff`
+clean ✓ · `makemigrations --check` no-change ✓ · `npm run lint` ✓ ·
+`npm run build` ✓ (rute /dashboard/{pengguna,profil,rekening}) · smoke live ✓ ·
+ADR-0006 ✓
+
+**Catatan/tundaan:** endpoint preview/PDF template → S11 (butuh model
+invoice; renderer + `TEMPLATE_VERSION` sudah siap); integrasi branding
+`tenant_settings` → pemanggilan S11; notifikasi email invite → S16; modul
+operasional (paket/jamaah/booking/manifest) → S07–S10 dengan pola shell +
+halaman config S06 sebagai template.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -134,7 +167,8 @@ S07+/S16; kas/bank cash-movement & payment gateway → sprint finance/PMT
 | S03 | 3 | Tenant resolver, RBAC, RLS PostgreSQL, security tests (M1) | DONE |
 | S04 | 4 | Trial lifecycle, kuota, konversi & expiry tanpa charge | DONE |
 | S05 | 5 | Travel profile, staf/invite, roles, rekening bank, audit (RBAC) | DONE |
-| S06–S19 | 6–19 | mengikuti Roadmap §3 | TODO |
+| S06 | 6 | Tenant dashboard UI, config, fondasi template dokumen | DONE |
+| S07–S19 | 7–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
