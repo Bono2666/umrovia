@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="card w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-primary">Lupa password</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Lupa password</h1>
         <p className="mt-1 text-sm text-muted">
           Masukkan email akun Anda — kami kirim tautan untuk mengatur ulang
           password.
@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
             </button>
           </form>
         ) : (
-          <div className="mt-4 space-y-3 rounded bg-background p-3 text-sm">
+          <div className="mt-4 space-y-3 border border-border p-3 text-sm">
             <p className="text-ink">
               Jika email terdaftar, tautan reset sudah dikirim. Periksa kotak
               masuk Anda (berlaku 60 menit).

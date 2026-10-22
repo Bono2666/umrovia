@@ -52,7 +52,7 @@ function VerifyEmailInner() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="card w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-primary">Verifikasi email</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Verifikasi email</h1>
 
         {state === "loading" && (
           <p className="mt-4 text-sm text-muted">Memverifikasi…</p>

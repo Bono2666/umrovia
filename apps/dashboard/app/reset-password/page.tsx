@@ -87,7 +87,7 @@ export default function ResetPasswordPage() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="card w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-primary">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">
           Atur ulang password
         </h1>
         <p className="mt-1 text-sm text-muted">

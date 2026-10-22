@@ -151,7 +151,7 @@ export default function PenggunaPage() {
       </p>
 
       {message ? (
-        <p className="mt-4 rounded border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
+        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
           {message}
         </p>
       ) : null}
@@ -288,7 +288,7 @@ export default function PenggunaPage() {
                   {(role.permissions.length > 0 ? role.permissions : ["(tanpa permission)"]).map((perm) => (
                     <code
                       key={perm}
-                      className="rounded bg-background px-1.5 py-0.5 text-[0.7rem] text-muted"
+                      className="border border-border bg-background px-1.5 py-0.5 text-[0.7rem] text-muted"
                     >
                       {perm}
                     </code>
