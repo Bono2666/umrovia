@@ -12,8 +12,6 @@ import {
   Landmark,
   LayoutDashboard,
   Package,
-  PanelLeftClose,
-  PanelLeftOpen,
   PlaneTakeoff,
   ShieldCheck,
   Target,
@@ -35,6 +33,33 @@ type NavItem = {
   permission?: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 };
+
+/**
+ * Icon panah toggle sidebar — path persis icon mega menu web_template
+ * (`icons.svg#arrow-down-small`: viewBox 10×10, stroke currentColor 1.2;
+ * dirender 12×12 agar pas dengan kotak isi `btn--circle-xs`).
+ * Arah disesuaikan: sidebar terbuka → panah ke kiri (aksi tutup),
+ * sidebar tertutup → panah ke kanan (aksi buka). Rotasi instan tanpa
+ * transisi — mengikuti sumber (`.btn .icon { transition: none }`).
+ */
+function CollapseArrow({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 10 10"
+      aria-hidden="true"
+      className={collapsed ? "-rotate-90" : "rotate-90"}
+    >
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        d="M9 5 5 9m0 0L1 5m4 4V1"
+      />
+    </svg>
+  );
+}
 
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
@@ -213,11 +238,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             aria-expanded={!collapsed}
             className="shrink-0"
           >
-            {collapsed ? (
-              <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
-            )}
+            <CollapseArrow collapsed={collapsed} />
           </Btn>
           <Link
             href="/dashboard"
