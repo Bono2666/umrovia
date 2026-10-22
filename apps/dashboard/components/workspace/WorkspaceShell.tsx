@@ -2,7 +2,25 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import {
+  BarChart3,
+  Bell,
+  Building2,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  Landmark,
+  LayoutDashboard,
+  Package,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PlaneTakeoff,
+  ShieldCheck,
+  Target,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { LoadingState, StatusBadge } from "@/components/workspace/ui";
@@ -15,41 +33,43 @@ type NavItem = {
   label: string;
   soon?: string;
   permission?: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 };
 
 const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Ringkasan",
-    items: [{ href: "/dashboard", label: "Ringkasan" }],
+    items: [{ href: "/dashboard", label: "Ringkasan", icon: LayoutDashboard }],
   },
   {
     title: "Operasional",
     items: [
-      { href: "/dashboard/leads", label: "Leads", soon: "S09" },
-      { href: "/dashboard/jamaah", label: "Jamaah", soon: "S07" },
-      { href: "/dashboard/paket", label: "Paket", soon: "S08" },
-      { href: "/dashboard/keberangkatan", label: "Keberangkatan", soon: "S08" },
-      { href: "/dashboard/booking", label: "Booking", soon: "S09" },
+      { href: "/dashboard/leads", label: "Leads", soon: "S09", icon: Target },
+      { href: "/dashboard/jamaah", label: "Jamaah", soon: "S07", icon: Users },
+      { href: "/dashboard/paket", label: "Paket", soon: "S08", icon: Package },
+      { href: "/dashboard/keberangkatan", label: "Keberangkatan", soon: "S08", icon: PlaneTakeoff },
+      { href: "/dashboard/booking", label: "Booking", soon: "S09", icon: ClipboardList },
     ],
   },
   {
     title: "Keuangan",
     items: [
-      { href: "/dashboard/pembayaran", label: "Pembayaran", soon: "S11" },
+      { href: "/dashboard/pembayaran", label: "Pembayaran", soon: "S11", icon: CreditCard },
       {
         href: "/dashboard/rekening",
         label: "Kas & Bank",
         permission: "bank_accounts.read",
+        icon: Landmark,
       },
-      { href: "/dashboard/wallet", label: "SaaS Wallet", soon: "S12" },
+      { href: "/dashboard/wallet", label: "SaaS Wallet", soon: "S12", icon: Wallet },
     ],
   },
   {
     title: "Dokumen & Laporan",
     items: [
-      { href: "/dashboard/manifest", label: "Manifest", soon: "S10" },
-      { href: "/dashboard/laporan", label: "Laporan", soon: "S17" },
-      { href: "/dashboard/notifikasi", label: "Notifikasi", soon: "S16" },
+      { href: "/dashboard/manifest", label: "Manifest", soon: "S10", icon: FileText },
+      { href: "/dashboard/laporan", label: "Laporan", soon: "S17", icon: BarChart3 },
+      { href: "/dashboard/notifikasi", label: "Notifikasi", soon: "S16", icon: Bell },
     ],
   },
   {
@@ -59,11 +79,13 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         href: "/dashboard/pengguna",
         label: "Pengguna & Role",
         permission: "memberships.read",
+        icon: ShieldCheck,
       },
       {
         href: "/dashboard/profil",
         label: "Profil Travel",
         permission: "tenant.settings.read",
+        icon: Building2,
       },
     ],
   },
@@ -84,6 +106,24 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<UserPayload | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [switchError, setSwitchError] = useState<string | null>(null);
+
+  // Sidebar collapse: localStorage sebagai store eksternal (useSyncExternalStore
+  // — aman untuk hydration; server snapshot = expanded). Toggle memancarkan
+  // event khusus agar render ulang terjadi di tab yang sama.
+  const collapsed = useSyncExternalStore(
+    (cb) => {
+      window.addEventListener("umrovia-sidebar-change", cb);
+      return () => window.removeEventListener("umrovia-sidebar-change", cb);
+    },
+    () => window.localStorage.getItem("umrovia.sidebar") === "collapsed",
+    () => false,
+  );
+
+  const toggleSidebar = useCallback(() => {
+    const next = window.localStorage.getItem("umrovia.sidebar") !== "collapsed";
+    window.localStorage.setItem("umrovia.sidebar", next ? "collapsed" : "expanded");
+    window.dispatchEvent(new Event("umrovia-sidebar-change"));
+  }, []);
 
   const loadMe = useCallback(() => {
     apiFetch<UserPayload>("/me").then((result) => {
@@ -165,6 +205,19 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       {/* Navbar atas (sticky): identitas brand + konteks workspace + akun/keluar */}
       <header className="sticky top-0 z-30 border-b border-border bg-surface">
         <div className="flex h-14 items-center gap-3 px-4">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? "Buka sidebar" : "Tutup sidebar"}
+            aria-expanded={!collapsed}
+            className="flex h-8 w-8 shrink-0 items-center justify-center border border-border text-muted transition-colors duration-300 hover:bg-ink hover:text-surface"
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
+            )}
+          </button>
           <Link
             href="/dashboard"
             className="text-lg font-semibold tracking-tight text-ink"
@@ -204,8 +257,12 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="flex">
-        {/* Sidebar navigasi (sticky, scroll sendiri): tinggi = viewport − navbar */}
-        <aside className="sticky top-14 -mt-px h-[calc(100vh-3.5rem)] w-60 shrink-0 self-start overflow-y-auto border-r border-border bg-surface p-4">
+        {/* Sidebar navigasi (sticky, scroll sendiri; bisa collapse jadi rail ikon) */}
+        <aside
+          className={`sticky top-14 -mt-px h-[calc(100vh-3.5rem)] shrink-0 self-start overflow-y-auto border-r border-border bg-surface transition-[width] duration-300 ${
+            collapsed ? "w-16 p-2" : "w-60 p-4"
+          }`}
+        >
           <nav className="flex flex-col gap-4">
             {NAV_GROUPS.map((group) => {
               const items = group.items.filter(
@@ -214,34 +271,56 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               if (items.length === 0) return null;
               return (
                 <div key={group.title}>
-                  <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
-                    {group.title}
-                  </p>
+                  {collapsed ? (
+                    <div className="mx-1 border-t border-border" />
+                  ) : (
+                    <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
+                      {group.title}
+                    </p>
+                  )}
                   <div className="mt-1 flex flex-col gap-0.5">
-                    {items.map((item) =>
-                      item.soon ? (
+                    {items.map((item) => {
+                      const Icon = item.icon;
+                      const icon = (
+                        <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                      );
+                      const center = collapsed ? "justify-center" : "";
+                      return item.soon ? (
                         <span
                           key={item.href}
-                          className="flex items-center justify-between px-2 py-1.5 text-sm text-muted/60"
-                          title={`Modul ${item.label} menyusul ${item.soon}`}
+                          className={`flex items-center gap-2 px-2 py-1.5 text-sm text-muted/60 ${center}`}
+                          title={
+                            collapsed
+                              ? `${item.label} — menyusul ${item.soon}`
+                              : `Modul ${item.label} menyusul ${item.soon}`
+                          }
                         >
-                          {item.label}
-                          <span className="text-[0.6rem] font-semibold">{item.soon}+</span>
+                          {icon}
+                          {collapsed ? null : (
+                            <>
+                              <span className="truncate">{item.label}</span>
+                              <span className="ml-auto text-[0.6rem] font-semibold">
+                                {item.soon}+
+                              </span>
+                            </>
+                          )}
                         </span>
                       ) : (
                         <Link
                           key={item.href}
                           href={item.href}
-                          className={`px-2 py-1.5 text-sm font-medium ${
+                          title={item.label}
+                          className={`flex items-center gap-2 px-2 py-1.5 text-sm font-medium ${center} ${
                             pathname === item.href
                               ? "bg-primary/10 text-primary"
                               : "text-ink hover:bg-background"
                           }`}
                         >
-                          {item.label}
+                          {icon}
+                          {collapsed ? null : <span className="truncate">{item.label}</span>}
                         </Link>
-                      ),
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               );
