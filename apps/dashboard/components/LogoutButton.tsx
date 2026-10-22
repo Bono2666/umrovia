@@ -2,37 +2,52 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, problemMessage } from "@/lib/api";
 
 /**
  * Tombol keluar (S02) — POST /auth/logout dengan CSRF
  * (GET /auth/csrf dahulu, otomatis oleh apiFetch).
+ *
+ * Ketahanan (perbaikan S06): `busy` selalu di-reset — baik saat request
+ * gagal/timeout maupun sesudah sukses SEBELUM navigasi, sehingga tombol
+ * tidak pernah bisa macet menampilkan "Keluar…" selamanya; kegagalan
+ * ditampilkan sebagai pesan agar bisa dicoba ulang.
  */
 export function LogoutButton() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onLogout() {
+    if (busy) return;
     setBusy(true);
+    setError(null);
     const result = await apiFetch<{ status: string }>("/auth/logout", {
       method: "POST",
     });
+    setBusy(false);
     if (result.ok) {
       router.push("/login");
-      router.refresh();
-    } else {
-      setBusy(false);
+      return;
     }
+    setError(problemMessage(result.error));
   }
 
   return (
-    <button
-      type="button"
-      onClick={onLogout}
-      disabled={busy}
-      className="border border-border-strong px-3 py-1.5 text-sm font-semibold text-ink transition-colors duration-300 hover:bg-ink hover:text-surface disabled:opacity-60"
-    >
-      {busy ? "Keluar…" : "Keluar"}
-    </button>
+    <span className="flex items-center gap-2">
+      {error ? (
+        <span className="max-w-48 truncate text-xs text-danger" role="alert">
+          {error}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        onClick={onLogout}
+        disabled={busy}
+        className="border border-border-strong px-3 py-1.5 text-sm font-semibold text-ink transition-colors duration-300 hover:bg-ink hover:text-surface disabled:opacity-60"
+      >
+        {busy ? "Keluar…" : "Keluar"}
+      </button>
+    </span>
   );
 }

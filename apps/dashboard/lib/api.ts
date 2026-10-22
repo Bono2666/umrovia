@@ -97,6 +97,8 @@ function readCookie(name: string): string | null {
 /**
  * Ambil token CSRF (S02): cookie `csrftoken` dibaca via JS; bila belum ada,
  * minta dulu lewat GET /auth/csrf (men-set cookie, Spec §8 logout pakai CSRF).
+ * Perhatian: Django memutasi cookie CSRF saat login — baca ulang cookie
+ * setiap saat (jangan cache), dan beri timeout agar tidak menggantung.
  */
 export async function ensureCsrfToken(): Promise<string> {
   const existing = readCookie("csrftoken");
@@ -104,6 +106,7 @@ export async function ensureCsrfToken(): Promise<string> {
   try {
     const response = await fetch(`${API_BASE}/api/v1/auth/csrf`, {
       credentials: "include",
+      signal: AbortSignal.timeout(10_000),
     });
     const data = (await response.json().catch(() => ({}))) as {
       csrfToken?: string;
@@ -140,6 +143,10 @@ export async function apiFetch<T>(
       ...init,
       credentials: "include",
       headers,
+      // Timeout: request menggantung harus tetap resolve sebagai error —
+      // supaya state "busy" tombol di UI selalu bisa pulih (tombol tak
+      // pernah macet selamanya).
+      signal: init?.signal ?? AbortSignal.timeout(15_000),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
