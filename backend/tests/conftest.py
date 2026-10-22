@@ -65,7 +65,7 @@ def tenant_b(db) -> Tenant:
 
 @pytest.fixture
 def owner_a(db, user, tenant_a) -> TenantMembership:
-    role = Role.objects.create(tenant=tenant_a, name="Owner", permissions_json={"*": True})
+    role = Role.objects.create(tenant=tenant_a, name="Owner", permissions_json=["*"])
     # provisioning tanpa context tenant → jalur bypass yang sah
     return TenantMembership.objects.without_tenant_guard().create(
         tenant=tenant_a, user=user, role=role, status="ACTIVE"
