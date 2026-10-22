@@ -3,7 +3,12 @@
  * state, validasi inline). Satu file kecil berisi primitif dipakai semua
  * halaman dashboard.
  */
-import type { ReactNode } from "react";
+import type {
+  AnchorHTMLAttributes,
+  ButtonHTMLAttributes,
+  ReactNode,
+} from "react";
+import Link from "next/link";
 
 export function LoadingState({ label = "Memuat…" }: { label?: string }) {
   return (
@@ -47,13 +52,9 @@ export function ErrorState({
     >
       <p>{message}</p>
       {onRetry ? (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="btn btn--link mt-3 text-xs"
-        >
+        <Btn variant="link" size="xs" className="mt-3" onClick={onRetry}>
           Coba lagi
-        </button>
+        </Btn>
       ) : null}
     </div>
   );
@@ -116,11 +117,106 @@ export function FormField({
   );
 }
 
-/** Tombol mengikuti sistem web_template (pill; slide-fill naik dari bawah
- * saat hover — lihat globals.css). BTN_PRIMARY = CTA utama (pill ink
- * pekat, template `--secondary` light); BTN_SECONDARY = aksi sekunder
- * (tint hairline + slide-fill ink, template `--primary` light);
- * BTN_DANGER = destruktif (mekanisme sama, nada danger). */
-export const BTN_PRIMARY = "btn btn--solid";
-export const BTN_SECONDARY = "btn btn--tint";
-export const BTN_DANGER = "btn btn--danger";
+/**
+ * Tombol — sistem `.btn` web_template (lihat globals.css untuk port CSS 1:1).
+ *
+ * Struktur DOM persis template: `.btn > .btn__inner > .btn__content > .btn__text`,
+ * dengan `.btn__content` ganda (yang kedua `aria-hidden`): template meng-klon
+ * konten via JS saat runtime (`btn--cloned`) untuk animasi teks berguling
+ * saat hover; kami merender duplikatnya secara statis.
+ *
+ * Varian (dipetakan ke kelas template):
+ * - "solid"  = CTA utama, pill ink pekat (template `btn--secondary` light)
+ * - "tint"   = aksi sekunder, tint + slide-fill (template `btn--primary`)
+ * - "danger" = destruktif, mekanisme sama, nada danger
+ * - "link"   = tautan bergaya (template `btn--link`)
+ *
+ * Ukuran opsional; tanpa `size` = tombol default template (30px/16px).
+ */
+export type BtnVariant = "solid" | "tint" | "danger" | "link";
+export type BtnSize = "xs" | "sm" | "md" | "lg" | "circle";
+
+const BTN_VARIANT_CLASS: Record<BtnVariant, string> = {
+  solid: "btn--secondary",
+  tint: "btn--primary",
+  danger: "btn--danger",
+  link: "btn--link",
+};
+
+const BTN_SIZE_CLASS: Record<BtnSize, string> = {
+  xs: "btn--xs",
+  sm: "btn--sm",
+  md: "btn--md",
+  lg: "btn--lg",
+  circle: "btn--circle-xs",
+};
+
+function btnClass(
+  variant: BtnVariant,
+  size: BtnSize | undefined,
+  className?: string,
+): string {
+  return [
+    "btn",
+    BTN_VARIANT_CLASS[variant],
+    size ? BTN_SIZE_CLASS[size] : "",
+    "btn--animated-content",
+    "btn--cloned",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function BtnInner({ children }: { children: ReactNode }) {
+  return (
+    <span className="btn__inner">
+      <span className="btn__content">
+        <span className="btn__text">{children}</span>
+      </span>
+      <span className="btn__content" aria-hidden="true">
+        <span className="btn__text">{children}</span>
+      </span>
+    </span>
+  );
+}
+
+export function Btn({
+  variant = "solid",
+  size,
+  className,
+  children,
+  type = "button",
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: BtnVariant;
+  size?: BtnSize;
+}) {
+  return (
+    <button
+      type={type}
+      className={btnClass(variant, size, className)}
+      {...rest}
+    >
+      <BtnInner>{children}</BtnInner>
+    </button>
+  );
+}
+
+export function BtnLink({
+  variant = "solid",
+  size,
+  className,
+  children,
+  ...rest
+}: AnchorHTMLAttributes<HTMLAnchorElement> & {
+  variant?: BtnVariant;
+  size?: BtnSize;
+  href: string;
+}) {
+  return (
+    <Link className={btnClass(variant, size, className)} {...rest}>
+      <BtnInner>{children}</BtnInner>
+    </Link>
+  );
+}

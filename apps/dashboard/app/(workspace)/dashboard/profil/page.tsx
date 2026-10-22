@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Btn,
   ErrorState,
   FormField,
   LoadingState,
@@ -166,14 +167,12 @@ export default function ProfilPage() {
             </div>
             <div className="mt-3 flex items-center gap-3">
               {readOnly ? null : (
-                <button
-                  type="button"
-                  className="btn btn--solid"
+                <Btn
                   disabled={busyKey === section.key}
                   onClick={() => onSave(section.key)}
                 >
                   {busyKey === section.key ? "Menyimpan…" : "Simpan"}
-                </button>
+                </Btn>
               )}
               {messages[section.key] ? (
                 <span

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, problemMessage, type UserPayload } from "@/lib/api";
+import { Btn } from "@/components/workspace/ui";
 
 /**
  * Login (S02) — POST /auth/login (session cookie + rate limit, Spec §8.1).
@@ -84,9 +85,9 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-          <button type="submit" className="btn btn--solid btn--lg w-full" disabled={busy}>
+          <Btn type="submit" className="w-full" disabled={busy}>
             {busy ? "Memproses…" : "Masuk"}
-          </button>
+          </Btn>
         </form>
         {message && (
           <p className="mt-4 border border-border p-3 text-sm text-danger">

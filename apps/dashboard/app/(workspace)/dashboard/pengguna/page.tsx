@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  Btn,
   EmptyState,
   ErrorState,
   FormField,
   LoadingState,
   StatusBadge,
-  BTN_DANGER,
 } from "@/components/workspace/ui";
 import {
   apiFetch,
@@ -213,9 +213,9 @@ export default function PenggunaPage() {
                     </td>
                     <td className="py-2">
                       {canManage && row.status !== "REVOKED" ? (
-                        <button type="button" className={BTN_DANGER} onClick={() => onRevoke(row)}>
+                        <Btn variant="danger" onClick={() => onRevoke(row)}>
                           Cabut akses
-                        </button>
+                        </Btn>
                       ) : (
                         <span className="text-xs text-muted">-</span>
                       )}
@@ -264,9 +264,9 @@ export default function PenggunaPage() {
               </select>
             </FormField>
             <div className="sm:col-span-2">
-              <button type="submit" className="btn btn--solid" disabled={busy}>
+              <Btn type="submit" disabled={busy}>
                 {busy ? "Mengirim…" : "Kirim undangan"}
-              </button>
+              </Btn>
             </div>
           </form>
         </section>

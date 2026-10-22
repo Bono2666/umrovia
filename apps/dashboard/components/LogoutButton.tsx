@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
+import { Btn } from "@/components/workspace/ui";
 
 /**
  * Tombol keluar (S02) — POST /auth/logout dengan CSRF
@@ -40,14 +41,9 @@ export function LogoutButton() {
           {error}
         </span>
       ) : null}
-      <button
-        type="button"
-        onClick={onLogout}
-        disabled={busy}
-        className="btn btn--tint btn--sm"
-      >
+      <Btn variant="tint" size="xs" onClick={onLogout} disabled={busy}>
         {busy ? "Keluar…" : "Keluar"}
-      </button>
+      </Btn>
     </span>
   );
 }

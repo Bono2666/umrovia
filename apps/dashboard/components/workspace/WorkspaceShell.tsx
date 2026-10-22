@@ -23,7 +23,7 @@ import {
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
-import { LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
 
 type Phase = "loading" | "unauth" | "no-workspace" | "ok";
@@ -205,19 +205,20 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       {/* Navbar atas (sticky): identitas brand + konteks workspace + akun/keluar */}
       <header className="sticky top-0 z-30 border-b border-border bg-surface">
         <div className="flex h-14 items-center gap-3 px-4">
-          <button
-            type="button"
+          <Btn
+            variant="tint"
+            size="circle"
             onClick={toggleSidebar}
             aria-label={collapsed ? "Buka sidebar" : "Tutup sidebar"}
             aria-expanded={!collapsed}
-            className="btn btn--icon shrink-0"
+            className="shrink-0"
           >
             {collapsed ? (
               <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />
             ) : (
               <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
             )}
-          </button>
+          </Btn>
           <Link
             href="/dashboard"
             className="text-lg font-semibold tracking-tight text-ink"

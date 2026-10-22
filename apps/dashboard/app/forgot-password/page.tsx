@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Btn } from "@/components/workspace/ui";
 
 type ForgotResponse = { status: string; dev_reset_url?: string };
 
@@ -55,13 +56,9 @@ export default function ForgotPasswordPage() {
                 placeholder="nama@travelanda.com"
               />
             </div>
-            <button
-              type="submit"
-              className="btn btn--solid btn--lg w-full"
-              disabled={busy}
-            >
+            <Btn type="submit" className="w-full" disabled={busy}>
               {busy ? "Mengirim…" : "Kirim tautan reset"}
-            </button>
+            </Btn>
           </form>
         ) : (
           <div className="mt-4 space-y-3 border border-border p-3 text-sm">
