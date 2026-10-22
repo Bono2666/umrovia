@@ -67,10 +67,37 @@ RLS PostgreSQL terpasang & teruji (Roadmap S03; Spec §2.2, §3, §5.6, §8.1, �
 host, isolasi membership) ✓ · ADR-0003 ✓
 
 **Catatan/tundaan:** tabel bisnis pertama (S05+) WAJIB memanggil `enable_tenant_rls()`
-di migrasinya + test probe-nya; pembatasan environment (demo/produksi) menunggu kolom
-`environment` (S04+); UI pemilih workspace & menu RBAC → S05; endpoint tulis
-`/memberships` & `/tenant/settings` → S05–S06; tabel kontrol-plane (users/tenants/
-roles/memberships) sengaja tidak di-RLS-kan (lihat ADR-0003 §3).
+di migrasinya + test probe-nya; pembatasan environment (demo/produksi) diperbarui di
+ADR-0004 (tenant_environment ada sejak S04); UI pemilih workspace & menu RBAC → S05;
+endpoint tulis `/memberships` & `/tenant/settings` → S05–S06; tabel kontrol-plane
+(users/tenants/roles/memberships) sengaja tidak di-RLS-kan (lihat ADR-0003 §3).
+
+## Sprint S04 — Minggu 4 — Trial lifecycle, kuota & expiry (F03)
+
+**Goal:** "Trial → active without auto-charge" — start saat provisioning, kuota
+atomik, konversi/expiry tanpa charge (Roadmap S04; Spec §5.1, §6.1, §7.1–7.2,
+§8.2/§8.7; POL-07..10; TR01–TR09).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S04-01 | App `modules/trial`: model tenant_trials / trial_events (append-only) / trial_entitlements / DemoBooking (`DEMO-`) | §5.1 | DONE | `modules/trial/models.py`; test append-only event |
+| S04-02 | `tenant_environment` (demo/produksi, UNIQUE per tenant) | §5.1, §2.2 | DONE | `tenants/models.py` + migrasi `tenants/0002` |
+| S04-03 | Provisioning penuh: Owner (guard kuota) + demo env + trial start → TRIAL; backfill migrasi tenant lama | §7.1.3, TR01, §6.1 | DONE | `provision_workspace`, `trial/migrations/0002`; test TR01 30×24 jam + idempoten |
+| S04-04 | Kuota atomik booking demo: lock+increment sebelum create, rollback saat create gagal, delete tak refund (20) | §7.1.5, POL-08, TR02/TR03 | DONE | `create_demo_booking`; test 20 OK / ke-21 `TRIAL_QUOTA_EXCEEDED`, rollback, no-refund |
+| S04-05 | Guard kuota internal user (3; portal di luar hitungan) | POL-08, TR04 | DONE | `assert_internal_user_quota`; test user ke-4 `TRIAL_USER_LIMIT`; S05 wajib memanggil saat invite staf |
+| S04-06 | `GET /trial/status` (payload §8.7), `POST /trial/convert` (confirm eksplisit, idempoten), `POST /trial/demo-bookings`, `GET /trial/demo-data` (read-only pasca-konversi) | §8.2, §8.7 | DONE | `trial/views.py`; test payload, RBAC Owner/Admin/Sales, `TRIAL_ALREADY_USED` |
+| S04-07 | Konversi dini: lock trial+tenant, demo → READ_ONLY, namespace produksi ACTIVE, ACTIVE + event; TANPA charge | §7.2, POL-10, TR09 | DONE | `convert_trial`; test konversi tunggal/idempoten, `trial_price_idr:0`, 1 event |
+| S04-08 | Job expiry `expire_trials`: `now>=ends_at`, re-check di bawah lock (race vs konversi dini), idempoten, no bill | §6.1, TR08 | DONE | management command + `expire_due_trials`; test auto-ACTIVE, re-run 0, race re-check |
+
+**Exit gate S04:** `pytest` 66/66 ✓ · `ruff` clean ✓ · smoke live (register → trial
+status → demo booking → convert → ACTIVE) ✓ · ADR-0004 ✓
+
+**Catatan/tundaan:** reminder H-7/H-3/H-1 + notifikasi `trial.*` → S16 (enum event +
+dedupe key siap); `GET /platform/trials` & `POST /platform/trials/{id}/extend` → S16
+console; guard "trial tenant → write produksi ditolak" penuh menunggu tabel bisnis
+berkolom `environment` (S07+); booking demo placeholder `DemoBooking` digantikan
+booking nyata S09 (semantik counter dipertahankan); UI trial banner/countdown → S06;
+invite staf S05 WAJIB memanggil `assert_internal_user_quota`.
 
 ## Sprint berikutnya
 
@@ -78,7 +105,8 @@ roles/memberships) sengaja tidak di-RLS-kan (lihat ADR-0003 §3).
 |---|---:|---|---|
 | S02 | 2 | Identity: signup, email verification, login/logout/reset, membership | DONE |
 | S03 | 3 | Tenant resolver, RBAC, RLS PostgreSQL, security tests (M1) | DONE |
-| S04–S19 | 4–19 | mengikuti Roadmap §3 | TODO |
+| S04 | 4 | Trial lifecycle, kuota, konversi & expiry tanpa charge | DONE |
+| S05–S19 | 5–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
