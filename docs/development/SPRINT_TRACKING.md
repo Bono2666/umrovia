@@ -47,12 +47,37 @@ smoke live (register → verify → login → /me → logout) ✓ · ADR-0002 �
 force-logout semua sesi lama saat ganti password (harden S19); state tenant → `TRIAL`
 menunggu record trial (S04/F03).
 
+## Sprint S03 — Minggu 3 — Tenant resolver, RBAC, RLS (F02 → M1)
+
+**Goal:** "Cross-tenant access denied" — resolver host/sesi, RBAC permission,
+RLS PostgreSQL terpasang & teruji (Roadmap S03; Spec §2.2, §3, §5.6, §8.1, §8.9).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S03-01 | Tenant resolver: subdomain host → sesi switch → fallback; fail-closed tanpa diam-diam fallback | §2.2 | DONE | `modules/tenants/resolver.py`, `middleware.py`; test host subdomain + host-tanpa-keanggotaan → `TENANT_CONTEXT_REQUIRED` |
+| S03-02 | Transaksi request + `SET LOCAL app.tenant_id` (koneksi request-bound, auto-reset) | §2.2 | DONE | `TenantContextMiddleware`; test kebocoran `current_setting` setelah request (transactional) |
+| S03-03 | `POST /workspaces/switch` (validasi membership server-side, sesi; denial kode sama) | §8.1 | DONE | `tenants/views.py`; test switch sukses/asing/tak-dikenal |
+| S03-04 | RBAC: pola `domain.object.action`, matcher wildcard, matriks default role | §3 | DONE | `modules/tenants/rbac.py` (`DEFAULT_ROLE_PERMISSIONS`), ADR-0003 |
+| S03-05 | `GET /memberships` digarap `require_permission("memberships.read")` (Owner/Admin) | §8.1 | DONE | test: Owner 200 · Sales 403 `permission_denied` · tanpa context 403 `TENANT_CONTEXT_REQUIRED` · anon 403 |
+| S03-06 | Helper RLS `common/rls.py` (pola §5.6 + `NULLIF` fail-closed, identitas tervalidasi) | §5.6 | DONE | `tenant_rls_statements()`; unit test pola & penolakan identifier tak aman |
+| S03-07 | Test RLS PostgreSQL: USING lintas-tenant, WITH CHECK, deny tanpa konteks (role non-superuser) | §5.6, §14 | DONE | `tests/test_rls.py` (tabel probe, `SET ROLE`) — 3 test |
+| S03-08 | Isolasi API antar-tenant: `/memberships` hanya berisi tenant aktif; `/me` ekspos permissions efektif | §2.2, §8.1 | DONE | `test_tenant_security.py` (12 test) |
+
+**Exit gate S03:** `pytest` 50/50 ✓ · `ruff` clean ✓ · smoke live (switch, subdomain
+host, isolasi membership) ✓ · ADR-0003 ✓
+
+**Catatan/tundaan:** tabel bisnis pertama (S05+) WAJIB memanggil `enable_tenant_rls()`
+di migrasinya + test probe-nya; pembatasan environment (demo/produksi) menunggu kolom
+`environment` (S04+); UI pemilih workspace & menu RBAC → S05; endpoint tulis
+`/memberships` & `/tenant/settings` → S05–S06; tabel kontrol-plane (users/tenants/
+roles/memberships) sengaja tidak di-RLS-kan (lihat ADR-0003 §3).
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
 |---|---:|---|---|
 | S02 | 2 | Identity: signup, email verification, login/logout/reset, membership | DONE |
-| S03 | 3 | Tenant resolver, RBAC, RLS PostgreSQL, security tests (M1) | TODO |
+| S03 | 3 | Tenant resolver, RBAC, RLS PostgreSQL, security tests (M1) | DONE |
 | S04–S19 | 4–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
