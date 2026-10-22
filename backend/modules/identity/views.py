@@ -110,6 +110,7 @@ class VerifyEmailView(APIView):
         tenant = Tenant.objects.filter(created_by=user, state="PENDING_EMAIL").first()
         if tenant is not None:
             try:
+                # Provisioning penuh (role Owner, demo env, trial) → state TRIAL (S04)
                 tenant = provision_workspace(user, tenant.slug)
             except ProvisioningError:
                 logger.exception("verify-email: provisioning gagal", extra={"user_id": str(user.id)})
@@ -118,8 +119,6 @@ class VerifyEmailView(APIView):
                      "detail": "Email terverifikasi, tetapi pembuatan workspace gagal. Hubungi support."},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
-            tenant.state = TenantState.PROVISIONING  # → TRIAL pada S04 ketika trial record dibuat
-            tenant.save(update_fields=["state", "updated_at"])
         logger.info("verify-email: sukses", extra={"user_id": str(user.id)})
         return Response(
             {"status": "verified", "email": user.email, "workspace": services.user_payload(user)["memberships"]},

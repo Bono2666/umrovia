@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from modules.identity.models import AuthToken, User, UserStatus
 from modules.tenants.models import Tenant, TenantMembership
+from modules.trial.models import TenantTrial
 
 REGISTER_PAYLOAD = {
     "email": "baru@travelkita.id",
@@ -92,7 +93,10 @@ def test_verify_email_provisions_workspace_and_activates(client, mailoutbox):
     user = User.objects.get(email="baru@travelkita.id")
     assert user.status == UserStatus.ACTIVE and user.is_email_verified
     tenant = Tenant.objects.get(slug="travel-kita")
-    assert tenant.state == "PROVISIONING"
+    # S04: provisioning penuh → state TRIAL + trial record aktif (§7.1 langkah 3)
+    assert tenant.state == "TRIAL"
+    trial = TenantTrial.objects.get(tenant=tenant)
+    assert trial.status == "RUNNING" and trial.converted_at is None
     membership = TenantMembership.objects.without_tenant_guard().get(tenant=tenant, user=user)
     assert membership.status == "ACTIVE" and membership.role.name == "Owner"
 
