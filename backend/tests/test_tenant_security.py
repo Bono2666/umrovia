@@ -182,6 +182,29 @@ def test_me_includes_effective_permissions(client, user, owner_a):
     assert body["memberships"][0]["permissions"] == ["*"]
 
 
+@pytest.mark.django_db
+def test_me_reports_active_tenant_slug(client, user, owner_a, tenant_a, tenant_b):
+    """`active_tenant_slug` = sesi switch; null = fallback membership pertama (S06)."""
+    from modules.tenants.models import MembershipStatus, Role, TenantMembership
+
+    client.force_login(user)
+    assert client.get("/api/v1/me").json()["active_tenant_slug"] is None
+
+    other_role = Role.objects.create(tenant=tenant_b, name="Sales", permissions_json=["bookings.read"])
+    TenantMembership.objects.without_tenant_guard().create(
+        tenant=tenant_b, user=user, role=other_role, status=MembershipStatus.ACTIVE
+    )
+    csrf = _csrf(client)
+    switched = client.post(
+        "/api/v1/workspaces/switch",
+        {"slug": tenant_b.slug},
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=csrf,
+    )
+    assert switched.status_code == 200
+    assert client.get("/api/v1/me").json()["active_tenant_slug"] == tenant_b.slug
+
+
 # ------------------------------------------------------- konteks & kebocoran --
 
 
