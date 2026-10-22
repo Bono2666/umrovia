@@ -8,3 +8,4 @@ psycopg[binary]>=3.2,<4
 django-cors-headers>=4.6,<5
 gunicorn>=23,<24
 whitenoise>=6.8,<7
+redis>=5,<9  # cache Django (throttle) saat REDIS_URL aktif — Spec §8 rate limit

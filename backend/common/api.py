@@ -1,7 +1,7 @@
 """API helpers — error style RFC7807 (Problem Details) sesuai Spec §8."""
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, Throttled, ValidationError
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from common.request_context import get_request_id
@@ -19,7 +19,7 @@ class ProblemDetailAPIException(APIException):
 
 
 def _problem_payload(exc, request) -> dict:
-    code = getattr(exc, "default_code", None) or getattr(exc, "code", None) or "error"
+    code = getattr(exc, "code", None) or getattr(exc, "default_code", None) or "error"
     status_code = getattr(exc, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR)
     detail = getattr(exc, "detail", str(exc))
     field_errors = None
@@ -45,6 +45,10 @@ def exception_handler(exc, context):
     response = drf_exception_handler(exc, context)
     if response is None:
         return None
+    if isinstance(exc, Throttled):
+        exc.code = "rate_limited"  # peta ke semangat §8.9 RATE_LIMITED
+    elif isinstance(exc, ValidationError) and getattr(exc, "code", None) is None:
+        exc.code = "bad_request"  # kode stabil untuk kegagalan validasi input
     request = context.get("request")
     payload = _problem_payload(exc, request)
     response.data = payload

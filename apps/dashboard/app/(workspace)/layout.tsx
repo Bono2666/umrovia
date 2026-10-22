@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LogoutButton } from "@/components/LogoutButton";
 
 const NAV = [
   { href: "/dashboard", label: "Ringkasan" },
@@ -43,7 +44,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
             {/* Tenant banner: nama travel + environment (DEMO/PRODUKSI) — S05 */}
             <span className="font-semibold text-ink">Umrovia</span> · workspace
           </div>
-          <div className="text-sm text-muted">Owner</div>
+          <LogoutButton />
         </header>
         <main className="flex-1 p-6">{children}</main>
       </div>

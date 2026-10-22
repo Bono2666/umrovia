@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, problemMessage } from "@/lib/api";
+
+type RegisterResponse = {
+  status: string;
+  message?: string;
+  dev_verification_url?: string;
+};
 
 /**
- * Registrasi travel baru (S01 placeholder UI — provisioning di S02/F02, Spec §7.1).
- * Field mengikuti alur signup: email, password, nama travel, slug, persetujuan T&C.
+ * Registrasi travel baru (S02) — POST /auth/register (Spec §7.1, §8.1):
+ * email, password, nama travel, slug, persetujuan T&C → link verifikasi email.
  */
 export default function RegisterPage() {
   const [travelName, setTravelName] = useState("");
@@ -15,10 +21,15 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [devUrl, setDevUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const result = await apiFetch<{ detail?: string }>("/auth/register", {
+    setBusy(true);
+    setMessage(null);
+    setDevUrl(null);
+    const result = await apiFetch<RegisterResponse>("/auth/register", {
       method: "POST",
       body: JSON.stringify({
         email,
@@ -28,11 +39,13 @@ export default function RegisterPage() {
         agree_terms: agreed,
       }),
     });
-    setMessage(
-      result.ok
-        ? "Pendaftaran dikirim (stub). Cek email untuk verifikasi."
-        : `Registrasi belum aktif di S01 — akan diisi pada S02. (${result.error.code})`,
-    );
+    setBusy(false);
+    if (result.ok) {
+      setMessage(result.data.message ?? "Link verifikasi sudah dikirim.");
+      setDevUrl(result.data.dev_verification_url ?? null);
+      return;
+    }
+    setMessage(problemMessage(result.error));
   }
 
   return (
@@ -115,11 +128,25 @@ export default function RegisterPage() {
             />
             Saya menyetujui Syarat Layanan dan Kebijakan Privasi Umrovia.
           </label>
-          <button type="submit" className="btn-primary w-full">
-            Buat workspace
+          <button type="submit" className="btn-primary w-full" disabled={busy}>
+            {busy ? "Membuat workspace…" : "Buat workspace"}
           </button>
         </form>
-        {message && <p className="mt-4 text-sm text-muted">{message}</p>}
+        {message && (
+          <div className="mt-4 rounded bg-background p-3 text-sm">
+            <p className="text-ink">{message}</p>
+            {devUrl && (
+              <a
+                href={devUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 break-all font-medium text-primary underline"
+              >
+                Buka link verifikasi (mode pengembangan)
+              </a>
+            )}
+          </div>
+        )}
         <p className="mt-6 text-sm text-muted">
           Sudah punya akun?{" "}
           <Link href="/login" className="font-semibold text-primary">

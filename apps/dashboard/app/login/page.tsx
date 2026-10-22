@@ -1,29 +1,51 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { apiFetch, problemMessage, type UserPayload } from "@/lib/api";
 
 /**
- * Login (S01 placeholder UI — endpoint /auth/login diimplementasikan di S02/F02).
- * Spec §8.1: POST /auth/login, rate limit, session/JWT + CSRF untuk cookie auth.
+ * Login (S02) — POST /auth/login (session cookie + rate limit, Spec §8.1).
+ * Bila sudah sesi aktif, langsung arahkan ke /dashboard.
  */
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch<UserPayload>("/me").then((result) => {
+      if (active && result.ok) router.replace("/dashboard");
+    });
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const result = await apiFetch<{ detail?: string }>("/auth/login", {
+    setBusy(true);
+    setMessage(null);
+    const result = await apiFetch<UserPayload>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
-    setMessage(
-      result.ok
-        ? "Login berhasil (stub)."
-        : `Login belum aktif di S01 — akan diisi pada S02. (${result.error.code})`,
-    );
+    if (result.ok) {
+      router.push("/dashboard");
+      return;
+    }
+    setBusy(false);
+    if (result.error.code === "email_not_verified") {
+      setMessage(
+        "Email belum diverifikasi. Cek kotak masuk Anda — atau minta link baru di halaman registrasi.",
+      );
+    } else {
+      setMessage(problemMessage(result.error));
+    }
   }
 
   return (
@@ -62,11 +84,20 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-          <button type="submit" className="btn-primary w-full">
-            Masuk
+          <button type="submit" className="btn-primary w-full" disabled={busy}>
+            {busy ? "Memproses…" : "Masuk"}
           </button>
         </form>
-        {message && <p className="mt-4 text-sm text-muted">{message}</p>}
+        {message && (
+          <p className="mt-4 rounded bg-background p-3 text-sm text-danger">
+            {message}
+          </p>
+        )}
+        <p className="mt-4 text-sm text-muted">
+          <Link href="/forgot-password" className="text-primary">
+            Lupa password?
+          </Link>
+        </p>
         <p className="mt-6 text-sm text-muted">
           Belum punya akun?{" "}
           <Link href="/register" className="font-semibold text-primary">
