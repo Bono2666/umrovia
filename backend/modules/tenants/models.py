@@ -103,3 +103,40 @@ class TenantMembership(TenantScopedModel, BaseAppModel):
 
     def __str__(self) -> str:
         return f"{self.user.email} @ {self.tenant.slug} ({self.status})"
+
+
+class Environment(models.TextChoices):
+    """Namespace data tenant (Spec §2.2/§5.1): trial = demo; produksi ada
+    hanya setelah konversi (§7.2 langkah 2)."""
+
+    DEMO = "demo", "Demo"
+    PRODUCTION = "production", "Produksi"
+
+
+class EnvironmentState(models.TextChoices):
+    ACTIVE = "ACTIVE", "Aktif"
+    READ_ONLY = "READ_ONLY", "Read-only"
+    DISABLED = "DISABLED", "Nonaktif"
+
+
+class TenantEnvironment(BaseAppModel):
+    """Baris environment per tenant (UNIQUE (tenant, environment), §5.1).
+
+    Pada tenant trial: demo ACTIVE, produksi tidak ada (write produksi fisik
+    mustahil). Setelah konversi: demo → READ_ONLY, produksi → ACTIVE.
+    """
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="environments")
+    environment = models.CharField(max_length=16, choices=Environment.choices)
+    state = models.CharField(max_length=16, choices=EnvironmentState.choices, default=EnvironmentState.ACTIVE)
+
+    class Meta:
+        verbose_name = "environment tenant"
+        verbose_name_plural = "environment tenants"
+        ordering = ["tenant__slug", "environment"]
+        constraints = [
+            models.UniqueConstraint(fields=["tenant", "environment"], name="uq_tenant_environment"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tenant.slug}:{self.environment} ({self.state})"

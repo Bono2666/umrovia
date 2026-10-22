@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     # Umrovia modules (Spec §2.1 modular monolith)
     "modules.identity",
     "modules.tenants",
+    "modules.trial",
 ]
 
 MIDDLEWARE = [
@@ -178,6 +179,8 @@ TENANT_DOMAIN_BASES = [b.strip().lower() for b in env("TENANT_DOMAIN_BASES", "um
 PLATFORM_ADMIN_URL = env("PLATFORM_ADMIN_URL", "http://localhost:3002")
 PUBLIC_API_URL = env("PUBLIC_API_URL", "http://localhost:8000")
 TRIAL_DAYS = int(env("TRIAL_DAYS", "30") or "30")
+TRIAL_DUMMY_BOOKING_LIMIT = int(env("TRIAL_DUMMY_BOOKING_LIMIT", "20") or "20")  # POL-08
+TRIAL_INTERNAL_USER_LIMIT = int(env("TRIAL_INTERNAL_USER_LIMIT", "3") or "3")  # POL-08
 
 # --- Observability (T10) ----------------------------------------------------
 REQUEST_ID_HEADER = "HTTP_X_REQUEST_ID"
