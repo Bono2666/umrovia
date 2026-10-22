@@ -4,7 +4,7 @@ User adalah akun lintas-tenant: satu user bisa memiliki membership di beberapa t
 Email = identifier unik (dinormalisasi huruf kecil). PII minimal di sini; data jamaah
 berada di modul pilgrims dengan isolasi tenant.
 """
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 
@@ -18,7 +18,7 @@ class UserStatus(models.TextChoices):
     DELETED = "DELETED", "Dihapus"
 
 
-class UserManager(models.Manager):
+class UserManager(BaseUserManager):
     def _normalize(self, email: str) -> str:
         return (email or "").strip().lower()
 
@@ -50,6 +50,7 @@ class User(BaseAppModel, AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, db_index=True)
     full_name = models.CharField(max_length=150, blank=True)
     email_verified_at = models.DateTimeField(null=True, blank=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)  # persetujuan T&C saat signup (§7.1)
     mfa_enabled = models.BooleanField(default=False)
     status = models.CharField(max_length=24, choices=UserStatus.choices, default=UserStatus.PENDING_VERIFICATION)
     is_staff = models.BooleanField(default=False)  # akses Django admin platform (operasional)
@@ -74,3 +75,38 @@ class User(BaseAppModel, AbstractBaseUser, PermissionsMixin):
     @property
     def is_email_verified(self) -> bool:
         return self.email_verified_at is not None
+
+
+class AuthTokenKind(models.TextChoices):
+    EMAIL_VERIFY = "EMAIL_VERIFY", "Verifikasi email"
+    PASSWORD_RESET = "PASSWORD_RESET", "Reset password"
+
+
+class AuthToken(BaseAppModel):
+    """Token sekali-pakai dengan TTL untuk verifikasi email & reset password (Spec §7.1, T07).
+
+    Hanya SHA-256 dari token yang disimpan — bocor DB tidak memungkinkan pemalsuan link.
+    Pemakaian: lookup by hash + belum expired + belum dipakai → tandai used_at dalam transaksi.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="auth_tokens")
+    kind = models.CharField(max_length=24, choices=AuthTokenKind.choices)
+    token_sha256 = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "kind", "used_at"], name="idx_authtoken_user_kind"),
+        ]
+
+    @property
+    def is_usable(self) -> bool:
+        from django.utils import timezone
+
+        return self.used_at is None and self.expires_at > timezone.now()
+
+    def __str__(self) -> str:
+        return f"{self.kind} for {self.user.email}"

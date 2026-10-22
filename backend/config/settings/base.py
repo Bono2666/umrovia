@@ -83,6 +83,23 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# --- Cache (throttle auth S02, queryset cache; Redis bila REDIS_URL tersedia) ---
+_redis_url = env("REDIS_URL")
+if _redis_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _redis_url,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "umrovia",
+        }
+    }
+
 # --- API (Spec §8) ----------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -94,6 +111,17 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "auth-register": "20/hour",
+        "auth-login": "10/min",
+        "auth-verify": "30/hour",
+        "auth-resend": "10/hour",
+        "auth-forgot": "5/hour",
+        "anon": "60/min",
+    },
     "EXCEPTION_HANDLER": "common.api.exception_handler",  # RFC7807-style (Spec §8)
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"] + (
         ["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else []

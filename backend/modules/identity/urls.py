@@ -1,22 +1,18 @@
-"""Auth API — signup/verify/login/logout/refresh (S02, Spec §8.1)."""
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+"""Auth API — signup/verify/login/logout/reset (S02, Spec §8.1)."""
+from django.urls import path
+
+from modules.identity import views
 
 app_name = "identity"
 
-urlpatterns: list = []
-
-
-@api_view(["GET"])
-def me(request):
-    """GET /api/v1/me — membership/workspaces milik user (implementasi lengkap di S02)."""
-    user = request.user
-    return Response(
-        {
-            "id": str(user.id),
-            "email": user.email,
-            "full_name": user.full_name,
-            "email_verified": user.is_email_verified,
-            "memberships": [],
-        }
-    )
+urlpatterns = [
+    path("auth/register", views.RegisterView.as_view(), name="register"),
+    path("auth/verify-email", views.VerifyEmailView.as_view(), name="verify-email"),
+    path("auth/resend-verification", views.ResendVerificationView.as_view(), name="resend-verification"),
+    path("auth/login", views.LoginView.as_view(), name="login"),
+    path("auth/logout", views.LogoutView.as_view(), name="logout"),
+    path("auth/csrf", views.csrf_view, name="csrf"),
+    path("auth/password/forgot", views.ForgotPasswordView.as_view(), name="password-forgot"),
+    path("auth/password/reset", views.ResetPasswordView.as_view(), name="password-reset"),
+    path("me", views.MeView.as_view(), name="me"),
+]
