@@ -18,6 +18,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from modules.audit.services import log_event
 from modules.tenants.models import (
     Environment,
     EnvironmentState,
@@ -166,6 +167,15 @@ def _convert_locked(tenant, trial: TenantTrial, *, actor, trigger: str) -> bool:
         metadata={"trigger": trigger, "converted_at": now.isoformat()},
     )
     tenant.state = tenant_locked.state  # sinkronkan state pada objek tenant milik caller
+    # Audit tunggal di choke-point (S05): menutup semua jalur (manual + expiry job)
+    log_event(
+        action="trial.converted",
+        tenant=tenant_locked,
+        actor=actor,
+        object_type="tenant_trial",
+        object_id=trial.id,
+        changes={"trigger": trigger, "from_state": "TRIAL", "to_state": tenant_locked.state},
+    )
     return True
 
 

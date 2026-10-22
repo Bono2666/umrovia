@@ -28,6 +28,8 @@ INSTALLED_APPS = [
     "modules.identity",
     "modules.tenants",
     "modules.trial",
+    "modules.travel_finance",
+    "modules.audit",
 ]
 
 MIDDLEWARE = [

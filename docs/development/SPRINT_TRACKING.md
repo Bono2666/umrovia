@@ -99,6 +99,33 @@ berkolom `environment` (S07+); booking demo placeholder `DemoBooking` digantikan
 booking nyata S09 (semantik counter dipertahankan); UI trial banner/countdown → S06;
 invite staf S05 WAJIB memanggil `assert_internal_user_quota`.
 
+## Sprint S05 — Minggu 5 — Travel profile, staff, roles, bank accounts (F04)
+
+**Goal:** "RBAC and audit passes" — undangan staf, CRUD role berproteksi,
+settings travel, rekening bank masked, audit append-only (Roadmap S05;
+Spec §3, §5.1, §5.3, §5.5, §8.1, §13).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S05-01 | App `modules.audit`: `audit_events` append-only (save/update ditolak), `log_event` + `redact()` (sensitif → `***`), gagal audit ≠ gagal operasi | §5.5, §13 | DONE | `modules/audit/{models,services}.py`; test append-only, redact, failure-tolerant |
+| S05-02 | App `modules.travel_finance`: `travel_bank_accounts` + **RLS sejak migrasi pertama** (pol §5.6 + NULLIF, SQL beku, FORCE); UNIQUE (tenant, bank, masked) | §5.3, §5.6 | DONE | `travel_finance/0001` + RunSQL; test `pg_policies`/`relforcerowsecurity` |
+| S05-03 | `tenant_settings` (`tenant_id` PK: branding/invoice/rules) + backfill `tenants/0004` (role default, Owner `is_system`, settings) | §5.1 | DONE | `tenants/models.py`, migrasi `0003`/`0004`; test provisioning membuat semua role default |
+| S05-04 | `GET/PATCH /tenant/settings` (Owner/Admin; per-method `tenant.settings.read/.write`; replace per-bagian, ≤16 KiB) | §8.1, §5.1 | DONE | `test_staff_admin.py`: Owner/Admin 200 · Sales 403 · payload invalid 400 |
+| S05-05 | `POST /memberships` invite: user baru → `PENDING_VERIFICATION` + `INVITED` (aktif saat verifikasi email), user ACTIVE → `ACTIVE`; guard kuota trial TR04 | §8.1 | DONE | hook `VerifyEmailView` (`memberships.activated`); test invite/duplikat/role asing 400 · Sales 403 · quota |
+| S05-06 | `PATCH/DELETE /memberships/{id}` (Owner-only, `memberships.manage`), revoke soft idempoten, **guard Owner terakhir**, IDOR 404 | §8.1 | DONE | test: ganti role OK · Admin 403 · Owner-terakhir 400 · akses hilang seketika · cross-tenant 404 |
+| S05-07 | Roles CRUD (`roles.read/.write`): proteksi `is_system` (Owner), nama "Owner" & grant `*` ditolak, pola §3 tervalidasi, role terpakai tak bisa dihapus, nama unik | §5.1, §3 | DONE | test parametrik validasi · system immutable · in-use 400 · Sales 403 · cross-tenant 404 |
+| S05-08 | Rekening bank `GET/POST /bank-accounts`, `PATCH /{id}` (Finance/Owner): `account_number` write-only → `account_masked` 4 digit; nomor asli tak tersimpan/dikirim/diaudit | §5.3, §3 | DONE | test masking (`*********0123`), audit masked, Admin/Sales 403, duplikat 400, cross-tenant 404 |
+| S05-09 | Audit event: `memberships.*`, `roles.*`, `tenant.settings.updated`, `bank_accounts.*`, `workspaces.switched`, `trial.converted` (choke-point `_convert_locked`) | §5.5 | DONE | asersi per aksi di `test_staff_admin.py` |
+| S05-10 | Matriks RBAC baru: `tenant.settings.read`, `roles.read/write`, `memberships.manage`, `bank_accounts.read/write` (Admin += settings.read+roles; Finance += bank; Admin/Sales − bank) | §3 | DONE | `rbac.py::DEFAULT_ROLE_PERMISSIONS`; test matrix per endpoint |
+
+**Exit gate S05:** `pytest` 105/105 ✓ (39 baru) · `ruff` clean ✓ ·
+`makemigrations --check` no-change ✓ · smoke live ✓ · ADR-0005 ✓
+
+**Catatan/tundaan:** email invite + staff UI → S06/S16 (jalur aktivasi
+sudah jalan via verifikasi email); baca audit (`GET /audit-events`)/export →
+S07+/S16; kas/bank cash-movement & payment gateway → sprint finance/PMT
+(launcher TBD); `branch_id` multi-cabang di memberships menyusul F04.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -106,7 +133,8 @@ invite staf S05 WAJIB memanggil `assert_internal_user_quota`.
 | S02 | 2 | Identity: signup, email verification, login/logout/reset, membership | DONE |
 | S03 | 3 | Tenant resolver, RBAC, RLS PostgreSQL, security tests (M1) | DONE |
 | S04 | 4 | Trial lifecycle, kuota, konversi & expiry tanpa charge | DONE |
-| S05–S19 | 5–19 | mengikuti Roadmap §3 | TODO |
+| S05 | 5 | Travel profile, staf/invite, roles, rekening bank, audit (RBAC) | DONE |
+| S06–S19 | 6–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
