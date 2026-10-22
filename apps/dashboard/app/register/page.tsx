@@ -128,7 +128,7 @@ export default function RegisterPage() {
             />
             Saya menyetujui Syarat Layanan dan Kebijakan Privasi Umrovia.
           </label>
-          <button type="submit" className="btn-primary w-full" disabled={busy}>
+          <button type="submit" className="btn btn--solid btn--lg w-full" disabled={busy}>
             {busy ? "Membuat workspace…" : "Buat workspace"}
           </button>
         </form>

@@ -47,7 +47,11 @@ export function ErrorState({
     >
       <p>{message}</p>
       {onRetry ? (
-        <button type="button" onClick={onRetry} className="mt-3 text-xs font-semibold underline">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="btn btn--link mt-3 text-xs"
+        >
           Coba lagi
         </button>
       ) : null}
@@ -112,9 +116,11 @@ export function FormField({
   );
 }
 
-/** Tombol sekunder gaya editorial (hairline; hover invert ke soft-black). */
-export const BTN_SECONDARY =
-  "border border-border-strong px-3 py-1.5 text-sm font-semibold transition-colors duration-300 hover:bg-ink hover:text-surface";
-
-export const BTN_DANGER =
-  "border border-danger/40 px-3 py-1.5 text-sm font-semibold text-danger transition-colors duration-300 hover:bg-danger hover:text-surface";
+/** Tombol mengikuti sistem web_template (pill; slide-fill naik dari bawah
+ * saat hover — lihat globals.css). BTN_PRIMARY = CTA utama (pill ink
+ * pekat, template `--secondary` light); BTN_SECONDARY = aksi sekunder
+ * (tint hairline + slide-fill ink, template `--primary` light);
+ * BTN_DANGER = destruktif (mekanisme sama, nada danger). */
+export const BTN_PRIMARY = "btn btn--solid";
+export const BTN_SECONDARY = "btn btn--tint";
+export const BTN_DANGER = "btn btn--danger";

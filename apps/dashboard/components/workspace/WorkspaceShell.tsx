@@ -210,7 +210,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             onClick={toggleSidebar}
             aria-label={collapsed ? "Buka sidebar" : "Tutup sidebar"}
             aria-expanded={!collapsed}
-            className="flex h-8 w-8 shrink-0 items-center justify-center border border-border text-muted transition-colors duration-300 hover:bg-ink hover:text-surface"
+            className="btn btn--icon shrink-0"
           >
             {collapsed ? (
               <PanelLeftOpen className="h-4 w-4" strokeWidth={1.75} />

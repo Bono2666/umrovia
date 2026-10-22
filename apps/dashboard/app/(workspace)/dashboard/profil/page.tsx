@@ -168,7 +168,7 @@ export default function ProfilPage() {
               {readOnly ? null : (
                 <button
                   type="button"
-                  className="btn-primary"
+                  className="btn btn--solid"
                   disabled={busyKey === section.key}
                   onClick={() => onSave(section.key)}
                 >
