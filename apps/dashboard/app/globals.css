@@ -119,6 +119,7 @@
     background-color: transparent;
     box-shadow: none;
     text-align: center;
+    text-decoration: none; /* template: .btn { text-decoration:none } */
     white-space: nowrap;
     vertical-align: middle;
     -webkit-user-select: none;
@@ -396,13 +397,26 @@
 
   /* Hover — template memakai kelas .has-hover; padanan kami media (hover:hover) */
   @media (hover: hover) {
+    /* Slide-fill: lapisan ::before naik dari bawah menutupi seluruh bidang.
+       Sumber (verbatim):
+       `.has-hover .btn:where(:not(.is-disabled)):hover:before { transform: translateY(0) }`
+       — berlaku untuk SEMUA varian (secondary/link efektif tak terlihat
+       karena lapisannya transparan/display:none). Varian :active:hover
+       menjaga lapisan tetap terangkat saat mouse ditekan. */
+    .btn:where(:not(:disabled)):hover::before,
+    .btn:where(:not(:disabled)):active:hover::before {
+      transform: translateY(0);
+    }
     .btn--primary:hover:not(:disabled) {
       color: #fff;
     }
     .btn--danger:hover:not(:disabled) {
       color: #fff;
     }
-    .btn--cloned:hover:not(:disabled) .btn__content {
+    /* Roll teks: konten ganda berguling naik — termasuk varian
+       :active:hover seperti sumber */
+    .btn--cloned:hover:not(:disabled) .btn__content,
+    .btn--cloned:active:hover:not(:disabled) .btn__content {
       transform: translateY(-100%);
     }
   }
