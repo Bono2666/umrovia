@@ -140,3 +140,19 @@ class TenantEnvironment(BaseAppModel):
 
     def __str__(self) -> str:
         return f"{self.tenant.slug}:{self.environment} ({self.state})"
+
+
+class TenantSettings(models.Model):
+    """Konfigurasi 1:1 tenant (tenant_id PK, Spec §5.1): branding, invoice, rules."""
+
+    tenant = models.OneToOneField(
+        Tenant, on_delete=models.CASCADE, related_name="settings", primary_key=True
+    )
+    branding_json = models.JSONField(default=dict, blank=True)
+    invoice_config_json = models.JSONField(default=dict, blank=True)
+    rules_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"Settings {self.tenant.slug}"

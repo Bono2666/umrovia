@@ -18,13 +18,17 @@ from modules.tenants.exceptions import TenantContextRequired
 
 # Grant default per role tenant (dipakai saat role dibuat — S05+ & test).
 # Catatan: Admin TIDAK mendapat payments.verify / wallet.topup / trial.convert
-# / reports.export_pii (matriks §3 = S/—); hanya Owner (wildcard) yang dapat.
+# / reports.export_pii / memberships.manage (Owner-only §8.1) / bank_accounts.*
+# (matriks §3 = S/—); hanya Owner (wildcard) yang dapat.
 DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
     "Owner": ["*"],
     "Admin": [
         "memberships.read",
         "memberships.write",
+        "tenant.settings.read",
         "tenant.settings.write",
+        "roles.read",
+        "roles.write",
         "bookings.create",
         "bookings.read",
         "departures.manage",
@@ -40,7 +44,14 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "leads.manage",
         "trial.demo_booking.create",
     ],
-    "Finance": ["payments.verify", "wallet.topup", "invoices.read", "reports.read"],
+    "Finance": [
+        "payments.verify",
+        "wallet.topup",
+        "invoices.read",
+        "reports.read",
+        "bank_accounts.read",
+        "bank_accounts.write",
+    ],
     "Operations": ["departures.manage", "documents.approve", "manifest.read", "bookings.read"],
     "Document Reviewer": ["documents.review", "bookings.read"],
 }

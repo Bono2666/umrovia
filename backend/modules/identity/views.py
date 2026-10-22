@@ -19,6 +19,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from modules.audit.services import log_event
 from modules.identity import services
 from modules.identity.models import AuthTokenKind, User, UserStatus
 from modules.identity.serializers import (
@@ -29,7 +30,7 @@ from modules.identity.serializers import (
     ResetPasswordSerializer,
     VerifyEmailSerializer,
 )
-from modules.tenants.models import Tenant, TenantState
+from modules.tenants.models import MembershipStatus, Tenant, TenantMembership, TenantState
 from modules.tenants.services import ProvisioningError, provision_workspace
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,24 @@ class VerifyEmailView(APIView):
             )
 
         user = services.mark_verified(user)
+        # S05: undangan staf (INVITED) otomatis aktif saat email diverifikasi
+        invited = list(
+            TenantMembership.objects.without_tenant_guard().filter(
+                user=user, status=MembershipStatus.INVITED
+            )
+        )
+        for m in invited:
+            m.status = MembershipStatus.ACTIVE
+            m.save(update_fields=["status", "updated_at"])
+            log_event(
+                action="memberships.activated",
+                request=request,
+                tenant=m.tenant,
+                actor=user,
+                object_type="membership",
+                object_id=m.id,
+                changes={"email": user.email, "role": m.role.name if m.role else None},
+            )
         tenant = Tenant.objects.filter(created_by=user, state="PENDING_EMAIL").first()
         if tenant is not None:
             try:
