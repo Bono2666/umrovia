@@ -207,12 +207,19 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
-    """GET /me — identitas + membership/workspaces (Spec §8.1)."""
+    """GET /me — identitas + membership/workspaces (Spec §8.1).
+
+    `active_tenant_slug` = sesi switch aktif (null bila masih fallback
+    membership pertama — resolver menentukan konteksnya; klien memakai
+    fallback yang sama untuk menampilkan header workspace).
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(services.user_payload(request.user), status=status.HTTP_200_OK)
+        payload = services.user_payload(request.user)
+        payload["active_tenant_slug"] = request.session.get("active_tenant_slug")
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class ForgotPasswordView(APIView):
