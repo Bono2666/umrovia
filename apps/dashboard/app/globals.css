@@ -47,6 +47,9 @@
   --color-accent: var(--brand-accent);
   --color-ink: var(--brand-ink);
   --color-muted: var(--brand-muted);
+  --color-danger: var(--status-danger);
+  --color-success: var(--status-success);
+  --color-warning: var(--status-warning);
   --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
