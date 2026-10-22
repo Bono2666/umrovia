@@ -41,7 +41,7 @@ services:
       ALLOWED_HOSTS: localhost,127.0.0.1,api
       DEBUG: ${DEBUG:-True}
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8001}:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -58,14 +58,14 @@ services:
       context: .
       dockerfile: infra/docker/web.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8001}
     ports:
       - "3000:3000"
     depends_on:
       api:
         condition: service_healthy
     environment:
-      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8001}
 
 volumes:
   pgdata:
