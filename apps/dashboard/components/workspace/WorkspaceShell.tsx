@@ -39,17 +39,32 @@ type NavItem = {
  * (`icons.svg#arrow-down-small`: viewBox 10×10, stroke currentColor 1.2;
  * dirender 12×12 agar pas dengan kotak isi `btn--circle-xs`).
  * Arah disesuaikan: sidebar terbuka → panah ke kiri (aksi tutup),
- * sidebar tertutup → panah ke kanan (aksi buka). Rotasi instan tanpa
- * transisi — mengikuti sumber (`.btn .icon { transition: none }`).
+ * sidebar tertutup → panah ke kanan (aksi buka). Berputar 180° saat status
+ * berubah lewat KLIK (bukan hover seperti template) dengan easing
+ * editorial .6s; transisi hanya diaktifkan setelah klik pertama (`animate`)
+ * agar panah tidak ikut berputar saat hydration.
  */
-function CollapseArrow({ collapsed }: { collapsed: boolean }) {
+function CollapseArrow({
+  collapsed,
+  animate,
+}: {
+  collapsed: boolean;
+  animate: boolean;
+}) {
   return (
     <svg
       width="12"
       height="12"
       viewBox="0 0 10 10"
       aria-hidden="true"
-      className={collapsed ? "-rotate-90" : "rotate-90"}
+      className={[
+        collapsed ? "-rotate-90" : "rotate-90",
+        animate
+          ? "transition-transform duration-[600ms] ease-[cubic-bezier(.25,.74,.22,.99)] motion-reduce:transition-none"
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <path
         fill="none"
@@ -131,6 +146,10 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<UserPayload | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
   const [switchError, setSwitchError] = useState<string | null>(null);
+  // Transisi putar icon toggle baru diaktifkan setelah klik pertama —
+  // mencegah panah ikut berputar saat hydration (sidebar tersimpan
+  // collapsed di localStorage, server snapshot = expanded).
+  const [arrowReady, setArrowReady] = useState(false);
 
   // Sidebar collapse: localStorage sebagai store eksternal (useSyncExternalStore
   // — aman untuk hydration; server snapshot = expanded). Toggle memancarkan
@@ -148,6 +167,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
     const next = window.localStorage.getItem("umrovia.sidebar") !== "collapsed";
     window.localStorage.setItem("umrovia.sidebar", next ? "collapsed" : "expanded");
     window.dispatchEvent(new Event("umrovia-sidebar-change"));
+    setArrowReady(true);
   }, []);
 
   const loadMe = useCallback(() => {
@@ -238,7 +258,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             aria-expanded={!collapsed}
             className="shrink-0"
           >
-            <CollapseArrow collapsed={collapsed} />
+            <CollapseArrow collapsed={collapsed} animate={arrowReady} />
           </Btn>
           <Link
             href="/dashboard"
