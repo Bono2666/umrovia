@@ -131,9 +131,17 @@ def membership_summary(user: User) -> list[dict]:
             },
             "role": m.role.name if m.role else None,
             "status": m.status,
+            "permissions": _permission_list(m.role),
         }
         for m in rows
     ]
+
+
+def _permission_list(role) -> list:
+    """Grant permission role → list (normalisasi; lihat modules.tenants.rbac)."""
+    from modules.tenants.rbac import permission_list
+
+    return permission_list(role)
 
 
 def user_payload(user: User) -> dict:

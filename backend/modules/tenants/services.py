@@ -29,7 +29,7 @@ def provision_workspace(owner, slug: str) -> Tenant:
     role = Role.objects.get_or_create(
         tenant=tenant,
         name="Owner",
-        defaults={"permissions_json": {"*": "*"}, "is_system": False},
+        defaults={"permissions_json": ["*"], "is_system": False},  # wildcard (Spec §3 Owner)
     )[0]
     TenantMembership.objects.without_tenant_guard().create(
         tenant=tenant,

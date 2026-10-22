@@ -9,7 +9,8 @@ VERSION = "0.1.0"  # dipakai health endpoint & User-Agent
 SECRET_KEY = env("SECRET_KEY")  # wajib di production; local.py menyediakan fallback dev
 DEBUG = env_bool("DEBUG", "False")
 
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
+# `.localhost` (wildcard) = subdomain dev untuk tenant resolver S03: <slug>.localhost
+ALLOWED_HOSTS = [*env_list("ALLOWED_HOSTS", "localhost,127.0.0.1"), ".localhost"]
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://localhost:8000")
 
 INSTALLED_APPS = [
@@ -172,6 +173,8 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Umrovia <no-reply@umrovia.com>")
 BRAND_NAME = env("BRAND_NAME", "Umrovia")
 PUBLIC_SITE_URL = env("PUBLIC_SITE_URL", "http://localhost:3001")
 TENANT_APP_URL = env("TENANT_APP_URL", "http://localhost:3000")
+# Basis domain tempat subdomain = slug tenant (Spec §2.2 resolver): <slug>.<base>
+TENANT_DOMAIN_BASES = [b.strip().lower() for b in env("TENANT_DOMAIN_BASES", "umrovia.com,localhost").split(",") if b.strip()]
 PLATFORM_ADMIN_URL = env("PLATFORM_ADMIN_URL", "http://localhost:3002")
 PUBLIC_API_URL = env("PUBLIC_API_URL", "http://localhost:8000")
 TRIAL_DAYS = int(env("TRIAL_DAYS", "30") or "30")

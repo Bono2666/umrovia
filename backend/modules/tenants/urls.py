@@ -1,5 +1,11 @@
-"""Tenant API — /tenant/settings, /memberships, /workspaces/switch (S05–S06, Spec §8.1)."""
+"""Tenant API — /workspaces/switch, /memberships (S03, Spec §8.1)."""
+from django.urls import path
+
+from modules.tenants import views
 
 app_name = "tenants"
 
-urlpatterns: list = []
+urlpatterns = [
+    path("workspaces/switch", views.SwitchWorkspaceView.as_view(), name="workspace-switch"),
+    path("memberships", views.ListMembershipsView.as_view(), name="memberships-list"),
+]
