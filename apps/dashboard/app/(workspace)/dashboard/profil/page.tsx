@@ -124,7 +124,7 @@ export default function ProfilPage() {
         aturan operasional. Setiap bagian berupa objek JSON.
       </p>
       {readOnly ? (
-        <p className="mt-4 rounded border border-border bg-surface p-3 text-sm text-muted">
+        <p className="mt-4 border border-border p-3 text-sm text-muted">
           Mode baca — peran Anda tidak memiliki <code>tenant.settings.write</code>.
         </p>
       ) : null}

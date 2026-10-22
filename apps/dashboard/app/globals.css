@@ -1,47 +1,48 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   Umrovia design tokens (Spec §4 — design behavior; Source of truth: brand
-   tokens terpusat. Tenant logo tidak menggantikan identitas legal Umrovia.)
+   Umrovia design tokens — gaya EDITORIAL (Spec §4; diadopsi dari template
+   web pengguna: soft-black #191b1d di atas putih, hairline border,
+   heading ketat, radius datar, transisi halus cubic-bezier(.25,.74,.22,.99)).
+   Keputusan S06: font tetap Poppins; aksen hijau Umrovia dipertahankan
+   untuk aksi/tautan/status (identitas brand — tenant logo tidak
+   menggantikan identitas legal Umrovia).
    ========================================================================== */
 :root {
   /* Brand */
   --brand-primary: #0e6b5c;
   --brand-primary-hover: #0a564a;
   --brand-accent: #c9a227;
-  --brand-ink: #10221f;
-  --brand-muted: #5b6b67;
+  --brand-ink: #191b1d; /* soft-black ala template (--c-black) */
+  --brand-muted: #6f7377; /* ~rgba(25,27,29,.55) */
 
-  /* Surface & border */
-  --background: #f7f9f8;
+  /* Surface & border — hairline (template --t-line: black-10) */
+  --background: #ffffff;
   --surface: #ffffff;
-  --border: #e2e8e6;
+  --border: rgb(25 27 29 / 0.12);
+  --border-strong: rgb(25 27 29 / 0.32);
 
-  /* Status (semantic) */
-  --status-success: #15803d;
-  --status-warning: #b45309;
-  --status-danger: #b91c1c;
+  /* Status (semantic, editorial-muted) */
+  --status-success: #157347;
+  --status-warning: #9a6700;
+  --status-danger: #b42318;
   --status-info: #1d4ed8;
 
-  /* Type scale */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
+  /* Radius: nyaris datar (template square) */
+  --radius: 0.125rem;
 
-  /* Font utama: Poppins (di-set via variable next/font di layout.tsx) */
+  /* Kartu tanpa bayangan — hanya hairline (gaya template) */
+  --shadow-card: none;
 
-  /* Radius & shadow */
-  --radius: 0.5rem;
-  --shadow-card: 0 1px 2px rgb(16 34 31 / 0.06), 0 1px 3px rgb(16 34 31 / 0.08);
+  /* Transisi editorial (template: cubic-bezier(.25,.74,.22,.99) 0.4s) */
+  --ease-editorial: cubic-bezier(0.25, 0.74, 0.22, 0.99);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-primary: var(--brand-primary);
   --color-primary-hover: var(--brand-primary-hover);
   --color-accent: var(--brand-accent);
@@ -54,10 +55,19 @@
   --font-mono: var(--font-geist-mono);
 }
 
-body {
-  background: var(--background);
-  color: var(--brand-ink);
-  font-family: var(--font-poppins), system-ui, sans-serif;
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--brand-ink);
+    font-family: var(--font-poppins), system-ui, sans-serif;
+  }
+
+  /* Tipografi editorial: heading rapat (letter-spacing negatif) */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.03em;
+  }
 }
 
 /* Komponen dasar */
@@ -65,7 +75,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
 }
 
 .btn-primary {
@@ -74,7 +84,8 @@ body {
   border-radius: var(--radius);
   padding: 0.5rem 1rem;
   font-weight: 600;
-  transition: background 0.15s ease;
+  letter-spacing: -0.01em;
+  transition: background 0.4s var(--ease-editorial);
 }
 .btn-primary:hover {
   background: var(--brand-primary-hover);
@@ -86,8 +97,12 @@ body {
   border-radius: var(--radius);
   padding: 0.5rem 0.75rem;
   background: var(--surface);
+  transition:
+    border-color 0.4s var(--ease-editorial),
+    box-shadow 0.4s var(--ease-editorial);
 }
 .input:focus {
-  outline: 2px solid var(--brand-primary);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--brand-ink);
+  box-shadow: 0 0 0 1px var(--brand-ink);
 }

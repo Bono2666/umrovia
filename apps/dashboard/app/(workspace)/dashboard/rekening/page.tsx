@@ -118,7 +118,7 @@ export default function RekeningPage() {
       </p>
 
       {message ? (
-        <p className="mt-4 rounded border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
+        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
           {message}
         </p>
       ) : null}
@@ -149,7 +149,7 @@ export default function RekeningPage() {
                   <p className="font-semibold">{account.bank_name}</p>
                   <p className="text-xs text-muted">{account.account_name}</p>
                 </div>
-                <code className="rounded bg-background px-2 py-0.5 text-xs">
+                <code className="border border-border bg-background px-2 py-0.5 text-xs">
                   {account.account_masked}
                 </code>
                 <StatusBadge tone={account.active ? "success" : "neutral"}>

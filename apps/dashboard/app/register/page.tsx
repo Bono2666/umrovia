@@ -51,7 +51,7 @@ export default function RegisterPage() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="card w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-primary">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">
           Coba Umrovia gratis
         </h1>
         <p className="mt-1 text-sm text-muted">
@@ -133,7 +133,7 @@ export default function RegisterPage() {
           </button>
         </form>
         {message && (
-          <div className="mt-4 rounded bg-background p-3 text-sm">
+          <div className="mt-4 border border-border p-3 text-sm">
             <p className="text-ink">{message}</p>
             {devUrl && (
               <a

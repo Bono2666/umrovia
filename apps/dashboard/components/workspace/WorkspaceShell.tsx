@@ -163,8 +163,11 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface p-4">
-        <Link href="/dashboard" className="text-lg font-bold text-primary">
-          Umrovia
+        <Link
+          href="/dashboard"
+          className="text-lg font-semibold tracking-tight text-ink"
+        >
+          Umrovia<span className="text-primary">.</span>
         </Link>
         <div className="mt-1 truncate text-xs text-muted" title={active.tenant.display_name}>
           {active.tenant.display_name}
@@ -185,7 +188,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                     item.soon ? (
                       <span
                         key={item.href}
-                        className="flex items-center justify-between rounded px-2 py-1.5 text-sm text-muted/60"
+                        className="flex items-center justify-between px-2 py-1.5 text-sm text-muted/60"
                         title={`Modul ${item.label} menyusul ${item.soon}`}
                       >
                         {item.label}
@@ -195,7 +198,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`rounded px-2 py-1.5 text-sm font-medium ${
+                        className={`px-2 py-1.5 text-sm font-medium ${
                           pathname === item.href
                             ? "bg-primary/10 text-primary"
                             : "text-ink hover:bg-background"

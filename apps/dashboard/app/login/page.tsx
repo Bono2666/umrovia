@@ -51,7 +51,7 @@ export default function LoginPage() {
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="card w-full max-w-md p-8">
-        <h1 className="text-2xl font-bold text-primary">Umrovia</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Umrovia</h1>
         <p className="mt-1 text-sm text-muted">
           Masuk ke workspace travel Anda
         </p>
@@ -89,7 +89,7 @@ export default function LoginPage() {
           </button>
         </form>
         {message && (
-          <p className="mt-4 rounded bg-background p-3 text-sm text-danger">
+          <p className="mt-4 border border-border p-3 text-sm text-danger">
             {message}
           </p>
         )}

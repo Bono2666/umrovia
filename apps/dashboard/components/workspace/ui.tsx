@@ -55,7 +55,8 @@ export function ErrorState({
   );
 }
 
-/** Status chip teks (§4.3: status memakai teks, bukan warna saja). */
+/** Status chip teks (§4.3: status memakai teks, bukan warna saja).
+ * Gaya editorial: persegi, hairline border. */
 export function StatusBadge({
   tone = "neutral",
   children,
@@ -71,7 +72,7 @@ export function StatusBadge({
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${tones[tone]}`}
+      className={`inline-flex items-center border px-1.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide ${tones[tone]}`}
     >
       {children}
     </span>
@@ -111,8 +112,9 @@ export function FormField({
   );
 }
 
+/** Tombol sekunder gaya editorial (hairline; hover invert ke soft-black). */
 export const BTN_SECONDARY =
-  "rounded border border-border bg-surface px-3 py-1.5 text-sm font-semibold hover:bg-background";
+  "border border-border-strong px-3 py-1.5 text-sm font-semibold transition-colors duration-300 hover:bg-ink hover:text-surface";
 
 export const BTN_DANGER =
-  "rounded border border-danger/30 bg-danger/10 px-3 py-1.5 text-sm font-semibold text-danger hover:bg-danger/20";
+  "border border-danger/40 px-3 py-1.5 text-sm font-semibold text-danger transition-colors duration-300 hover:bg-danger hover:text-surface";
