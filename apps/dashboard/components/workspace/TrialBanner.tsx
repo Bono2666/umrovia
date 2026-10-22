@@ -78,7 +78,7 @@ export function TrialBanner({
             type="button"
             onClick={onConvert}
             disabled={busy || !status.can_convert_now}
-            className="btn-primary ml-auto disabled:opacity-50"
+            className="btn btn--solid ml-auto"
           >
             {busy ? "Mengonversi…" : "Konversi ke Produksi"}
           </button>

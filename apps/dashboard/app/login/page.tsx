@@ -84,7 +84,7 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-          <button type="submit" className="btn-primary w-full" disabled={busy}>
+          <button type="submit" className="btn btn--solid btn--lg w-full" disabled={busy}>
             {busy ? "Memproses…" : "Masuk"}
           </button>
         </form>

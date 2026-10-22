@@ -37,7 +37,7 @@ function ResetPasswordInner() {
         <p className="text-sm text-danger">
           Tautan reset tidak memiliki token. Minta tautan baru.
         </p>
-        <Link href="/forgot-password" className="btn-primary block w-full text-center">
+        <Link href="/forgot-password" className="btn btn--solid btn--lg block w-full text-center">
           Minta tautan baru
         </Link>
       </div>
@@ -50,7 +50,7 @@ function ResetPasswordInner() {
         <p className="text-sm text-success">
           Password berhasil diperbarui. Silakan masuk dengan password baru.
         </p>
-        <Link href="/login" className="btn-primary block w-full text-center">
+        <Link href="/login" className="btn btn--solid btn--lg block w-full text-center">
           Lanjut masuk
         </Link>
       </div>
@@ -74,7 +74,7 @@ function ResetPasswordInner() {
           placeholder="Minimal 8 karakter"
         />
       </div>
-      <button type="submit" className="btn-primary w-full" disabled={busy}>
+      <button type="submit" className="btn btn--solid btn--lg w-full" disabled={busy}>
         {busy ? "Menyimpan…" : "Simpan password baru"}
       </button>
       {message && <p className="text-sm text-danger">{message}</p>}

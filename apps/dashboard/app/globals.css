@@ -78,17 +78,136 @@
   box-shadow: none;
 }
 
-.btn-primary {
-  background: var(--brand-primary);
-  color: #fff;
-  border-radius: var(--radius);
-  padding: 0.5rem 1rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  transition: background 0.4s var(--ease-editorial);
-}
-.btn-primary:hover {
-  background: var(--brand-primary-hover);
+/* --------------------------------------------------------------------------
+   Tombol — mengikuti sistem `.btn` web_template (tema light):
+   - pill (template: border-radius 60px), tinggi 30px (sm 25px), padding-x 16px
+   - font-weight 400, letter-spacing -0.04em, line-height 1
+   - efek khas "slide-fill": lapisan warna naik dari BAWAH ke seluruh bidang
+     saat hover (template: ::before translateY(101%) → 0, 0.6s) — di sini
+     direplikasi dengan background-gradient agar label teks polos ikut
+     benar tanpa perlu pembungkus elemen.
+   - template light: `--primary` = tint black-10 + teks hitam → hover hitam
+     penuh + teks putih; `--secondary` = pill hitam pekat + teks putih.
+     Nama kelas kita dipetakan SEMANTIK: --solid = CTA (template secondary),
+     --tint = aksi sekunder (template primary).
+   - fokus: ring ganda (gap surface + ink) supaya terlihat di semua varian;
+     disabled: opacity 40% + cursor default.
+   -------------------------------------------------------------------------- */
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 1.875rem; /* 30px — tinggi default template */
+    padding: 0 1rem; /* 16px */
+    border: 1px solid var(--brand-ink);
+    border-radius: 9999px; /* pill */
+    background-color: transparent;
+    background-image: linear-gradient(
+      var(--btn-fill, transparent),
+      var(--btn-fill, transparent)
+    );
+    background-repeat: no-repeat;
+    background-position: bottom;
+    background-size: 100% 0%;
+    color: var(--brand-ink);
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 400;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    transition:
+      background-size 0.6s var(--ease-editorial),
+      color 0.6s var(--ease-editorial),
+      border-color 0.6s var(--ease-editorial),
+      opacity 0.3s var(--ease-editorial);
+  }
+
+  /* Slide-fill naik dari bawah saat hover (desktop) */
+  @media (hover: hover) {
+    .btn:hover:not(:disabled) {
+      background-size: 100% 100%;
+      color: var(--btn-hover-fg, #fff);
+    }
+  }
+
+  .btn:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px var(--brand-ink);
+  }
+  .btn:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+
+  /* CTA utama: pill ink pekat, teks putih (template --secondary light) */
+  .btn--solid {
+    --btn-fill: rgb(255 255 255 / 0.14);
+    background-color: var(--brand-ink);
+    color: #fff;
+  }
+
+  /* Aksi sekunder: tint hairline + slide-fill ink (template --primary light) */
+  .btn--tint {
+    --btn-fill: var(--brand-ink);
+    background-color: rgb(25 27 29 / 0.1);
+    color: var(--brand-ink);
+  }
+
+  /* Aksi destruktif: adaptasi danger dengan mekanisme sama */
+  .btn--danger {
+    --btn-fill: var(--status-danger);
+    border-color: rgb(180 35 24 / 0.4);
+    background-color: rgb(180 35 24 / 0.08);
+    color: var(--status-danger);
+  }
+
+  /* Ukuran (template xs/sm 25px, lg besar) */
+  .btn--sm {
+    height: 1.5rem; /* 24px */
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+  }
+  .btn--lg {
+    height: 2.5rem; /* 40px */
+    padding: 0 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  /* Ikon saja — lingkaran (template btn--circle-xs); fill ikut ink agar
+     hover slide-fill + ikon putih berlaku seperti tombol lain */
+  .btn--icon {
+    --btn-fill: var(--brand-ink);
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  /* Tautan-bergaya (template btn--link/underline) */
+  .btn--link {
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: inherit;
+    letter-spacing: -0.02em;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn {
+      transition-duration: 0.01ms;
+    }
+  }
 }
 
 .input {

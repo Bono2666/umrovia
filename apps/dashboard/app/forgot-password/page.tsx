@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
             </div>
             <button
               type="submit"
-              className="btn-primary w-full"
+              className="btn btn--solid btn--lg w-full"
               disabled={busy}
             >
               {busy ? "Mengirim…" : "Kirim tautan reset"}

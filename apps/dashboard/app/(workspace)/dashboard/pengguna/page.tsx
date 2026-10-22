@@ -264,7 +264,7 @@ export default function PenggunaPage() {
               </select>
             </FormField>
             <div className="sm:col-span-2">
-              <button type="submit" className="btn-primary" disabled={busy}>
+              <button type="submit" className="btn btn--solid" disabled={busy}>
                 {busy ? "Mengirim…" : "Kirim undangan"}
               </button>
             </div>

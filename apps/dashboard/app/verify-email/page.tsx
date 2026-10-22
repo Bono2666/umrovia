@@ -63,7 +63,7 @@ function VerifyEmailInner() {
             <p className="text-sm text-success">
               Email terverifikasi — workspace travel Anda sudah aktif.
             </p>
-            <Link href="/login" className="btn-primary block w-full text-center">
+            <Link href="/login" className="btn btn--solid btn--lg block w-full text-center">
               Lanjut masuk
             </Link>
           </div>
@@ -86,7 +86,7 @@ function VerifyEmailInner() {
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder="nama@travelanda.com"
                 />
-                <button type="submit" className="btn-primary w-full">
+                <button type="submit" className="btn btn--solid btn--lg w-full">
                   Kirim ulang link
                 </button>
               </form>
