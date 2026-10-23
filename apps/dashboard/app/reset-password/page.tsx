@@ -59,7 +59,7 @@ function ResetPasswordInner() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6">
+    <form onSubmit={onSubmit} className="mt-8">
       <FormField
         label="Password baru"
         htmlFor="new_password"

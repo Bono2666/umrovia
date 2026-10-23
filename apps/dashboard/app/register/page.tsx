@@ -61,7 +61,7 @@ export default function RegisterPage() {
         {/* Struktur form = form kontak web_template 1:1 (form-group ritme
             55px, field float-label, checkbox bulat template, submit
             circle-xl rata kanan). */}
-        <form onSubmit={onSubmit} className="mt-6">
+        <form onSubmit={onSubmit} className="mt-8">
           <FormField
             label="Nama travel"
             htmlFor="travel_name"

@@ -143,7 +143,7 @@ export default function ProfilPage() {
         SECTIONS.map((section) => (
           <section key={section.key} className="card mt-4 p-6">
             <h2 className="font-semibold">{section.label}</h2>
-            <div className="mt-3">
+            <div className="mt-8">
               <FormTextarea
                 label={section.label}
                 htmlFor={section.key}
