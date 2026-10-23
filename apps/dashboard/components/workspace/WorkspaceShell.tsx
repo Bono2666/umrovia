@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
+import { UmroviaMark } from "@/components/UmroviaMark";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { Btn, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
@@ -262,8 +263,9 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
           </Btn>
           <Link
             href="/dashboard"
-            className="text-lg font-semibold tracking-tight text-ink"
+            className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink"
           >
+            <UmroviaMark className="h-7 w-7 shrink-0" />
             Umrovia<span className="text-primary">.</span>
           </Link>
           <div className="flex items-center gap-2 border-l border-border pl-3">
