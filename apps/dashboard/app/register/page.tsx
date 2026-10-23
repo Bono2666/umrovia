@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
-import { Btn } from "@/components/workspace/ui";
+import { Btn, FormCheckbox, FormField } from "@/components/workspace/ui";
 
 type RegisterResponse = {
   status: string;
@@ -58,80 +58,67 @@ export default function RegisterPage() {
         <p className="mt-1 text-sm text-muted">
           30 hari trial · tanpa kartu kredit · 20 booking dummy
         </p>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="text-sm font-medium" htmlFor="travel_name">
-              Nama travel
-            </label>
-            <input
-              id="travel_name"
-              required
-              className="input mt-1"
-              value={travelName}
-              onChange={(e) => setTravelName(e.target.value)}
-              placeholder="PT Bahagia Selamat"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium" htmlFor="slug">
-              Alamat workspace
-            </label>
-            <div className="mt-1 flex items-center gap-2">
-              <input
-                id="slug"
-                required
-                pattern="[a-z0-9-]+"
-                className="input"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase())}
-                placeholder="bahagia-selamat"
-              />
-              <span className="text-sm whitespace-nowrap text-muted">
-                .umrovia.com
-              </span>
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium" htmlFor="reg_email">
-              Email owner
-            </label>
-            <input
-              id="reg_email"
-              type="email"
-              required
-              className="input mt-1"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@travelanda.com"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium" htmlFor="reg_password">
-              Password
-            </label>
-            <input
-              id="reg_password"
-              type="password"
-              required
-              minLength={8}
-              className="input mt-1"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <label className="flex items-start gap-2 text-sm text-muted">
-            <input
-              type="checkbox"
+        {/* Struktur form = form kontak web_template 1:1 (form-group ritme
+            55px, field float-label, checkbox bulat template, submit
+            circle-xl rata kanan). */}
+        <form onSubmit={onSubmit} className="mt-6">
+          <FormField
+            label="Nama travel"
+            htmlFor="travel_name"
+            required
+            value={travelName}
+            onChange={(e) => setTravelName(e.target.value)}
+            placeholder="PT Bahagia Selamat"
+          />
+          <FormField
+            label="Alamat workspace"
+            htmlFor="slug"
+            required
+            pattern="[a-z0-9-]+"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value.toLowerCase())}
+            placeholder="bahagia-selamat"
+            suffix=".umrovia.com"
+          />
+          <FormField
+            label="Email owner"
+            htmlFor="reg_email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="owner@travelanda.com"
+          />
+          <FormField
+            label="Password"
+            htmlFor="reg_password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="form-group">
+            <FormCheckbox
+              id="agree_terms"
               checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
+              onChange={setAgreed}
               required
-              className="mt-0.5"
+              label={
+                <>
+                  Saya menyetujui Syarat Layanan dan Kebijakan Privasi
+                  Umrovia.
+                </>
+              }
             />
-            Saya menyetujui Syarat Layanan dan Kebijakan Privasi Umrovia.
-          </label>
-          <Btn type="submit" className="w-full" disabled={busy}>
-            {busy ? "Membuat workspace…" : "Buat workspace"}
-          </Btn>
+          </div>
+          <div className="form-submit">
+            <Btn type="submit" size="circle-xl" loading={busy}>
+              Daftar
+            </Btn>
+          </div>
         </form>
         {message && (
           <div className="mt-4 border border-border p-3 text-sm">

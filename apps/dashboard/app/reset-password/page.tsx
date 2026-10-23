@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
-import { Btn, BtnLink } from "@/components/workspace/ui";
+import { Btn, BtnLink, FormField } from "@/components/workspace/ui";
 
 type ResetResponse = { status: string };
 
@@ -59,26 +59,33 @@ function ResetPasswordInner() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-4">
-      <div>
-        <label className="text-sm font-medium" htmlFor="new_password">
-          Password baru
-        </label>
-        <input
-          id="new_password"
-          type="password"
-          required
-          minLength={8}
-          className="input mt-1"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Minimal 8 karakter"
-        />
+    <form onSubmit={onSubmit} className="mt-6">
+      <FormField
+        label="Password baru"
+        htmlFor="new_password"
+        type="password"
+        required
+        minLength={8}
+        autoComplete="new-password"
+        hint="Minimal 8 karakter"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      {message ? (
+        <p className="error-message" role="alert">
+          {message}
+        </p>
+      ) : null}
+      <div className="form-footer form-footer--narrow">
+        <p className="text--t3-sm text--color-small">
+          Gunakan password yang belum pernah dipakai di akun lain.
+        </p>
       </div>
-      <Btn type="submit" className="w-full" disabled={busy}>
-        {busy ? "Menyimpan…" : "Simpan password baru"}
-      </Btn>
-      {message && <p className="text-sm text-danger">{message}</p>}
+      <div className="form-submit">
+        <Btn type="submit" size="circle-xl" loading={busy}>
+          Simpan
+        </Btn>
+      </div>
     </form>
   );
 }

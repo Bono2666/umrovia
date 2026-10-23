@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
   ErrorState,
-  FormField,
+  FormTextarea,
   LoadingState,
 } from "@/components/workspace/ui";
 import {
@@ -144,26 +144,21 @@ export default function ProfilPage() {
           <section key={section.key} className="card mt-4 p-6">
             <h2 className="font-semibold">{section.label}</h2>
             <div className="mt-3">
-              <FormField
+              <FormTextarea
                 label={section.label}
                 htmlFor={section.key}
                 hint={section.hint}
                 error={fieldErrors[section.key]}
-              >
-                <textarea
-                  id={section.key}
-                  className="input min-h-40 font-mono text-sm"
-                  value={values?.[section.key] ?? ""}
-                  onChange={(event) => {
-                    const text = event.target.value;
-                    setValues((prev) => (prev ? { ...prev, [section.key]: text } : prev));
-                    setMessages((prev) => ({ ...prev, [section.key]: null }));
-                  }}
-                  onBlur={() => values && validate(section.key, values[section.key])}
-                  readOnly={readOnly}
-                  spellCheck={false}
-                />
-              </FormField>
+                value={values?.[section.key] ?? ""}
+                onChange={(event) => {
+                  const text = event.target.value;
+                  setValues((prev) => (prev ? { ...prev, [section.key]: text } : prev));
+                  setMessages((prev) => ({ ...prev, [section.key]: null }));
+                }}
+                onBlur={() => values && validate(section.key, values[section.key])}
+                readOnly={readOnly}
+                spellCheck={false}
+              />
             </div>
             <div className="mt-3 flex items-center gap-3">
               {readOnly ? null : (

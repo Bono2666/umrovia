@@ -21,7 +21,7 @@ import {
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
-import { Btn, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
 
 type Phase = "loading" | "unauth" | "no-workspace" | "ok";
@@ -273,8 +273,9 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             <StatusBadge tone={environment.tone}>{environment.label}</StatusBadge>
           </div>
           {activeList.length > 1 ? (
-            <select
-              className="input w-auto text-sm"
+            <FormSelect
+              htmlFor="workspace-switcher"
+              className="w-auto pb-1 text-sm"
               value={active.tenant.slug}
               onChange={(event) => onSwitch(event.target.value)}
               aria-label="Pindah workspace"
@@ -284,7 +285,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                   {m.tenant.display_name}
                 </option>
               ))}
-            </select>
+            </FormSelect>
           ) : null}
           {switchError ? (
             <span className="text-xs text-danger" role="alert">

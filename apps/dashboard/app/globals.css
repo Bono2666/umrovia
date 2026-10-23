@@ -36,6 +36,16 @@
 
   /* Transisi editorial (template: cubic-bezier(.25,.74,.22,.99) 0.4s) */
   --ease-editorial: cubic-bezier(0.25, 0.74, 0.22, 0.99);
+
+  /* Skala & warna form — port form kontak template (--scale-px,
+     --scale-text-rem→10px karena html kita tidak 62.5%, --t-* → --c-black*) */
+  --scale-px: 1px;
+  --scale-rem: 10px; /* 1rem template */
+  --form-text: #191b1d; /* --t-text = --c-black */
+  --form-small: rgb(25 27 29 / 0.5); /* --t-small = --c-black-50 */
+  --form-line-20: rgb(25 27 29 / 0.2); /* --t-line-20 */
+  --form-line-100: #191b1d; /* --t-line-100 */
+  --form-error: #d9534f; /* --c-error template (1:1, bukan --status-danger) */
 }
 
 @theme inline {
@@ -354,6 +364,100 @@
     }
   }
 
+  /* Ukuran submit form kontak — PORT 1:1 (.btn--circle-xl 120px +
+     .btn--large-circle + .btn--start, persis <button> halaman contact) */
+  .btn--circle-xl {
+    --button-height: calc(var(--btn-scale-px) * 120);
+    height: calc(var(--btn-scale-px) * 120);
+    width: calc(var(--btn-scale-px) * 120);
+  }
+  .btn--circle-xl,
+  .btn--circle-xl::before,
+  .btn--circle-xl::after {
+    border-radius: 50%;
+  }
+  .btn--circle-xl > .btn__inner {
+    padding: 0 calc(var(--btn-scale-px) * 27) 0 calc(var(--btn-scale-px) * 20);
+  }
+  .btn--circle-xl > .btn__content {
+    height: calc(var(--btn-scale-px) * 120);
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  .btn--start {
+    text-align: left;
+  }
+  .btn--start .btn__content {
+    justify-content: flex-start;
+  }
+  /* large-circle: lapisan hover jadi ring transparan + teks bertukar
+     (crossfade), bukan slide-fill pekat */
+  .btn--large-circle::after {
+    border: 1px solid transparent;
+  }
+  .btn--large-circle::before {
+    background-color: transparent;
+    border: 1px solid;
+  }
+  .btn--large-circle .btn__text {
+    transition-property: transform, opacity;
+  }
+  .btn--large-circle .btn__content:nth-child(2) .btn__text {
+    opacity: 0;
+  }
+  /* Roll khusus circle-xl: teks klon mulai -50px, dihover masuk; teks
+     asli keluar +50px (sumber: rule .btn--animated-content.btn--circle-xl) */
+  .btn--animated-content.btn--circle-xl .btn__content:nth-child(2) {
+    left: auto;
+  }
+  .btn--animated-content.btn--circle-xl
+    .btn__content:nth-child(2)
+    .btn__text {
+    transform: translateY(calc(var(--btn-scale-px) * -50));
+  }
+
+  /* Spinner loading — PORT 1:1 (muncul saat .is-loading) */
+  .spinner {
+    --spinner-size: calc(var(--btn-scale-px) * 20);
+    --spinner-radius: calc(var(--btn-scale-px) * 3);
+    --spinner-color: var(--brand-ink);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+    height: var(--spinner-size);
+    width: var(--spinner-size);
+    border: var(--spinner-radius) solid var(--spinner-color);
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transform-origin: 50% 50%;
+    transition-property: opacity;
+    transition-duration: 0.4s;
+    transition-timing-function: var(--ease-editorial);
+    animation: spinner 1s linear infinite;
+  }
+  .btn .spinner {
+    --spinner-color: currentColor;
+  }
+  .btn--large-circle .spinner {
+    --spinner-size: calc(var(--btn-scale-px) * 30);
+  }
+  .is-loading .spinner {
+    opacity: 1;
+  }
+  @keyframes spinner {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+      transform: translate(-50%, -50%) rotate(1turn);
+    }
+  }
+
   /* Varian — warna persis tema light template
      (--t-text #191b1d, --c-black-10 rgba(25,27,29,.1), hover #fff) */
   .btn--primary {
@@ -424,6 +528,26 @@
     .btn--cloned:active:hover:not(:disabled) .btn__content {
       transform: translateY(-100%);
     }
+    /* circle-xl / large-circle — hover persis sumber (teks crossfade +
+       klon masuk dari -50px, teks asli keluar +50px) */
+    .btn--large-circle:hover:not(:disabled)
+      .btn__content:nth-child(2)
+      .btn__text {
+      opacity: 1;
+    }
+    .btn--large-circle:hover:not(:disabled) .btn__content:first-child .btn__text {
+      opacity: 0;
+    }
+    .btn--animated-content:hover:not(:disabled)
+      .btn__content:nth-child(2)
+      .btn__text {
+      transform: translateY(0);
+    }
+    .btn--animated-content:hover:not(:disabled).btn--circle-xl
+      .btn__content:first-child
+      .btn__text {
+      transform: translateY(50px);
+    }
   }
 
   /* Fokus — persis template: ring 2px var(--t-text) */
@@ -492,4 +616,400 @@
   outline: none;
   border-color: var(--brand-ink);
   box-shadow: 0 0 0 1px var(--brand-ink);
+}
+
+/* ==========================================================================
+   Form controls — PORT 1:1 dari form kontak web_template (global.css:
+   .form-control, .form-label, .form-control__line/__progress, .form-group,
+   .form-footer, .form-control-checkbox, .error-message).
+
+   Perilaku (setara plugin `inputState` template, dijalankan komponen
+   FormControl di ui.tsx):
+   - `is-focused` → progress line menggambar + label naik saat fokus
+   - `is-not-empty` → state terisi (label tetap naik walau sudah blur)
+   - select selalu `is-not-empty` (setara cek appearance menulist-button)
+   - `form-control--error` → garis jadi coretan bergelombang
+
+   Nilai = resolusi desktop dari pola template `var(--md, A) var(--n-md, B)`
+   (A utama / B mobile; --n-md:initial = undefined → pakai fallback);
+   override mobile ada di blok terakhir (breakpoint md template ≈ 980px).
+   ========================================================================== */
+@layer components {
+  .form-group {
+    position: relative;
+    margin-top: calc(var(--scale-px) * 55);
+    margin-bottom: calc(var(--scale-px) * 55);
+  }
+  .form-group:where(:first-child) {
+    margin-top: 0;
+  }
+  .form-group:where(:last-child) {
+    margin-bottom: 0;
+  }
+
+  .form-control {
+    position: relative;
+  }
+  .form-control[readonly] {
+    pointer-events: none;
+  }
+
+  /* Kontrol dasar — transparan, tanpa border, tipografi editorial 22px.
+     font-family: inherit (port kita; template memakai font sistem) */
+  .form-control--input input,
+  .form-control--select select,
+  .form-control--textarea textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0 0 calc(var(--scale-px) * 20);
+    height: auto;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    vertical-align: middle;
+    color: var(--form-text);
+    font-family: inherit;
+    font-size: calc(var(--scale-rem) * 2.2);
+    font-weight: 400;
+    letter-spacing: -0.05em;
+    line-height: 1.13636;
+    transition:
+      color 0.4s var(--ease-editorial),
+      background-color 0.4s var(--ease-editorial),
+      border-color 0.4s var(--ease-editorial);
+  }
+  .form-control--select select {
+    -webkit-appearance: menulist-button;
+    appearance: menulist-button;
+    cursor: pointer;
+  }
+
+  /* Autofill Chrome — trik delay transisi persis template */
+  .form-control--input input:-webkit-autofill,
+  .form-control--input input:-webkit-autofill:active,
+  .form-control--input input:-webkit-autofill:focus,
+  .form-control--input input:-webkit-autofill:hover {
+    -webkit-transition:
+      color 0.4s var(--ease-editorial),
+      border-color 0.4s var(--ease-editorial),
+      background-color 1ms ease-in-out 5000s !important;
+    transition:
+      color 0.4s var(--ease-editorial),
+      border-color 0.4s var(--ease-editorial),
+      background-color 1ms ease-in-out 5000s !important;
+  }
+
+  /* Label — tipografi identik input (rule gabungan template), versi float
+     absolut di kiri-atas; dihover/fokus/terisi naik + mengecil */
+  .form-label {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    user-select: none;
+    color: var(--form-text);
+    font-size: calc(var(--scale-rem) * 2.2);
+    font-weight: 400;
+    letter-spacing: -0.05em;
+    line-height: 1.13636;
+  }
+  .form-label small {
+    color: var(--form-small);
+    font-size: inherit;
+  }
+  .form-label::before {
+    content: "";
+    display: block;
+    position: absolute;
+    top: -15px;
+    right: -15px;
+    bottom: -15px;
+    left: -15px;
+  }
+  .form-control--float .form-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: auto;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    transform-origin: 0 0;
+    transition:
+      transform 0.4s var(--ease-editorial),
+      color 0.4s var(--ease-editorial);
+  }
+  /* Placeholder transparan — label pengganti placeholder (float) */
+  .form-control--float input::placeholder,
+  .form-control--float textarea::placeholder {
+    color: transparent !important;
+  }
+  .form-control--float input:focus ~ .form-label,
+  .form-control--float textarea:focus ~ .form-label,
+  .form-control--float.is-focused:not(.form-control--select) .form-label,
+  .form-control--float.is-not-empty .form-label {
+    color: var(--form-small);
+    transform: translateY(-26px) scale(0.63636);
+  }
+  /* Select: label ikut terangkat lewat is-not-empty (fokus tak berpengaruh,
+     persis selector :not(.form-control--select) di sumber) */
+
+  /* Garis dasar (20%) + coretan bergelombang khusus error —
+     .form-control__line persis sumber; SVG gelombang #191b1d data-uri */
+  .form-control__line::before {
+    content: "";
+    display: block;
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    left: 0;
+    border-bottom: 1px solid var(--form-line-20);
+  }
+  .form-control__line::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    opacity: 0.2;
+    background: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 562 4'%3E%3Cpath stroke='%23191B1D' d='M1 2C4.333.667 7.667.667 11 2s6.667 1.333 10 0S27.667.667 31 2s6.667 1.333 10 0S47.667.667 51 2s6.667 1.333 10 0S67.667.667 71 2s6.667 1.333 10 0S87.667.667 91 2s6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0 6.667-1.333 10 0 6.667 1.333 10 0'/%3E%3C/svg%3E")
+      repeat-x 0 0;
+  }
+
+  /* Progress line — garis pekat yang "menggambar" ke kanan saat
+     fokus/terisi/hover */
+  .form-control__progress {
+    display: block;
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    left: 0;
+    width: 100%;
+    border-bottom: 1px solid var(--form-line-100);
+    transform: scaleX(0);
+    transform-origin: 0 0;
+    transition: transform 0.4s var(--ease-editorial);
+  }
+  .form-control.is-focused .form-control__progress,
+  .form-control.is-not-empty .form-control__progress {
+    transform: scaleX(1);
+  }
+  @media (hover: hover) {
+    .form-control:hover .form-control__progress {
+      transform: scaleX(1);
+    }
+  }
+  .form-control--error .form-control__progress {
+    transform: scaleX(0) !important;
+  }
+  .form-control--error .form-control__line::before,
+  .form-control:not(.form-control--error) .form-control__line::after {
+    opacity: 0 !important;
+  }
+
+  /* Textarea (kontak: Comment) — tinggi desktop resolved dari spacing */
+  .form-control--textarea textarea {
+    height: calc(var(--scale-px) * 64);
+    resize: vertical;
+  }
+
+  /* Suffix inline (mis. ".umrovia.com") — pola input-secondary template
+     (padding-right 110px + elemen di kanan) */
+  .form-control--with-suffix input {
+    padding-right: calc(var(--scale-px) * 110);
+  }
+  .form-control__suffix {
+    position: absolute;
+    top: calc(var(--scale-px) * 4);
+    right: 0;
+    color: var(--form-small);
+    font-size: calc(var(--scale-rem) * 1.4);
+    letter-spacing: -0.04em;
+    line-height: 1.2;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Catatan field — token template (tak ada padanan di sumber) */
+  .form-control__hint {
+    margin-top: calc(var(--scale-px) * 12);
+    color: var(--form-small);
+    font-size: calc(var(--scale-rem) * 1.4);
+    letter-spacing: -0.04em;
+    line-height: 1.4;
+  }
+
+  /* Pesan error — template: .error-message { color } (jarak = penyesuaian
+     kami agar tidak menempel pada garis field) */
+  .error-message {
+    margin-top: calc(var(--scale-px) * 16);
+    color: var(--form-error);
+    font-size: calc(var(--scale-rem) * 1.4);
+    letter-spacing: -0.04em;
+    line-height: 1.4;
+  }
+
+  /* Footer form (catatan persetujuan di atas tombol submit) */
+  .form-footer {
+    margin-top: calc(var(--scale-px) * 55);
+    margin-bottom: calc(var(--scale-px) * 30);
+  }
+  .form-footer:where(:first-child) {
+    margin-top: 0;
+  }
+  .form-footer:where(:last-child) {
+    margin-bottom: 0;
+  }
+  .form-footer--narrow p {
+    /* ≈ 3 kolom + 2 gutter pada grid 1440 (template: var(--grid-col)…);
+       fallback mobile 90% */
+    max-width: min(calc(var(--scale-px) * 330), 90%);
+  }
+
+  /* Tipografi pendukung form (template: .text--t3-sm, .text--color-small) */
+  .text--t3-sm {
+    color: inherit;
+    font-size: calc(var(--scale-rem) * 1.4);
+    font-weight: 400;
+    letter-spacing: -0.04em;
+    line-height: 1.14286;
+  }
+  .text--color-small {
+    color: var(--form-small);
+  }
+
+  /* Blok submit: template membungkus tombol dengan .text--right:md */
+  .form-submit {
+    text-align: right;
+  }
+
+  /* Checkbox — PORT 1:1 .form-control-checkbox (bulat 20px, centang SVG) */
+  .form-control-checkbox {
+    display: flex;
+    align-items: center;
+  }
+  .form-control-checkbox input {
+    position: absolute;
+    clip-path: polygon(0 0, 0 0, 0 0, 0 0);
+  }
+  .form-control-checkbox__icon,
+  .form-control-checkbox__label {
+    position: relative;
+    cursor: pointer;
+  }
+  .form-control-checkbox__icon {
+    height: calc(var(--scale-px) * 20);
+    width: calc(var(--scale-px) * 20);
+    min-height: calc(var(--scale-px) * 20);
+    flex-shrink: 0;
+    background-color: transparent;
+    border: 1px solid var(--form-text);
+    border-radius: 50%;
+    transition-property: background-color;
+    transition-duration: 0.4s;
+    transition-timing-function: var(--ease-editorial);
+  }
+  .form-control-checkbox__icon::before {
+    content: "";
+    display: block;
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    height: calc(var(--scale-px) * 20);
+    width: calc(var(--scale-px) * 20);
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'%3E%3Cpath stroke='%23fff' fill='none' stroke-width='1.2' d='m1 4 3 3 5-6'/%3E%3C/svg%3E");
+    background-position: 50%;
+    background-repeat: no-repeat;
+    background-size: calc(var(--scale-px) * 8);
+    opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.4s;
+    transition-timing-function: var(--ease-editorial);
+  }
+  .form-control-checkbox__icon::after,
+  .form-control-checkbox__label::after {
+    content: "";
+    display: block;
+    position: absolute;
+    top: -10px;
+    right: -5px;
+    bottom: -10px;
+    left: -5px;
+  }
+  .form-control-checkbox__label {
+    flex-grow: 1;
+    padding: 0 0 0 10px;
+    font-size: calc(var(--scale-rem) * 1.6);
+    letter-spacing: -0.04em;
+    line-height: 1.25;
+  }
+  .form-control-checkbox__label small {
+    color: var(--form-small);
+    font-size: inherit;
+  }
+  .form-control-checkbox input:checked ~ .form-control-checkbox__icon {
+    background-color: var(--form-text);
+  }
+  .form-control-checkbox input:checked
+    ~ .form-control-checkbox__icon::before {
+    opacity: 1;
+  }
+  .form-control-checkbox input:focus-visible
+    ~ .form-control-checkbox__icon {
+    box-shadow: 0 0 0 2px var(--form-text);
+  }
+  .form-control-checkbox input:disabled ~ .form-control-checkbox__icon,
+  .form-control-checkbox input:disabled ~ .form-control-checkbox__label {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* Nilai mobile (fallback --n-md sumber; md template ≈ 980px) */
+  @media (max-width: 979px) {
+    .form-control--input input,
+    .form-control--select select,
+    .form-control--textarea textarea,
+    .form-control--float input:focus ~ .form-label,
+    .form-control--float textarea:focus ~ .form-label,
+    .form-control--float.is-focused:not(.form-control--select) .form-label,
+    .form-control--float.is-not-empty .form-label,
+    .form-label {
+      font-size: calc(var(--scale-rem) * 1.9);
+      line-height: 1.15789;
+    }
+    .form-control--input input,
+    .form-control--select select {
+      height: calc(var(--scale-px) * 40);
+    }
+    .form-group {
+      margin-top: calc(var(--scale-px) * 51);
+      margin-bottom: calc(var(--scale-px) * 51);
+    }
+    .form-footer {
+      margin-top: calc(var(--scale-px) * 33);
+      margin-bottom: calc(var(--scale-px) * 42);
+    }
+    .form-control--textarea textarea {
+      height: calc(var(--scale-px) * 40);
+    }
+    .text--t3-sm {
+      font-size: calc(var(--scale-rem) * 1.2);
+      letter-spacing: -0.03em;
+      line-height: 1.16667;
+    }
+  }
+
+  /* Aksesibilitas gerak (netral visual; template tanpa aturan ini) */
+  @media (prefers-reduced-motion: reduce) {
+    .form-control__progress,
+    .form-control--float .form-label {
+      transition-duration: 0.01ms;
+    }
+  }
 }
