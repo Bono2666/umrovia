@@ -238,7 +238,7 @@ export default function PenggunaPage() {
             email (anti-enumeration — pesan sukses sama untuk email baru/lama).
           </p>
           {/* Field = form-control 1:1 form kontak; ritme dari .form-group. */}
-          <form onSubmit={onInvite} className="mt-4">
+          <form onSubmit={onInvite} className="mt-8">
             <FormField
               label="Email"
               htmlFor="invite-email"

@@ -59,7 +59,7 @@ export default function LoginPage() {
         {/* Struktur form = form kontak web_template 1:1: form-group per
             field, error-message, form-footer--narrow, submit circle-xl
             rata kanan (template: .text--right:md). */}
-        <form onSubmit={onSubmit} className="mt-6">
+        <form onSubmit={onSubmit} className="mt-8">
           <FormField
             label="Email"
             htmlFor="email"

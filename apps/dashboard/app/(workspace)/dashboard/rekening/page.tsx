@@ -168,7 +168,7 @@ export default function RekeningPage() {
         <h2 className="font-semibold">Tambah rekening</h2>
         {/* Field = form-control 1:1 form kontak; ritme antar-field datang
             dari .form-group (55px) → tanpa grid/gap. */}
-        <form onSubmit={onAdd} className="mt-4">
+        <form onSubmit={onAdd} className="mt-8">
           <FormField
             label="Nama bank"
             htmlFor="bank-name"

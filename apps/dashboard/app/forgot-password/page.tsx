@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
         </p>
 
         {!sent ? (
-          <form onSubmit={onSubmit} className="mt-6">
+          <form onSubmit={onSubmit} className="mt-8">
             <FormField
               label="Email"
               htmlFor="fp_email"

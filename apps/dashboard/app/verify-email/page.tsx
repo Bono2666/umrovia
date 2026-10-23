@@ -74,7 +74,7 @@ function VerifyEmailInner() {
           <div className="mt-4 space-y-4">
             <p className="text-sm text-danger">{message}</p>
             {!resendDone ? (
-              <form onSubmit={onResend} className="mt-4">
+              <form onSubmit={onResend} className="mt-8">
                 <FormField
                   label="Email"
                   htmlFor="resend_email"
