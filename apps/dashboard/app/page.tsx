@@ -2,6 +2,7 @@
 
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
+import { Parallax } from "@/components/marketing/Parallax";
 import {
   CircleArrow,
   MockCard,
@@ -22,7 +23,8 @@ type FiturSegmen = {
  * pita gelap pernyataan dengan mock produk, empat segmen fitur bernomor
  * (2 kolom ala expertise), daftar modul gelap (ala capabilities), pita
  * uji coba abu-abu dengan angka besar (ala company), tiga langkah mulai
- * (ala insights), dan footer terang.
+ * (ala insights), dan footer terang. Elemen bervariasi di tiap section
+ * digerakkan paralaks (locomotive-style) lewat `data-scroll-speed`.
  */
 const FITUR: FiturSegmen[] = [
   {
@@ -174,6 +176,7 @@ function ProductMock() {
 export default function Home() {
   return (
     <>
+      <Parallax />
       <MarketingHeader />
 
       <main>
@@ -188,7 +191,10 @@ export default function Home() {
           </h1>
 
           <div className="mt-auto pt-14 md:pt-20 md:pb-14">
-            <p className="text-[56px] font-medium leading-none tracking-[-0.04em] text-[#191b1d] md:text-[120px]">
+            <p
+              data-scroll-speed="1"
+              className="text-[56px] font-medium leading-none tracking-[-0.04em] text-[#191b1d] md:text-[120px]"
+            >
               Umrovia
             </p>
           </div>
@@ -202,11 +208,14 @@ export default function Home() {
                 Untuk travel modern
               </p>
               {/* Pernyataan di separuh kanan — komposisi awards template */}
-              <h2 className="text--h2 md:col-span-6 md:col-start-7">
+              <h2
+                data-scroll-speed="1"
+                className="text--h2 md:col-span-6 md:col-start-7"
+              >
                 Satu layar untuk seluruh operasi travel.
               </h2>
             </div>
-            <div className="mt-12 md:mt-20">
+            <div className="mt-12 md:mt-20" data-scroll-speed="1.5">
               <ProductMock />
             </div>
           </div>
@@ -222,7 +231,7 @@ export default function Home() {
                 index > 0 ? "border-t border-black/10" : ""
               }`}
             >
-              <div className="order-2 md:order-none">
+              <div className="order-2 md:order-none" data-scroll-speed="1">
                 <div className="flex items-center gap-3">
                   <NumberBadge n={segmen.n} />
                   <BtnLink href="#modul" variant="tint">
@@ -254,7 +263,11 @@ export default function Home() {
                 <br />
                 untuk operasional
               </h2>
-              <div className="mt-12 hidden md:flex" aria-hidden="true">
+              <div
+                className="mt-12 hidden md:flex"
+                aria-hidden="true"
+                data-scroll-speed="2"
+              >
                 {[0, 1, 2, 3].map((i) => (
                   <span
                     key={i}
@@ -289,6 +302,7 @@ export default function Home() {
         <section className="relative overflow-hidden bg-[#cdcfd0] text-[#191b1d]">
           <span
             aria-hidden="true"
+            data-scroll-speed="2"
             className="absolute -left-40 top-10 hidden h-96 w-96 rounded-full bg-[#191b1d] md:block"
           />
           <div className="mkt-container relative scroll-mt-16 py-16 md:py-28">
@@ -334,7 +348,10 @@ export default function Home() {
             </BtnLink>
           </div>
 
-          <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3">
+          <div
+            className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3"
+            data-scroll-speed="1"
+          >
             {LANGKAH.map((langkah) => (
               <article
                 key={langkah.tag}
