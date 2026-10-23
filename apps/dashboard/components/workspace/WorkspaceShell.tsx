@@ -328,6 +328,12 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                       );
                       const center = collapsed ? "justify-center" : "";
+                      /* Roll teks menu — replika hover menu web_template
+                         (`.btn--cloned .btn__content`): label diduplikasi di
+                         bawah lapisan `overflow:hidden`, keduanya berguling
+                         naik -100% saat hover (0.6s editorial). */
+                      const roll =
+                        "block truncate transition-transform duration-[600ms] ease-[cubic-bezier(.25,.74,.22,.99)] group-hover:-translate-y-full motion-reduce:transition-none";
                       return item.soon ? (
                         <span
                           key={item.href}
@@ -353,14 +359,24 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                           key={item.href}
                           href={item.href}
                           title={item.label}
-                          className={`flex items-center gap-2 px-2 py-1.5 text-sm font-medium ${center} ${
+                          className={`group flex items-center gap-2 px-2 py-1.5 text-sm font-medium ${center} ${
                             pathname === item.href
                               ? "bg-primary/10 text-primary"
                               : "text-ink hover:bg-background"
                           }`}
                         >
                           {icon}
-                          {collapsed ? null : <span className="truncate">{item.label}</span>}
+                          {collapsed ? null : (
+                            <span className="relative block min-w-0 overflow-hidden">
+                              <span className={roll}>{item.label}</span>
+                              <span
+                                aria-hidden
+                                className={`absolute left-0 top-full w-full ${roll}`}
+                              >
+                                {item.label}
+                              </span>
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
