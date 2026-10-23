@@ -7,11 +7,11 @@ import { apiFetch, type BankAccount, type MembershipRow, type RoleRow, type Tria
 import { formatDate, formatRemaining } from "@/lib/format";
 
 const CHECKLIST = [
-  { step: "1", label: "Lengkapi profil travel", note: "Branding & invoice → halaman Profil Travel", href: "/dashboard/profil" },
-  { step: "2", label: "Daftarkan rekening bank resmi", note: "Untuk instruksi DP — halaman Kas & Bank", href: "/dashboard/rekening" },
-  { step: "3", label: "Undang staf & atur role", note: "Owner/Admin/Sales/Finance → Pengguna & Role", href: "/dashboard/pengguna" },
-  { step: "4", label: "Buat paket & jadwal keberangkatan", note: "Menyusul di Sprint S08", href: null },
-  { step: "5", label: "Simulasikan booking, DP & invoice", note: "Booking S09 · Pembayaran S11", href: null },
+  { step: "01", label: "Lengkapi profil travel", note: "Branding & invoice → halaman Profil Travel", href: "/dashboard/profil" },
+  { step: "02", label: "Daftarkan rekening bank resmi", note: "Untuk instruksi DP — halaman Kas & Bank", href: "/dashboard/rekening" },
+  { step: "03", label: "Undang staf & atur role", note: "Owner/Admin/Sales/Finance → Pengguna & Role", href: "/dashboard/pengguna" },
+  { step: "04", label: "Buat paket & jadwal keberangkatan", note: "Menyusul di Sprint S08", href: null },
+  { step: "05", label: "Simulasikan booking, DP & invoice", note: "Booking S09 · Pembayaran S11", href: null },
 ];
 
 /** Ambil data opsional; 403/404 → `forbidden` (tile disembunyikan). */
