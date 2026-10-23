@@ -177,8 +177,8 @@ export default function Home() {
       <MarketingHeader />
 
       <main>
-        {/* Hero — judul dua baris (baris kedua muted) + wordmark raksasa
-            yang memenuhi lebar kontainer (SVG textLength, ala intro template) */}
+        {/* Hero — judul dua baris (baris kedua muted) + wordmark yang
+            lebih kecil, rapat, dan rata kiri */}
         <section className="mkt-container flex min-h-[480px] flex-col pt-16 md:min-h-[760px] md:pt-32">
           <h1 className="text--lead max-w-[760px]">
             Pendaftaran. Pembayaran. Manifest.
@@ -188,25 +188,9 @@ export default function Home() {
           </h1>
 
           <div className="mt-auto pt-14 md:pt-20 md:pb-14">
-            <svg
-              viewBox="0 0 1000 184"
-              className="block h-auto w-full"
-              role="img"
-              aria-label="Umrovia"
-            >
-              <text
-                x="0"
-                y="172"
-                textLength="1000"
-                lengthAdjust="spacingAndGlyphs"
-                fontSize="227"
-                fontWeight="500"
-                fill="#191b1d"
-                style={{ fontFamily: "var(--font-poppins), sans-serif" }}
-              >
-                Umrovia
-              </text>
-            </svg>
+            <p className="text-[56px] font-medium leading-none tracking-[-0.04em] text-[#191b1d] md:text-[120px]">
+              Umrovia
+            </p>
           </div>
         </section>
 
