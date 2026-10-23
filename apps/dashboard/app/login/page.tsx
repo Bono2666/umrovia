@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, problemMessage, type UserPayload } from "@/lib/api";
-import { Btn } from "@/components/workspace/ui";
+import { Btn, FormField } from "@/components/workspace/ui";
 
 /**
  * Login (S02) — POST /auth/login (session cookie + rate limit, Spec §8.1).
@@ -56,49 +56,49 @@ export default function LoginPage() {
         <p className="mt-1 text-sm text-muted">
           Masuk ke workspace travel Anda
         </p>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="text-sm font-medium" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              className="input mt-1"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="nama@travelanda.com"
-            />
+        {/* Struktur form = form kontak web_template 1:1: form-group per
+            field, error-message, form-footer--narrow, submit circle-xl
+            rata kanan (template: .text--right:md). */}
+        <form onSubmit={onSubmit} className="mt-6">
+          <FormField
+            label="Email"
+            htmlFor="email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="nama@travelanda.com"
+          />
+          <FormField
+            label="Password"
+            htmlFor="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+          />
+          {message ? (
+            <p className="error-message" role="alert">
+              {message}
+            </p>
+          ) : null}
+          <div className="form-footer form-footer--narrow">
+            <p className="text--t3-sm text--color-small">
+              Lupa password?{" "}
+              <Link href="/forgot-password" className="text-primary">
+                Pulihkan lewat email
+              </Link>
+            </p>
           </div>
-          <div>
-            <label className="text-sm font-medium" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              className="input mt-1"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
+          <div className="form-submit">
+            <Btn type="submit" size="circle-xl" loading={busy}>
+              Masuk
+            </Btn>
           </div>
-          <Btn type="submit" className="w-full" disabled={busy}>
-            {busy ? "Memproses…" : "Masuk"}
-          </Btn>
         </form>
-        {message && (
-          <p className="mt-4 border border-border p-3 text-sm text-danger">
-            {message}
-          </p>
-        )}
-        <p className="mt-4 text-sm text-muted">
-          <Link href="/forgot-password" className="text-primary">
-            Lupa password?
-          </Link>
-        </p>
         <p className="mt-6 text-sm text-muted">
           Belum punya akun?{" "}
           <Link href="/register" className="font-semibold text-primary">

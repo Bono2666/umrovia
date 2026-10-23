@@ -166,53 +166,48 @@ export default function RekeningPage() {
 
       <section className="card mt-4 p-6">
         <h2 className="font-semibold">Tambah rekening</h2>
-        <form onSubmit={onAdd} className="mt-4 grid gap-4 sm:grid-cols-2">
-          <FormField label="Nama bank" htmlFor="bank-name" error={formErrors.bank_name}>
-            <input
-              id="bank-name"
-              className="input"
-              value={bankName}
-              onChange={(event) => setBankName(event.target.value)}
-              placeholder="BCA"
-              required
-            />
-          </FormField>
-          <FormField label="Nama pemilik rekening" htmlFor="account-name" error={formErrors.account_name}>
-            <input
-              id="account-name"
-              className="input"
-              value={accountName}
-              onChange={(event) => setAccountName(event.target.value)}
-              placeholder="PT Travel Nusantara"
-              required
-            />
-          </FormField>
+        {/* Field = form-control 1:1 form kontak; ritme antar-field datang
+            dari .form-group (55px) → tanpa grid/gap. */}
+        <form onSubmit={onAdd} className="mt-4">
+          <FormField
+            label="Nama bank"
+            htmlFor="bank-name"
+            error={formErrors.bank_name}
+            value={bankName}
+            onChange={(event) => setBankName(event.target.value)}
+            placeholder="BCA"
+            required
+          />
+          <FormField
+            label="Nama pemilik rekening"
+            htmlFor="account-name"
+            error={formErrors.account_name}
+            value={accountName}
+            onChange={(event) => setAccountName(event.target.value)}
+            placeholder="PT Travel Nusantara"
+            required
+          />
           <FormField
             label="Nomor rekening"
             htmlFor="account-number"
             hint="Hanya 4 digit terakhir yang disimpan (write-only)."
             error={formErrors.account_number}
-          >
-            <input
-              id="account-number"
-              className="input"
-              value={accountNumber}
-              onChange={(event) => setAccountNumber(event.target.value)}
-              inputMode="numeric"
-              placeholder="1234567890"
-              required
-            />
-          </FormField>
-          <div className="flex items-end sm:col-span-2">
+            value={accountNumber}
+            onChange={(event) => setAccountNumber(event.target.value)}
+            inputMode="numeric"
+            placeholder="1234567890"
+            required
+          />
+          {formErrors.form ? (
+            <p className="error-message" role="alert">
+              {formErrors.form}
+            </p>
+          ) : null}
+          <div className="form-submit">
             <Btn type="submit" disabled={busy}>
               {busy ? "Menyimpan…" : "Tambah rekening"}
             </Btn>
           </div>
-          {formErrors.form ? (
-            <p className="text-xs text-danger sm:col-span-2" role="alert">
-              {formErrors.form}
-            </p>
-          ) : null}
         </form>
       </section>
     </div>

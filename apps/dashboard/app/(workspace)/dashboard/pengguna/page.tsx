@@ -6,6 +6,7 @@ import {
   EmptyState,
   ErrorState,
   FormField,
+  FormSelect,
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
@@ -190,8 +191,9 @@ export default function PenggunaPage() {
                     <td className="py-2 pr-4">{row.user.full_name || "-"}</td>
                     <td className="py-2 pr-4">
                       {canManage && roles.length > 0 ? (
-                        <select
-                          className="input w-auto py-1 text-sm"
+                        <FormSelect
+                          htmlFor={`role-${row.id}`}
+                          className="w-full pb-1 text-sm"
                           value={row.role_id ?? ""}
                           onChange={(event) => onChangeRole(row, event.target.value)}
                           aria-label={`Ubah peran ${row.user.email}`}
@@ -201,7 +203,7 @@ export default function PenggunaPage() {
                               {role.name}
                             </option>
                           ))}
-                        </select>
+                        </FormSelect>
                       ) : (
                         row.role ?? "-"
                       )}
@@ -235,35 +237,33 @@ export default function PenggunaPage() {
             Pengguna baru menerima undangan email; ia aktif setelah verifikasi
             email (anti-enumeration — pesan sukses sama untuk email baru/lama).
           </p>
-          <form onSubmit={onInvite} className="mt-4 grid gap-4 sm:grid-cols-2">
-            <FormField label="Email" htmlFor="invite-email" error={inviteError}>
-              <input
-                id="invite-email"
-                type="email"
-                className="input"
-                value={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
-                placeholder="nama@travel.id"
-                required
-              />
-            </FormField>
-            <FormField label="Peran" htmlFor="invite-role">
-              <select
-                id="invite-role"
-                className="input"
-                value={inviteRoleId}
-                onChange={(event) => setInviteRoleId(event.target.value)}
-                required
-              >
-                <option value="">Pilih peran…</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <div className="sm:col-span-2">
+          {/* Field = form-control 1:1 form kontak; ritme dari .form-group. */}
+          <form onSubmit={onInvite} className="mt-4">
+            <FormField
+              label="Email"
+              htmlFor="invite-email"
+              type="email"
+              error={inviteError}
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              placeholder="nama@travel.id"
+              required
+            />
+            <FormSelect
+              label="Peran"
+              htmlFor="invite-role"
+              value={inviteRoleId}
+              onChange={(event) => setInviteRoleId(event.target.value)}
+              required
+            >
+              <option value="">Pilih peran…</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </FormSelect>
+            <div className="form-submit">
               <Btn type="submit" disabled={busy}>
                 {busy ? "Mengirim…" : "Kirim undangan"}
               </Btn>

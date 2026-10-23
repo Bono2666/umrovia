@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Btn } from "@/components/workspace/ui";
+import { Btn, FormField } from "@/components/workspace/ui";
 
 type ForgotResponse = { status: string; dev_reset_url?: string };
 
@@ -41,24 +41,28 @@ export default function ForgotPasswordPage() {
         </p>
 
         {!sent ? (
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="text-sm font-medium" htmlFor="fp_email">
-                Email
-              </label>
-              <input
-                id="fp_email"
-                type="email"
-                required
-                className="input mt-1"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@travelanda.com"
-              />
+          <form onSubmit={onSubmit} className="mt-6">
+            <FormField
+              label="Email"
+              htmlFor="fp_email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="nama@travelanda.com"
+            />
+            <div className="form-footer form-footer--narrow">
+              <p className="text--t3-sm text--color-small">
+                Tautan reset berlaku 60 menit dan hanya dikirim bila email
+                terdaftar.
+              </p>
             </div>
-            <Btn type="submit" className="w-full" disabled={busy}>
-              {busy ? "Mengirim…" : "Kirim tautan reset"}
-            </Btn>
+            <div className="form-submit">
+              <Btn type="submit" size="circle-xl" loading={busy}>
+                Kirim
+              </Btn>
+            </div>
           </form>
         ) : (
           <div className="mt-4 space-y-3 border border-border p-3 text-sm">

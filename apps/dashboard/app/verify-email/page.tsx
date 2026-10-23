@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
-import { Btn, BtnLink } from "@/components/workspace/ui";
+import { Btn, BtnLink, FormField } from "@/components/workspace/ui";
 
 type VerifyResponse = { status: string; email?: string };
 type ResendResponse = { status: string; message?: string };
@@ -74,22 +74,28 @@ function VerifyEmailInner() {
           <div className="mt-4 space-y-4">
             <p className="text-sm text-danger">{message}</p>
             {!resendDone ? (
-              <form onSubmit={onResend} className="space-y-3">
-                <label className="text-sm font-medium" htmlFor="resend_email">
-                  Minta link verifikasi baru
-                </label>
-                <input
-                  id="resend_email"
+              <form onSubmit={onResend} className="mt-4">
+                <FormField
+                  label="Email"
+                  htmlFor="resend_email"
                   type="email"
                   required
-                  className="input mt-1 w-full"
+                  autoComplete="email"
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder="nama@travelanda.com"
                 />
-                <Btn type="submit" className="w-full">
-                  Kirim ulang link
-                </Btn>
+                <div className="form-footer form-footer--narrow">
+                  <p className="text--t3-sm text--color-small">
+                    Kami kirim link verifikasi baru ke email ini (berlaku 60
+                    menit).
+                  </p>
+                </div>
+                <div className="form-submit">
+                  <Btn type="submit" size="circle-xl">
+                    Kirim
+                  </Btn>
+                </div>
               </form>
             ) : (
               <p className="text-sm text-muted">
