@@ -1005,3 +1005,105 @@
     }
   }
 }
+
+/* ==========================================================================
+   Tipografi marketing — PORT skala `.text--*` web_template (global.css)
+   untuk halaman landing `/`. Sumber memakai skala `html{font-size:62.5%}`
+   (1rem = 10px) → kita emulasi lewat `--scale-rem: 10px` (root font-size
+   TIDAK diubah). Aturan dasar = desktop (md ≥ 980px); blok
+   @media (max-width: 979px) = nilai mobile (fallback `--n-md` sumber).
+   `.text--t3-sm` & `.text--color-small` sudah ada di lapisan form.
+   ========================================================================== */
+@layer components {
+  /* Judul hero — .text--lead: 28/19px, w500, ls -.05em, lh 1.25/1.15789 */
+  .text--lead {
+    font-size: calc(var(--scale-rem) * 2.8);
+    font-weight: 500;
+    letter-spacing: -0.05em;
+    line-height: 1.25;
+  }
+
+  /* Judul raksasa — .text--h1: 90/38px, w500, ls -.07/-.05em, lh 1/1.05263 */
+  .text--h1 {
+    font-size: calc(var(--scale-rem) * 9);
+    font-weight: 500;
+    letter-spacing: -0.07em;
+    line-height: 1;
+  }
+
+  /* Pernyataan besar — .text--h2: 76/32px, w500, ls -.07/-.05em */
+  .text--h2 {
+    font-size: calc(var(--scale-rem) * 7.6);
+    font-weight: 500;
+    letter-spacing: -0.07em;
+    line-height: 0.92105;
+  }
+
+  /* Judul baris/kartu — .text--h3: 38/24px, w500, ls -.05em, lh 1.05263 */
+  .text--h3 {
+    font-size: calc(var(--scale-rem) * 3.8);
+    font-weight: 500;
+    letter-spacing: -0.05em;
+    line-height: 1.05263;
+  }
+
+  /* Nav header & label pill — .text--t2-short: 16px, lh 1em, ls -.04em */
+  .text--t2-short {
+    font-size: calc(var(--scale-rem) * 1.6);
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  /* Teks pendukung — .text--t3-md: 16/14px, lh 1.25/1.14286, ls -.04em */
+  .text--t3-md {
+    font-size: calc(var(--scale-rem) * 1.6);
+    letter-spacing: -0.04em;
+    line-height: 1.25;
+  }
+
+  /* Kontainer halaman marketing (container-h template): max 1320px,
+     ≥1440px melebar ke 1680px; padding 30 → 80 → 140px */
+  .mkt-container {
+    margin-inline: auto;
+    max-width: calc(var(--scale-px) * 1320);
+    padding-inline: calc(var(--scale-px) * 30);
+    width: 100%;
+  }
+  @media (min-width: 980px) {
+    .mkt-container {
+      padding-inline: calc(var(--scale-px) * 80);
+    }
+  }
+  @media (min-width: 1440px) {
+    .mkt-container {
+      max-width: calc(var(--scale-px) * 1680);
+      padding-inline: calc(var(--scale-px) * 140);
+    }
+  }
+
+  /* Nilai mobile (fallback --n-md sumber; md template ≈ 980px) */
+  @media (max-width: 979px) {
+    .text--lead {
+      font-size: calc(var(--scale-rem) * 1.9);
+      line-height: 1.15789;
+    }
+    .text--h1 {
+      font-size: calc(var(--scale-rem) * 3.8);
+      letter-spacing: -0.05em;
+      line-height: 1.05263;
+    }
+    .text--h2 {
+      font-size: calc(var(--scale-rem) * 3.2);
+      letter-spacing: -0.05em;
+      line-height: 1.09375;
+    }
+    .text--h3 {
+      font-size: calc(var(--scale-rem) * 2.4);
+      line-height: 1.08333;
+    }
+    .text--t3-md {
+      font-size: calc(var(--scale-rem) * 1.4);
+      line-height: 1.14286;
+    }
+  }
+}
