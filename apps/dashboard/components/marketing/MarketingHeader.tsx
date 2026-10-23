@@ -8,13 +8,15 @@ import { BtnLink } from "@/components/workspace/ui";
 
 /**
  * Tautan nav dengan animasi teks "berguling" (roll) — pola yang sama dengan
- * sidebar workspace: dua lapis label, keduanya bergeser -100% saat hover.
+ * template (`.btn__content ~ .btn__content`): dua lapis label setinggi tombol
+ * 30px di dalam kotak clip 30px; keduanya bergeser -100% saat hover sehingga
+ * tidak ada huruf yang terpotong.
  */
 function RollLink({ href, children }: { href: string; children: string }) {
   const roll =
-    "block transition-transform duration-[600ms] ease-[cubic-bezier(.25,.74,.22,.99)] group-hover:-translate-y-full motion-reduce:transition-none";
+    "flex h-[30px] items-center transition-transform duration-[600ms] ease-[cubic-bezier(.25,.74,.22,.99)] group-hover:-translate-y-full motion-reduce:transition-none";
   return (
-    <a href={href} className="group relative block h-4 overflow-hidden">
+    <a href={href} className="group relative block h-[30px] overflow-hidden">
       <span className={roll}>{children}</span>
       <span aria-hidden className={roll}>
         {children}
@@ -24,8 +26,9 @@ function RollLink({ href, children }: { href: string; children: string }) {
 }
 
 /**
- * Header halaman marketing — sticky setinggi 48px dengan hairline bawah
- * (ala `header--sticky` template). Mengecek sesi lewat GET /me: bila sudah
+ * Header halaman marketing — sticky setinggi `--header-height` template:
+ * 50px (60px mulai layar xxl ≥1440) dengan hairline bawah `--t-line`
+ * (#e8e8e8) ala `header--sticky`. Mengecek sesi lewat GET /me: bila sudah
  * masuk, CTA kanan berubah menjadi "Buka dashboard".
  */
 export function MarketingHeader() {
@@ -42,8 +45,8 @@ export function MarketingHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-black/10 bg-white">
-      <div className="mkt-container flex h-12 items-center justify-between gap-6">
+    <header className="sticky top-0 z-50 h-[50px] bg-white before:absolute before:inset-x-0 before:bottom-0 before:h-px before:bg-[#e8e8e8] min-[1440px]:h-[60px]">
+      <div className="mkt-container flex h-full items-center justify-between gap-6">
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2.5"
