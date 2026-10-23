@@ -134,7 +134,11 @@
   }
 
   /* Lapisan pseudo — sama seperti sumber: ::before yang bergerak (z-index 1,
-     sebelum konten di DOM → konten .btn__content (z-index 1) menutupinya) */
+     sebelum konten di DOM → konten .btn__content (z-index 1) menutupinya).
+     border-radius EKSPLISIT di pseudo seperti template
+     (`.btn,.btn:after,.btn:before{border-radius:60px}`) — jangan mengandalkan
+     overflow:hidden, lapisan hitam yang bergerak tetap pill. (Pseudo circle
+     di override 50% di bawah.) */
   .btn::before,
   .btn::after {
     content: "";
@@ -143,6 +147,7 @@
     right: 0;
     bottom: 0;
     left: 0;
+    border-radius: calc(var(--btn-scale-px) * 60);
     transition-property: transform;
     transition-duration: 0.6s;
     transition-timing-function: var(--ease-editorial);
