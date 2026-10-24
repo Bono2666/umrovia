@@ -19,7 +19,9 @@ from modules.tenants.exceptions import TenantContextRequired
 # Grant default per role tenant (dipakai saat role dibuat — S05+ & test).
 # Catatan: Admin TIDAK mendapat payments.verify / wallet.topup / trial.convert
 # / reports.export_pii / memberships.manage (Owner-only §8.1) / bank_accounts.*
-# (matriks §3 = S/—); hanya Owner (wildcard) yang dapat.
+# (matriks §3 = S/—); hanya Owner (wildcard) yang dapat. S10: Admin juga
+# TIDAK mendapat manifest.export_pii (matriks §3 "Export manifest dengan PII":
+# Admin/Ops = S → approval/scope belum ada di v1 → tidak di-grant).
 DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
     "Owner": ["*"],
     "Admin": [
@@ -37,6 +39,10 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "departures.write",
         "departures.manage",
         "documents.approve",
+        "documents.requirements.manage",  # MOD-08 checklist per paket
+        "manifest.read",  # §8.3 manifest: Ops/Admin
+        "manifest.publish",
+        "manifest.export",  # ekspor NON-PII; export_pii = Owner-only (§3)
         "pilgrims.read",
         "pilgrims.write",
         "reports.read",
@@ -72,7 +78,10 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "departures.write",
         "departures.manage",
         "documents.approve",
+        "documents.requirements.manage",  # MOD-08 checklist per paket
         "manifest.read",
+        "manifest.publish",  # §8.3: Ops/Admin
+        "manifest.export",  # ekspor NON-PII; export_pii = Owner-only (§3)
         "bookings.read",
         "pilgrims.read",
     ],

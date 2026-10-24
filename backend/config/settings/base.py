@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "modules.catalog",
     "modules.departures",
     "modules.booking",
+    "modules.manifest",
     "modules.audit",
     "modules.documents",
 ]
