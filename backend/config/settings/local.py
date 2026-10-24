@@ -13,3 +13,11 @@ if not DEBUG and not SECRET_KEY:
 
 if not SECRET_KEY:  # DEBUG tanpa SECRET_KEY: key hanya untuk proses lokal ini
     SECRET_KEY = "django-insecure-local-dev-only-umrovia"  # noqa: S105
+
+if not PII_ENCRYPTION_KEY:  # noqa: F405 — dev-only: derive deterministik dari SECRET_KEY
+    import base64
+    import hashlib
+
+    PII_ENCRYPTION_KEY = base64.urlsafe_b64encode(  # noqa: F405
+        hashlib.sha256(f"umrovia-dev-pii|{SECRET_KEY}".encode()).digest()  # noqa: S105
+    ).decode()

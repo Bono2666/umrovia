@@ -159,6 +159,35 @@ invoice; renderer + `TEMPLATE_VERSION` sudah siap); integrasi branding
 operasional (paket/jamaah/booking/manifest) → S07–S10 dengan pola shell +
 halaman config S06 sebagai template.
 
+## Sprint S07 — Minggu 7 — Master Jamaah + dokumen secured (F04)
+
+**Goal:** "Jamaah CRUD usable" — master data jamaah per tenant+environment
+dengan PII terenkripsi, penanganan duplikat, dan model dokumen ber-versi
+(Roadmap S07; Spec §5.2, §5.6, §2.2, §8.3, §10.1; PRD MOD-04).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S07-01 | App `modules.pilgrims`: `Pilgrim` (kode auto `JM-<8hex>`, UNIQUE(tenant,environment,code), kolom environment S07+) + **RLS sejak migrasi pertama** (pola §5.6 + NULLIF, SQL beku, ENABLE+FORCE) | §5.2, §5.6 | DONE | `pilgrims/0001` + RunSQL; test `pg_policies`/`relforcerowsecurity` (2 tabel) |
+| S07-02 | PII: NIK/paspor Fernet-`*_encrypted` di rest, `identity_hash` HMAC tenant-scoped (dedup & pencarian tanpa dekripsi), output API SELALU masked 4 karakter terakhir; key `PII_ENCRYPTION_KEY` (production wajib, local derive dari SECRET_KEY) | §5.2, §10.1 | DONE | `crypto.py`; test enkripsi round-trip, plaintext tak pernah di resp/audit |
+| S07-03 | `GET/POST /pilgrims` + `GET/PATCH /pilgrims/{id}`: validasi (NIK 16 digit, email RFC, telepon → +62 E.164, tanggal), pencarian normalisasi aman (nama/kode/telepon/NIK-exact-via-hash), list scoped | §8.3 | DONE | `views.py`, `serializers.py`; test CRUD, validasi, search, scoping |
+| S07-04 | Duplikat: identitas sama ditandai `possible_duplicate_of` (MOD-04: ditandai BUKAN digabung otomatis); normalisasi spasi/dash tetap terdeteksi | MOD-04 | DONE | test `test_duplicate_identity_flagged_not_merged` |
+| S07-05 | Guard environment server-side: trial → demo; pasca-konversi → production; demo READ_ONLY → write ditolak 403 (tetap terbaca) | §2.2 | DONE | `services.py`; test konversi write-pindah-production |
+| S07-06 | `PilgrimDocument`: object_key wajib prefix `tenants/<id>/environments/<env>/pilgrims/<id>/`, versi naik otomatis, UNIQUE(pilgrim,kind,version), review approve/reject **alasan wajib saat reject** (`documents.review`), audit event | §5.2, UI-11 | DONE | test prefix-enforcement, versioning, review reason |
+| S07-07 | RBAC `pilgrims.read/.write` (§3): Owner `*`; Admin+Sales tulis; Finance+Operations+DocReviewer baca; cross-tenant IDOR → 404 | §3, §8.3 | DONE | `rbac.py`; test matriks + IDOR |
+| S07-08 | Halaman `/dashboard/jamaah`: daftar + pencarian, tambah (NIK/paspor write-only), detail masked + checklist dokumen; sidebar link aktif `pilgrims.read` | §4.1, UI-06 | DONE | `dashboard/jamaah/page.tsx`, `WorkspaceShell.tsx` |
+
+**Exit gate S07:** `pytest` ✓ (11 baru: CRUD/enkripsi/duplikat/search,
+matriks RBAC, IDOR, RLS 2 tabel, guard environment, dokumen prefix/version,
+review reason) · `ruff` clean ✓ · `makemigrations --check` no-change ✓ ·
+`npm run lint` + `tsc --noEmit` ✓ · `npm run build` ✓ (rute
+/dashboard/jamaah) · smoke live ✓
+
+**Catatan/tundaan:** FK dokumen ke `booking_participant` (§5.2 varian) →
+S09 saat tabel `booking_participants` ada — pada S07 dokumen melekat pada
+jamaah (PRD data model); signed-URL upload/download → S14 (object storage);
+wali/mahram & catatan kebutuhan khusus sudah di model/detail payload —
+UI form penuh menyusul bersama booking S09.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -168,7 +197,8 @@ halaman config S06 sebagai template.
 | S04 | 4 | Trial lifecycle, kuota, konversi & expiry tanpa charge | DONE |
 | S05 | 5 | Travel profile, staf/invite, roles, rekening bank, audit (RBAC) | DONE |
 | S06 | 6 | Tenant dashboard UI, config, fondasi template dokumen | DONE |
-| S07–S19 | 7–19 | mengikuti Roadmap §3 | TODO |
+| S07 | 7 | Master Jamaah + dokumen secured (PII terenkripsi, duplikat, RLS) | DONE |
+| S08–S19 | 8–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 

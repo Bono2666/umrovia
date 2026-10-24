@@ -33,6 +33,8 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "bookings.read",
         "departures.manage",
         "documents.approve",
+        "pilgrims.read",
+        "pilgrims.write",
         "reports.read",
         "trial.read",
         "trial.demo_booking.create",
@@ -42,6 +44,8 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "bookings.read",
         "invoices.read",
         "leads.manage",
+        "pilgrims.read",
+        "pilgrims.write",  # CS/Pendaftaran: profil & pendaftaran jamaah (PRD §MOD-04)
         "trial.demo_booking.create",
     ],
     "Finance": [
@@ -51,9 +55,16 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "reports.read",
         "bank_accounts.read",
         "bank_accounts.write",
+        "pilgrims.read",
     ],
-    "Operations": ["departures.manage", "documents.approve", "manifest.read", "bookings.read"],
-    "Document Reviewer": ["documents.review", "bookings.read"],
+    "Operations": [
+        "departures.manage",
+        "documents.approve",
+        "manifest.read",
+        "bookings.read",
+        "pilgrims.read",
+    ],
+    "Document Reviewer": ["documents.review", "bookings.read", "pilgrims.read"],
 }
 
 
