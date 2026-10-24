@@ -57,6 +57,35 @@ cd apps/dashboard && npm run lint
 
 Docker (butuh Docker Desktop/Engine): `docker compose up --build` → api:8000, web:3000, db:5432, redis:6379.
 
+### Email formulir kontak marketing
+
+Pesan kontak disimpan di database dan notifikasinya ditujukan ke
+`CONTACT_RECIPIENT_EMAIL` (default: `bonoworxx@gmail.com`). Reply-To memakai
+alamat pengunjung; alamat pengirim memakai `DEFAULT_FROM_EMAIL` yang diizinkan
+oleh penyedia email, bukan alamat pengunjung.
+
+Backend email default adalah **console**: email hanya ditampilkan pada log lokal,
+tidak dikirim ke inbox. Untuk pengiriman nyata, isi `.env` dengan konfigurasi
+penyedia SMTP, lalu jalankan ulang container API:
+
+```dotenv
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.penyedia-anda.example
+EMAIL_PORT=587
+EMAIL_HOST_USER=akun-smtp
+EMAIL_HOST_PASSWORD=isi-secret-di-env-lokal
+EMAIL_USE_TLS=True
+EMAIL_USE_SSL=False
+DEFAULT_FROM_EMAIL=Umrovia <alamat-pengirim-terverifikasi@example.com>
+CONTACT_RECIPIENT_EMAIL=bonoworxx@gmail.com
+```
+
+`docker compose up -d --no-deps --build api` menerapkan konfigurasi tersebut.
+Jangan commit kredensial SMTP. Jika pengiriman gagal, pesan tetap tersimpan dan
+dapat diperiksa melalui Django admin menggunakan nomor referensinya. Pengiriman
+belum memiliki antrean retry otomatis; periksa log dan pesan tersimpan bila SMTP
+bermasalah.
+
 ## Aturan branching & kualitas (Roadmap §1)
 
 - `main` selalu green; semua pekerjaan lewat branch `sprint/<sprint>-<topik>` atau `feat/<topik>`.

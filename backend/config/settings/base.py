@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     # Umrovia modules (Spec §2.1 modular monolith)
+    "modules.platform",
     "modules.identity",
     "modules.tenants",
     "modules.trial",
@@ -126,6 +127,7 @@ REST_FRAMEWORK = {
         "auth-resend": "10/hour",
         "auth-forgot": "5/hour",
         "anon": "60/min",
+        "contact-submit": "5/hour",
     },
     "EXCEPTION_HANDLER": "common.api.exception_handler",  # RFC7807-style (Spec §8)
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"] + (
@@ -171,7 +173,9 @@ EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", "False")
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", "False")
+EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "10") or "10")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Umrovia <no-reply@umrovia.com>")
+CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", "bonoworxx@gmail.com")
 
 # --- Brand / produk (Spec §18.4) --------------------------------------------
 BRAND_NAME = env("BRAND_NAME", "Umrovia")
