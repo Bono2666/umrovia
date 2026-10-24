@@ -96,7 +96,7 @@ export default function RekeningPage() {
 
   if (noAccess) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="workspace-page">
         <h1 className="text-2xl font-bold">Kas &amp; Bank</h1>
         <div className="mt-6">
           <EmptyState
@@ -109,7 +109,7 @@ export default function RekeningPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="workspace-page">
       <h1 className="text-2xl font-bold">Kas &amp; Bank</h1>
       <p className="mt-1 text-sm text-muted">
         Rekening bank resmi travel untuk instruksi pembayaran DP. Nomor rekening
@@ -128,7 +128,8 @@ export default function RekeningPage() {
         </div>
       ) : null}
 
-      <section className="card mt-6 p-6">
+      <div className="workspace-columns mt-6">
+      <section className="card p-6">
         <h2 className="font-semibold">Rekening terdaftar</h2>
         {rows === null ? (
           <div className="mt-4">
@@ -164,11 +165,10 @@ export default function RekeningPage() {
         )}
       </section>
 
-      <section className="card mt-4 p-6">
+      <section className="card p-6">
         <h2 className="font-semibold">Tambah rekening</h2>
-        {/* Field = form-control 1:1 form kontak; ritme antar-field datang
-            dari .form-group (55px) → tanpa grid/gap. */}
-        <form onSubmit={onAdd} className="mt-8">
+        {/* Workspace controls use compact typography and field spacing. */}
+        <form onSubmit={onAdd} className="mt-6">
           <FormField
             label="Nama bank"
             htmlFor="bank-name"
@@ -210,6 +210,7 @@ export default function RekeningPage() {
           </div>
         </form>
       </section>
+      </div>
     </div>
   );
 }

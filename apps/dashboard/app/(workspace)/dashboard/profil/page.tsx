@@ -118,7 +118,7 @@ export default function ProfilPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="workspace-page">
       <h1 className="text-2xl font-bold">Profil Travel</h1>
       <p className="mt-1 text-sm text-muted">
         Konfigurasi workspace (§5.1): branding dokumen, pengaturan invoice, dan
@@ -140,10 +140,11 @@ export default function ProfilPage() {
           <LoadingState label="Memuat pengaturan…" />
         </div>
       ) : (
-        SECTIONS.map((section) => (
-          <section key={section.key} className="card mt-4 p-6">
+        <div className="workspace-columns mt-6">
+        {SECTIONS.map((section) => (
+          <section key={section.key} className="card p-6">
             <h2 className="font-semibold">{section.label}</h2>
-            <div className="mt-8">
+            <div className="mt-6">
               <FormTextarea
                 label={section.label}
                 htmlFor={section.key}
@@ -181,7 +182,8 @@ export default function ProfilPage() {
               ) : null}
             </div>
           </section>
-        ))
+        ))}
+        </div>
       )}
 
       <p className="mt-4 text-xs text-muted">
