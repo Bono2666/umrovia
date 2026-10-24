@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "modules.tenants",
     "modules.trial",
     "modules.travel_finance",
+    "modules.pilgrims",
     "modules.audit",
     "modules.documents",
 ]
@@ -176,6 +177,11 @@ EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", "False")
 EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "10") or "10")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Umrovia <no-reply@umrovia.com>")
 CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", "bonoworxx@gmail.com")
+
+# --- Enkripsi PII jamaah (Spec §5.2 identity_encrypted, §10.1) ---------------
+# Key Fernet (urlsafe base64 32 byte). Production WAJIB eksplisit (production.py);
+# local.py menyediakan fallback deterministik dari SECRET_KEY hanya saat DEBUG.
+PII_ENCRYPTION_KEY = env("PII_ENCRYPTION_KEY", "")
 
 # --- Brand / produk (Spec §18.4) --------------------------------------------
 BRAND_NAME = env("BRAND_NAME", "Umrovia")

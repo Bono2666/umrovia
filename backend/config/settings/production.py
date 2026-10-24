@@ -5,6 +5,10 @@ from config.settings.base import *  # noqa: F401,F403
 SECRET_KEY = env("SECRET_KEY", required=True)  # noqa: F405
 DEBUG = False  # noqa: F405
 
+# Enkripsi NIK/paspor jamaah (Spec §5.2): key eksplisit, tanpa fallback (§18.4).
+if not PII_ENCRYPTION_KEY:  # noqa: F405
+    raise RuntimeError("PII_ENCRYPTION_KEY wajib di-set di production (lihat .env.example)")
+
 if not env_bool("ALLOW_INSECURE", "False"):
     # TLS wajib di belakang reverse proxy (Spec §18.2)
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -1,6 +1,8 @@
 asgiref==3.12.1
 attrs==26.1.0
+cffi==2.1.1
 cfgv==3.5.0
+cryptography==46.0.7
 distlib==0.4.4
 dj-database-url==2.3.0
 Django==5.2.18
@@ -25,6 +27,7 @@ Pygments==2.21.0
 pytest==8.4.2
 pytest-django==4.14.0
 python-discovery==1.6.4
+pycparser==3.12
 PyYAML==6.0.3
 referencing==0.37.0
 redis==8.1.0
