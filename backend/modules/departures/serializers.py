@@ -25,7 +25,9 @@ def departure_payload(dep: Departure) -> dict:
             dep.registration_deadline.isoformat() if dep.registration_deadline else None
         ),
         "lead_staff": str(dep.lead_staff_id) if dep.lead_staff_id else None,
-        "lead_staff_name": dep.lead_staff.get_full_name() if dep.lead_staff_id else None,
+        "lead_staff_name": (
+            (dep.lead_staff.full_name or dep.lead_staff.email) if dep.lead_staff_id else None
+        ),
         "status": dep.status,
         "notes": dep.notes,
     }

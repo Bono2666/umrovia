@@ -225,6 +225,45 @@ menunggu endpoint daftar staf ber-permission (S09); `FULL`/`CLOSED` MOD-06
 diturunkan dari data (available==0 / deadline terlampaui), bukan status
 tersimpan — kontrak tersimpan mengikuti §6.5.
 
+## Sprint S09 — Minggu 9 — Booking status & tautan peserta ↔ keberangkatan (F05)
+
+**Goal:** "Booking end-to-end" — pendaftaran jamaah terhubung ke keberangkatan
+dengan kursi atomik, state machine booking/peserta, snapshot harga dan kuota
+trial (Roadmap S09; Spec §5.2, §6.2, §7.1.5, §8.3, UI-07; PRD MOD-07, UAT-03,
+UAT-04, POL-08).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S09-01 | App `modules.booking`: `Booking` (kode auto `BK-<8hex>`, UNIQUE(tenant,environment,code), status MOD-07), `BookingParticipant` (UNIQUE(booking,pilgrim), `booking_passenger_id` UUID permanen, `participant_status` §6.2, `saas_charge_state` default `not_eligible`, `pricing_snapshot_json`) + `BookingPriceLine` (snapshot §5.2) + **RLS 3 tabel sejak migrasi pertama** | §5.2, §5.6, MOD-07 | DONE | `booking/0001` + RunSQL; test RLS 3 tabel |
+| S09-02 | `GET/POST /bookings` + `GET/PATCH /bookings/{id}` (PATCH **hanya DRAFT**: ganti peserta/keberangkatan/catatan dengan guard ulang + delta kuota) + `POST /bookings/{id}/transition`; filter `?status/?departure/?q`, audit `bookings.*` | §8.3, UI-07 | DONE | `booking/{views,serializers}.py`; test CRUD, draft-only PATCH, scoping |
+| S09-03 | create booking: departure harus OPEN & belum lewat deadline/berangkat; peserta ≥1 unik & satu environment; **satu jamaah satu booking aktif per keberangkatan (MOD-07)** — divalidasi di bawah `SELECT FOR UPDATE` baris departure + override `allow_duplicate`; snapshot harga 1 baris × n peserta | §5.2, MOD-07, UAT-03/04 | DONE | `services.py::create_booking`; test UAT-03 (3 peserta unik), UAT-04, guard deadline, duplikat+override |
+| S09-04 | State machine MOD-07 header + sinkron peserta §6.2: DRAFT→RESERVED (`reserve_seats(n)` atomik — **UAT-02 di level booking**) →CONFIRMED→DOCUMENT_PROCESS→READY_TO_DEPART (hook dokumen S10) →DEPARTED (menunggu keberangkatan berangkat) →COMPLETED; CANCELED alasan wajib + `release_seats`; EXPIRED terkontrol (hanya setelah pendaftaran ditutup) | MOD-07, §6.2, BR-002 | DONE | `services.py::transition_booking`; test rantai penuh, cancel-release, expired-guard, graph §6.2 |
+| S09-05 | Kuota trial per booking-jamaah (POL-08, §7.1.5): `dummy_count += n peserta` SEBELUM create dalam transaksi (rollback bila gagal), PATCH mengonsumsi delta, tak pernah dikurangi (TR03) | §7.1.5, POL-08 | DONE | `services.py::_consume_trial_quota`; test 403+rollback, delta PATCH, non-trial lolos |
+| S09-06 | RBAC memakai grant `bookings.create` (Owner/Admin/Sales) & `bookings.read` (Ops/DocReviewer baca; Finance tanpa `bookings.*`) sesuai §8.3 Sales/Admin | §3, §8.3 | DONE | test matriks Sales/Ops/Finance + IDOR 404 |
+| S09-07 | Halaman `/dashboard/booking` (UI-07): daftar + filter + peserta per baris, form tambah (pilih departure OPEN, pencari jamaah multi-pick, catatan), tombol transisi MOD-07, batalkan ber-alasan, kedaluwarsa; sidebar link aktif `bookings.read`; penanda Leads → P1 (CRM/agen P1, §15) | §4.1, UI-07 | DONE | `dashboard/booking/page.tsx`, `WorkspaceShell.tsx`, tipe `Booking` di `lib/api.ts` |
+
+**Exit gate S09 (Booking end-to-end):** `pytest` 185/185 ✓ (20 baru: create
+E2E UAT-03, UAT-04 snapshot vs perubahan harga paket, rantai status MOD-07
+penuh dengan sinkronisasi peserta §6.2 + guard tautan keberangkatan, cancel
+melepas kursi & expired-guard, **race 2-booking kursi terakhir = 1 pemenang**,
+duplikat MOD-07 + override, guard keberangkatan tertutup, draft-only PATCH,
+kuota trial per-peserta + rollback + delta, graph §6.2, RBAC/IDOR/read-only/
+RLS 3 tabel) · `ruff` clean ✓ · `makemigrations --check` no-change ✓ ·
+`tsc --noEmit` + `npm run lint` ✓ · `npm run build` ✓ (rute /dashboard/booking) ·
+schema spectacular OK (hanya graceful-fallback APIView pre-existing) ✓
+
+**Catatan/tundaan:** agen/`agent_id` & cabang pada booking mengikuti §15 (P1 —
+agensi & portal agen); tahap DP peserta (`AWAITING_DP` →
+`DP_VERIFIED_PENDING_CHARGE`) + gerbang aturan DP pada konfirmasi → S11/S12
+(hook `dp_confirmed` terpasang — sementara shortcut REGISTERED→CONFIRMED karena
+aturan DP belum ada); kelengkapan dokumen sebagai gerbang READY_TO_DEPART →
+S10 (hook `documents_complete` sementara selalu lulus); varian harga per tipe
+kamar (QUAD/TRIPLE) → S11 (snapshot per peserta sudah ada); invoice dari
+`booking_price_lines` → S11 (`issue-invoice`); auto-expiry job EXPIRED → S16
+(transisi manual terkontrol dulu); rekonsiliasi `seats_taken` vs booking aktif
+→ S16/S17 (counter kini diperbarui atomik lewat reservasi/pelepasan);
+penanganan massal booking saat keberangkatan CANCELED → tundaan operasional.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -236,7 +275,8 @@ tersimpan — kontrak tersimpan mengikuti §6.5.
 | S06 | 6 | Tenant dashboard UI, config, fondasi template dokumen | DONE |
 | S07 | 7 | Master Jamaah + dokumen secured (PII terenkripsi, duplikat, RLS) | DONE |
 | S08 | 8 | Paket, keberangkatan & alokasi kursi (capacity concurrency tests) | DONE |
-| S09–S19 | 9–19 | mengikuti Roadmap §3 | TODO |
+| S09 | 9 | Booking status, linking pilgrims to departures (booking end-to-end) | DONE |
+| S10–S19 | 10–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
