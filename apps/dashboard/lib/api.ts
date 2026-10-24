@@ -75,6 +75,52 @@ export type PilgrimDocument = {
   reason: string;
 };
 
+/** Payload paket (S08, Spec §5.2/§8.3, MOD-05) — harga integer rupiah (§10.1). */
+export type TravelPackage = {
+  id: string;
+  environment: string;
+  code: string;
+  name: string;
+  kind: string;
+  description: string;
+  duration_days: number;
+  price_idr: number;
+  inclusions: string[];
+  exclusions: string[];
+  cancellation_policy: string;
+  payment_terms: string;
+  status: string;
+  published: boolean;
+};
+
+/**
+ * Payload keberangkatan (S08, §5.2/§6.5, MOD-06) — kursi atomik (BR-002):
+ * `seats_taken` hanya lewat layanan atomik; `available = capacity − taken −
+ * blocked` (formula MOD-06).
+ */
+export type Departure = {
+  id: string;
+  environment: string;
+  code: string;
+  package_id: string;
+  package_code: string;
+  package_name: string;
+  start_at: string;
+  end_at: string | null;
+  city_of_origin: string;
+  route: string;
+  meeting_point: string;
+  seat_capacity: number;
+  seats_blocked: number;
+  seats_taken: number;
+  available_seats: number;
+  registration_deadline: string | null;
+  lead_staff: string | null;
+  lead_staff_name: string | null;
+  status: string;
+  notes: string;
+};
+
 /** Payload GET /trial/status (Spec §8.7). */
 export type TrialStatus = {
   trial_status: string;

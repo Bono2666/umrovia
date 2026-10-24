@@ -1,0 +1,84 @@
+"""Serializer keberangkatan (Spec §8.3, UI-05) + transisi status."""
+from rest_framework import serializers
+
+from modules.departures.models import Departure, DepartureStatus
+
+
+def departure_payload(dep: Departure) -> dict:
+    return {
+        "id": str(dep.id),
+        "environment": dep.environment,
+        "code": dep.code,
+        "package_id": str(dep.package_id),
+        "package_code": dep.package.code,
+        "package_name": dep.package.name,
+        "start_at": dep.start_at.isoformat(),
+        "end_at": dep.end_at.isoformat() if dep.end_at else None,
+        "city_of_origin": dep.city_of_origin,
+        "route": dep.route,
+        "meeting_point": dep.meeting_point,
+        "seat_capacity": dep.seat_capacity,
+        "seats_blocked": dep.seats_blocked,
+        "seats_taken": dep.seats_taken,
+        "available_seats": dep.available_seats,
+        "registration_deadline": (
+            dep.registration_deadline.isoformat() if dep.registration_deadline else None
+        ),
+        "lead_staff": str(dep.lead_staff_id) if dep.lead_staff_id else None,
+        "lead_staff_name": dep.lead_staff.get_full_name() if dep.lead_staff_id else None,
+        "status": dep.status,
+        "notes": dep.notes,
+    }
+
+
+class DepartureWriteSerializer(serializers.ModelSerializer):
+    """Create/update keberangkatan. `seats_taken` TIDAK writable (hanya via
+    layanan seat atomik); `seat_capacity`/`seats_blocked` ber-guard agar
+    invariant BR-002 tidak pernah dilanggar di level aplikasi."""
+
+    # `package` dibiarkan digenerate ModelSerializer (queryset = Manager,
+    # dievaluasi saat validasi dengan context tenant aktif → paket tenant
+    # lain ditolak 400, bukan lolos siluman).
+
+    class Meta:
+        model = Departure
+        fields = [
+            "package", "start_at", "end_at", "city_of_origin", "route",
+            "meeting_point", "seat_capacity", "seats_blocked",
+            "registration_deadline", "lead_staff", "notes",
+        ]
+
+    def validate_city_of_origin(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Kota asal wajib diisi.")
+        return value.strip()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        start = attrs.get("start_at", getattr(self.instance, "start_at", None))
+        end = attrs.get("end_at", getattr(self.instance, "end_at", None))
+        if start and end and end <= start:
+            raise serializers.ValidationError({"end_at": "Kepulangan harus setelah keberangkatan (§10.1)."})
+        deadline = attrs.get(
+            "registration_deadline", getattr(self.instance, "registration_deadline", None)
+        )
+        if deadline and start and deadline > start.date():
+            raise serializers.ValidationError(
+                {"registration_deadline": "Batas pendaftaran tidak boleh setelah tanggal keberangkatan."}
+            )
+
+        capacity = attrs.get("seat_capacity", getattr(self.instance, "seat_capacity", 0) or 0)
+        blocked = attrs.get("seats_blocked", getattr(self.instance, "seats_blocked", 0) or 0)
+        taken = getattr(self.instance, "seats_taken", 0) or 0
+        if blocked + taken > capacity:
+            raise serializers.ValidationError(
+                {"seats_blocked": "Kuota blokir + kursi terpakai melebihi kapasitas (BR-002)."}
+            )
+        return attrs
+
+
+class DepartureTransitionSerializer(serializers.Serializer):
+    """POST /departures/{id}/transition — target wajib; alasan wajib saat cancel."""
+
+    target = serializers.ChoiceField(choices=DepartureStatus.choices)
+    reason = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
