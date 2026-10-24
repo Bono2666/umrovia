@@ -31,6 +31,10 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "roles.write",
         "bookings.create",
         "bookings.read",
+        "packages.read",  # §8.3 katalog: Owner/Admin/Ops
+        "packages.write",
+        "departures.read",
+        "departures.write",
         "departures.manage",
         "documents.approve",
         "pilgrims.read",
@@ -44,6 +48,8 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "bookings.read",
         "invoices.read",
         "leads.manage",
+        "packages.read",  # turunan dari booking: pilih paket/departure (MOD-07)
+        "departures.read",
         "pilgrims.read",
         "pilgrims.write",  # CS/Pendaftaran: profil & pendaftaran jamaah (PRD §MOD-04)
         "trial.demo_booking.create",
@@ -55,9 +61,15 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
         "reports.read",
         "bank_accounts.read",
         "bank_accounts.write",
+        "packages.read",  # harga paket untuk invoice (MOD-09)
+        "departures.read",
         "pilgrims.read",
     ],
     "Operations": [
+        "packages.read",  # §8.3 katalog: Owner/Admin/Ops
+        "packages.write",
+        "departures.read",
+        "departures.write",
         "departures.manage",
         "documents.approve",
         "manifest.read",

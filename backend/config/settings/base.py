@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     "modules.trial",
     "modules.travel_finance",
     "modules.pilgrims",
+    "modules.catalog",
+    "modules.departures",
     "modules.audit",
     "modules.documents",
 ]
