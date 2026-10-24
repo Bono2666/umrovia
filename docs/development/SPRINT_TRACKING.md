@@ -188,6 +188,43 @@ jamaah (PRD data model); signed-URL upload/download → S14 (object storage);
 wali/mahram & catatan kebutuhan khusus sudah di model/detail payload —
 UI form penuh menyusul bersama booking S09.
 
+## Sprint S08 — Minggu 8 — Paket, keberangkatan & alokasi kursi (F04)
+
+**Goal:** "Paket & departure usable, kursi tak overbooking" — katalog paket
++ jadwal keberangkatan per tenant+environment dengan seat counter atomik dan
+gerbang kualitas **capacity concurrency tests** (Roadmap S08; Spec §5.2,
+§5.6, §6.5, §8.3, §10.1; PRD MOD-05/MOD-06, BR-002, UAT-01/UAT-02).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S08-01 | App `modules.catalog`: `TravelPackage` (kode auto `PKT-<8hex>`, UNIQUE(tenant,environment,code), `price_idr` integer rupiah ≤ Rp10 miliar, `inclusions/exclusions_json`, status DRAFT/ACTIVE/INACTIVE/ARCHIVED + `published`) + **RLS sejak migrasi pertama** | §5.2, §5.6, MOD-05 | DONE | `catalog/0001` + RunSQL; test `pg_policies`/`relforcerowsecurity` |
+| S08-02 | `GET/POST /packages` + `GET/PATCH /packages/{id}`: validasi (nama, durasi ≤365, harga ≤10M), **publish hanya dari ACTIVE** (guard §5.2/UI-04), list scoped + search `?q/?status`, audit `packages.*` | §8.3, UI-04 | DONE | `catalog/{views,serializers}.py`; test CRUD, publish-guard, scoping, IDOR 404 |
+| S08-03 | App `modules.departures`: `Departure` (kode auto `DPR-<8hex>`, package FK PROTECT, CHECK `seats_taken+seats_blocked<=seat_capacity` — BR-002) + `departure_events` **append-only** + **RLS 2 tabel sejak migrasi pertama** | §5.2, §5.6, MOD-06 | DONE | `departures/0001` + RunSQL; test append-only + RLS 2 tabel |
+| S08-04 | State machine §6.5: `POST /departures/{id}/transition` DRAFT→OPEN→READY→DEPARTED→COMPLETED atau CANCELED (alasan **wajib**), gerbang OPEN kapasitas ≥1, hook checklist READY (isi riil S10); tiap transisi tulis `departure_events` + audit `departures.transitioned` | §6.5, §8.3, UI-05 | DONE | `services.py::transition_departure`; test happy-path 4 langkah, lompatan ilegal 400, cancel reason, terminal |
+| S08-05 | Seat atomik: `reserve_seats/release_seats` = satu UPDATE ber-guard WHERE (baris terkunci → tepat satu pemenang; over-release & count<1 ditolak); `seats_taken` **tidak writable lewat API** (hanya layanan; dipakai booking S09); PATCH `seat_capacity/seats_blocked` ber-guard + CHECK DB pengaman kedua | BR-002, UAT-02, MOD-06 | DONE | `services.py`; test reserve-sampai-penuh, guard PATCH, **race 2-thread kursi terakhir = 1 pemenang (UAT-02)**, **race 10-thread/5-kursi = 5 pemenang** |
+| S08-06 | Integritas lintas-environment: departure hanya menunjuk paket environment aktif (ditolak 400, §5.2 integrity note); guard environment pindah ke rumah bersama `modules/tenants/environment.py` (pilgrims re-export) | §5.2, §2.2 | DONE | `tenants/environment.py`; test cross-env 400 + demo READ_ONLY 403 (paket & departure) |
+| S08-07 | RBAC baru: `packages.read/.write` (Owner/Admin/Ops tulis; Sales/Finance baca — turunan booking/invoice), `departures.read/.write` (Ops/Admin tulis), transisi via `departures.manage` (Ops/Admin) | §3, §8.3 | DONE | `rbac.py::DEFAULT_ROLE_PERMISSIONS`; test matriks per endpoint + cross-tenant IDOR 404 |
+| S08-08 | Halaman `/dashboard/paket` (daftar + tambah + aktifkan/publikasikan/tarik) & `/dashboard/keberangkatan` (gauge kursi, filter status, form + pemilih paket, tombol transisi §6.5, blokir via prompt); sidebar link aktif `packages.read`/`departures.read` | §4.1, UI-04, UI-05 | DONE | `dashboard/{paket,keberangkatan}/page.tsx`, `WorkspaceShell.tsx` |
+
+**Exit gate S08 (capacity concurrency tests):** `pytest` 165/165 ✓ (24 baru:
+katalog CRUD/publish/RBAC/RLS, state machine + event append-only, matriks
+departures/RBAC/IDOR/guard environment, **2 test konkurensi seat** — 2-thread
+kursi terakhir & 10-thread/5-kursi, keduanya tepat-satu/tepat-lima pemenang,
+`seats_taken == seat_capacity` tanpa overbooking) · `ruff` clean ✓ ·
+`makemigrations --check` no-change ✓ · `tsc --noEmit` + `npm run lint` ✓ ·
+`npm run build` ✓ (rute /dashboard/paket & /dashboard/keberangkatan) ·
+smoke live ✓
+
+**Catatan/tundaan:** konsumsi kursi oleh booking & rekonsiliasi
+`seats_taken` vs daftar booking → S09 (counter = cache seperti
+`balance_cached_idr`, §5.4); varian harga per tipe kamar (QUAD/TRIPLE/…)
+→ S09 (`booking_price_lines`); checklist lengkap sebagai gerbang READY →
+S10 (hook `checklist_complete` sudah terpasang, sementara selalu lulus);
+PIC/`lead_staff` tersedia di API (validasi staf aktif) — pemilih PIC di UI
+menunggu endpoint daftar staf ber-permission (S09); `FULL`/`CLOSED` MOD-06
+diturunkan dari data (available==0 / deadline terlampaui), bukan status
+tersimpan — kontrak tersimpan mengikuti §6.5.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -198,7 +235,8 @@ UI form penuh menyusul bersama booking S09.
 | S05 | 5 | Travel profile, staf/invite, roles, rekening bank, audit (RBAC) | DONE |
 | S06 | 6 | Tenant dashboard UI, config, fondasi template dokumen | DONE |
 | S07 | 7 | Master Jamaah + dokumen secured (PII terenkripsi, duplikat, RLS) | DONE |
-| S08–S19 | 8–19 | mengikuti Roadmap §3 | TODO |
+| S08 | 8 | Paket, keberangkatan & alokasi kursi (capacity concurrency tests) | DONE |
+| S09–S19 | 9–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
