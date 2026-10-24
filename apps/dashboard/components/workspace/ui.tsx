@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Komponen dasar workspace (S06, Spec §4.2: form, tabel, empty/loading/error
  * state, validasi inline) — termasuk port 1:1 form kontak web_template
@@ -148,7 +150,7 @@ function ControlShell({
   error?: string | null;
 }) {
   return (
-    <div className="form-group">
+    <div className={`form-group${label ? "" : " form-group--unlabelled"}`}>
       <div className={wrapperClass}>
         {children}
         {label ? (
@@ -347,7 +349,7 @@ export function FormCheckbox({
         required={required}
         onChange={(event) => onChange(event.target.checked)}
       />
-      <span className="form-control-checkbox__icon" aria-hidden="true" />
+      <label htmlFor={id} className="form-control-checkbox__icon" aria-hidden="true" />
       <label className="form-control-checkbox__label" htmlFor={id}>
         {label}
       </label>
@@ -469,9 +471,11 @@ export function BtnLink({
   size?: BtnSize;
   href: string;
 }) {
+  // Keep fragment links native so the page's scroll controller handles them.
+  const Component = rest.href.startsWith("#") ? "a" : Link;
   return (
-    <Link className={btnClass(variant, size, className)} {...rest}>
+    <Component className={btnClass(variant, size, className)} {...rest}>
       <BtnInner>{children}</BtnInner>
-    </Link>
+    </Component>
   );
 }

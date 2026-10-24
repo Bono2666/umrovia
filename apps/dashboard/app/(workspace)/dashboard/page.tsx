@@ -57,17 +57,20 @@ export default function DashboardPage() {
       value: `${bank.data.results.filter((r) => r.active).length} aktif`,
     });
   }
+  const hasSummary = Boolean(trial.data) || tiles.length > 0;
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="workspace-page">
       <h1 className="text-2xl font-bold">Ringkasan</h1>
       <p className="mt-1 text-sm text-muted">
         Status workspace, konfigurasi travel, dan langkah mencoba alur lengkap
         (data demo tidak pernah menjadi tagihan).
       </p>
 
+      <div className="workspace-columns mt-6">
+      {hasSummary ? <div className="space-y-4">
       {trial.data ? (
-        <section className="card mt-6 p-6">
+        <section className="card p-6">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold">Masa uji coba</h2>
             <StatusBadge tone={trial.data.converted_at ? "success" : "warning"}>
@@ -96,7 +99,7 @@ export default function DashboardPage() {
       ) : null}
 
       {tiles.length > 0 ? (
-        <section className="mt-4 grid gap-3 sm:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-2">
           {tiles.map((tile) => (
             <div key={tile.label} className="card p-4">
               <p className="text-xs text-muted">{tile.label}</p>
@@ -106,8 +109,9 @@ export default function DashboardPage() {
           ))}
         </section>
       ) : null}
+      </div> : null}
 
-      <section className="card mt-6 p-6">
+      <section className={`card p-6 ${hasSummary ? "" : "lg:col-span-2"}`}>
         <h2 className="font-semibold">Quick-start checklist</h2>
         <ol className="mt-4 space-y-3">
           {CHECKLIST.map((item) => (
@@ -117,7 +121,7 @@ export default function DashboardPage() {
               </span>
               <div>
                 {item.href ? (
-                  <Link href={item.href} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
+                  <Link href={item.href} className="text-sm font-medium text-primary hover:text-primary-hover">
                     {item.label}
                   </Link>
                 ) : (
@@ -129,6 +133,7 @@ export default function DashboardPage() {
           ))}
         </ol>
       </section>
+      </div>
     </div>
   );
 }

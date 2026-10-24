@@ -247,7 +247,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="workspace-shell min-h-screen">
       {/* Navbar atas (sticky): identitas brand + konteks workspace + akun/keluar */}
       <header className="sticky top-0 z-30 border-b border-border bg-surface">
         <div className="flex h-14 items-center gap-3 px-4">
@@ -305,7 +305,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         {/* Sidebar navigasi (sticky, scroll sendiri; bisa collapse jadi rail ikon) */}
         <aside
           className={`sticky top-14 -mt-px h-[calc(100vh-3.5rem)] shrink-0 self-start overflow-y-auto border-r border-border bg-surface transition-[width] duration-300 ${
-            collapsed ? "w-16 p-2" : "w-60 p-4"
+            collapsed ? "w-16 py-2" : "w-60 py-4"
           }`}
         >
           <nav className="flex flex-col gap-4">
@@ -317,9 +317,9 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               return (
                 <div key={group.title}>
                   {collapsed ? (
-                    <div className="mx-1 border-t border-border" />
+                    <div className="mx-3 border-t border-border" />
                   ) : (
-                    <p className="px-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
+                    <p className="px-6 text-[0.65rem] font-semibold uppercase tracking-wide text-muted">
                       {group.title}
                     </p>
                   )}
@@ -330,6 +330,8 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                       );
                       const center = collapsed ? "justify-center" : "";
+                      const inset = collapsed ? "px-2" : "px-6";
+                      const isActive = pathname === item.href;
                       /* Roll teks menu — replika hover menu web_template
                          (`.btn--cloned .btn__content`): label diduplikasi di
                          bawah lapisan `overflow:hidden`, keduanya berguling
@@ -339,7 +341,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                       return item.soon ? (
                         <span
                           key={item.href}
-                          className={`flex items-center gap-2 px-2 py-1.5 text-sm text-muted/60 ${center}`}
+                          className={`flex w-full items-center gap-2 py-1.5 text-sm text-muted/60 ${inset} ${center}`}
                           title={
                             collapsed
                               ? `${item.label} — menyusul ${item.soon}`
@@ -361,9 +363,10 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                           key={item.href}
                           href={item.href}
                           title={item.label}
-                          className={`group flex items-center gap-2 px-2 py-1.5 text-sm font-medium ${center} ${
-                            pathname === item.href
-                              ? "bg-primary/10 text-primary"
+                          aria-current={isActive ? "page" : undefined}
+                          className={`group flex w-full items-center gap-2 py-1.5 text-sm font-medium ${inset} ${center} ${
+                            isActive
+                              ? "text-primary"
                               : "text-ink hover:bg-background"
                           }`}
                         >
@@ -390,7 +393,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Konten halaman */}
-        <main className="min-w-0 flex-1 space-y-4 p-6">
+        <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6">
           <TrialBanner
             canConvert={hasPermission(permissions, "trial.convert")}
             onConverted={loadMe}

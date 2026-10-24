@@ -1109,3 +1109,439 @@
     }
   }
 }
+
+/* Compact application layout and controls. Public/marketing forms retain
+   their editorial spacing and typography; root font/scale tokens stay intact. */
+.workspace-shell .workspace-page {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+}
+.workspace-shell .workspace-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+.workspace-shell .workspace-columns > * {
+  min-width: 0;
+}
+@media (min-width: 1024px) {
+  .workspace-shell .workspace-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.workspace-shell .form-group {
+  margin-block: 24px;
+}
+.workspace-shell .form-group:first-child {
+  margin-top: 0;
+}
+.workspace-shell .form-group:last-child {
+  margin-bottom: 0;
+}
+.workspace-shell .form-group--unlabelled {
+  margin-block: 0;
+}
+.workspace-shell .form-control--input input,
+.workspace-shell .form-control--select select,
+.workspace-shell .form-control--textarea textarea {
+  height: 32px;
+  padding-bottom: 8px;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 20px;
+}
+.workspace-shell .form-control--textarea textarea {
+  height: 64px;
+  min-height: 64px;
+}
+.workspace-shell .form-label {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 20px;
+}
+.workspace-shell .form-control--float:is(.is-focused, .is-not-empty) .form-label,
+.workspace-shell .form-control--float input:focus ~ .form-label,
+.workspace-shell .form-control--float textarea:focus ~ .form-label {
+  transform: translateY(-16px) scale(0.857143);
+}
+.workspace-shell .form-control__hint,
+.workspace-shell .error-message {
+  margin-top: 8px;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+.workspace-shell .form-control__suffix {
+  font-size: 12px;
+}
+.workspace-shell .btn {
+  font-size: 14px;
+}
+@media (max-width: 639px) {
+  /* Avoid iOS zoom on focus while keeping the compact control geometry. */
+  .workspace-shell .form-control--input input,
+  .workspace-shell .form-control--select select,
+  .workspace-shell .form-control--textarea textarea {
+    font-size: 16px;
+  }
+}
+
+/* Text reveals from web_template/global.css: title characters are masked by
+   each word; body words share the delay of their measured visual line.
+   Without JS, no ready marker exists and every word remains readable. */
+.mkt-text-reveal__word,
+.mkt-text-reveal__unit {
+  display: inline-block;
+  vertical-align: top;
+}
+.mkt-text-reveal__word {
+  position: relative;
+  margin: -10px -5px;
+  padding: 10px 5px;
+  white-space: nowrap;
+}
+.mkt-text-reveal--title .mkt-text-reveal__word {
+  overflow: hidden;
+}
+.mkt-text-reveal[data-reveal-ready][data-reveal-visible] .mkt-text-reveal__unit {
+  transition-property: transform, opacity;
+  transition-duration: 0.7s;
+  transition-delay: calc(var(--text-reveal-delay, 30ms) + var(--text-reveal-line, 0) * 40ms);
+  transition-timing-function: var(--ease-editorial);
+}
+.mkt-text-reveal--title[data-reveal-ready][data-reveal-visible] .mkt-text-reveal__unit {
+  transition-duration: 0.75s;
+  transition-delay: var(--text-reveal-delay, 30ms);
+  transition-timing-function: ease;
+}
+.mkt-text-reveal[data-reveal-ready]:not([data-reveal-visible]) .mkt-text-reveal__unit {
+  opacity: 0;
+  transform: translateY(150%);
+}
+.mkt-text-reveal--title[data-reveal-ready]:not([data-reveal-visible]) .mkt-text-reveal__unit {
+  transform: translateY(110%);
+}
+@media (prefers-reduced-motion: reduce), (update: slow) {
+  .mkt-text-reveal[data-reveal-ready] .mkt-text-reveal__unit {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Sticky header follows the section crossing its lower edge, including when
+   smooth scrolling uses transforms instead of the browser scroll position. */
+.marketing-header {
+  --marketing-header-background: #fff;
+  --marketing-header-text: var(--brand-ink);
+  --marketing-header-brand: var(--brand-primary);
+  --marketing-header-line: rgb(25 27 29 / 0.1);
+  background-color: var(--marketing-header-background);
+  color: var(--marketing-header-text);
+  transition: background-color 0.4s var(--ease-editorial), color 0.4s var(--ease-editorial);
+}
+.marketing-header::before {
+  background-color: var(--marketing-header-line);
+}
+.marketing-header__brand {
+  color: var(--marketing-header-brand);
+}
+.marketing-header__menu {
+  background-color: var(--marketing-header-background);
+  border-color: var(--marketing-header-line);
+  transition: background-color 0.4s var(--ease-editorial);
+}
+.marketing-header[data-tone="dark"] {
+  --marketing-header-text: #fff;
+  --marketing-header-brand: #fff;
+  --marketing-header-line: rgb(255 255 255 / 0.2);
+  --umrovia-mark-background: #fff;
+  --umrovia-mark-text: var(--marketing-header-background);
+}
+.marketing-header[data-tone="dark"] .btn--secondary {
+  color: var(--marketing-header-background);
+}
+.marketing-header[data-tone="dark"] .btn--secondary::after {
+  background-color: #fff;
+}
+.marketing-header[data-tone="dark"] .btn--secondary::before {
+  background-color: #e8e8e8;
+}
+.marketing-header .btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--marketing-header-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .marketing-header, .marketing-header__menu {
+    transition: none;
+  }
+}
+
+/* Public pages follow the contact and privacy layouts in web_template. */
+.marketing-intro {
+  display: flex;
+  min-height: 540px;
+  flex-direction: column;
+  padding-block: 72px 64px;
+}
+.marketing-intro__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 40px;
+  margin-top: auto;
+  padding-top: 56px;
+}
+.marketing-arrow-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+}
+.marketing-arrow-link__arrow {
+  display: block;
+  flex-shrink: 0;
+}
+.marketing-arrow-link__icon {
+  background: var(--brand-ink);
+  color: white;
+}
+.marketing-two-column { display: grid; gap: 40px; }
+.pricing-price { font-size: clamp(60px, 9vw, 132px); font-weight: 500; letter-spacing: -0.08em; line-height: 1; }
+.pricing-calculator { display: grid; gap: 40px; margin-top: 56px; border-top: 1px solid rgb(0 0 0 / 0.2); padding-top: 40px; }
+.privacy-copy { max-width: 760px; }
+.privacy-copy > p { margin-top: 28px; color: var(--brand-muted); font-size: 16px; line-height: 1.8; letter-spacing: -0.02em; }
+.contact-marketing-form .form-group:first-child { margin-top: 0; }
+.contact-marketing-form > .grid { row-gap: 64px; margin-bottom: 55px; }
+.contact-marketing-form > .grid > .form-group { margin-block: 0; }
+@media (min-width: 980px) {
+  .marketing-intro { min-height: 650px; padding-block: 100px 80px; }
+  .marketing-two-column { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 80px; }
+  .pricing-calculator { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 64px; }
+  .privacy-copy > p { font-size: 18px; }
+}
+
+/* Capabilities: one accordion panel and its matching circle illustration.
+   Source: web_template/landing.css (.accordion, .capabilities) and
+   landing.js (highlightCircles): idle .2, hover .4, active 1, duration .8s. */
+.module-capabilities {
+  display: grid;
+  gap: 40px;
+  padding-block: 64px 80px;
+}
+.module-capabilities__art {
+  display: block;
+  width: min(100%, 380px);
+  height: auto;
+  margin-top: 32px;
+}
+.module-capabilities__art circle {
+  opacity: 0.2;
+  transition: opacity 0.8s var(--ease-editorial);
+}
+.module-capabilities__art circle[data-state="hovered"] {
+  opacity: 0.4;
+}
+.module-capabilities__art circle[data-state="active"] {
+  opacity: 1;
+}
+.module-accordion {
+  --accordion-line: rgb(255 255 255 / 0.2);
+  --accordion-arrow: rgb(255 255 255 / 0.1);
+  --accordion-arrow-hover: #fff;
+  --accordion-arrow-hover-text: var(--brand-ink);
+  min-width: 0;
+}
+.module-accordion--light {
+  --accordion-line: rgb(25 27 29 / 0.15);
+  --accordion-arrow: rgb(25 27 29 / 0.06);
+  --accordion-arrow-hover: var(--brand-primary);
+  --accordion-arrow-hover-text: #fff;
+}
+.module-accordion--light .module-accordion__description {
+  color: var(--brand-muted);
+}
+.module-accordion__trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 30px 29px;
+  border-top: 1px solid var(--accordion-line);
+  border-bottom: 1px solid transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.6s var(--ease-editorial);
+}
+.module-accordion__trigger[aria-expanded="true"] {
+  border-bottom-color: currentColor;
+}
+.module-accordion__trigger:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+.module-accordion__arrow {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accordion-arrow);
+  transition: background-color 0.6s var(--ease-editorial), color 0.6s var(--ease-editorial);
+}
+.module-accordion__arrow svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.6s var(--ease-editorial);
+}
+.module-accordion__trigger[aria-expanded="true"] .module-accordion__arrow svg {
+  transform: rotate(180deg);
+}
+.module-accordion__trigger:is(:hover, :focus-visible) .module-accordion__arrow {
+  background: var(--accordion-arrow-hover);
+  color: var(--accordion-arrow-hover-text);
+}
+.module-accordion__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 0.6s var(--ease-editorial), visibility 0.6s;
+}
+.module-accordion__panel[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+.module-accordion__clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.module-accordion__description {
+  padding-block: 28px 64px;
+  font-size: 19px;
+  line-height: 1.4;
+  letter-spacing: -0.04em;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.4s var(--ease-editorial), transform 0.6s var(--ease-editorial);
+}
+.module-accordion__panel[data-expanded="true"] .module-accordion__description {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (min-width: 980px) {
+  .module-capabilities {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 24px;
+    padding-block: 140px 180px;
+  }
+  .module-capabilities__left {
+    grid-column: span 5;
+    padding-top: 30px;
+  }
+  .module-capabilities__art {
+    width: 100%;
+    max-width: 420px;
+    margin-top: 112px;
+  }
+  .module-capabilities > .module-accordion {
+    grid-column: 7 / -1;
+    min-height: 600px;
+  }
+  .module-accordion__item:first-child .module-accordion__trigger {
+    border-top-color: transparent;
+  }
+  .module-accordion__trigger {
+    padding-block: 25px;
+  }
+  .module-accordion__description {
+    padding-block: 35px 100px;
+    font-size: 24px;
+    line-height: 1.3;
+  }
+}
+@media (min-width: 1440px) {
+  .module-capabilities > .module-accordion {
+    min-height: 650px;
+  }
+  .module-accordion__trigger {
+    padding-block: 34px 35px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .module-capabilities__art circle,
+  .module-accordion__trigger,
+  .module-accordion__arrow,
+  .module-accordion__arrow svg,
+  .module-accordion__panel,
+  .module-accordion__description {
+    transition: none;
+  }
+}
+
+/* web_template: the section scrolls normally; its inner layer exits at 30vh. */
+.mkt-scroll-section {
+  position: relative;
+  overflow: clip;
+  isolation: isolate;
+}
+.mkt-scroll-section__inner {
+  position: relative;
+  background-color: inherit;
+}
+
+/* Smooth scroll and parallax use separate transforms, as in the template. */
+html.has-scroll-smooth {
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+}
+html.has-scroll-smooth body {
+  overflow: clip;
+}
+.has-scroll-smooth .mkt-scroll-section,
+.has-scroll-smooth .mkt-scroll-section__inner {
+  will-change: transform;
+}
+
+/* Scrollbar tipis khas template (`.c-scrollbar`) */
+.c-scrollbar {
+  height: 100vh;
+  opacity: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  transform-origin: center right;
+  transition: transform 0.3s, opacity 0.3s;
+  width: 11px;
+  z-index: 11;
+}
+.c-scrollbar:hover {
+  transform: scaleX(1.45);
+}
+.c-scrollbar:hover,
+.has-scroll-dragging .c-scrollbar,
+.has-scroll-scrolling .c-scrollbar {
+  opacity: 1;
+}
+.c-scrollbar_thumb {
+  background-color: #000;
+  border-radius: 10px;
+  cursor: grab;
+  margin: 2px;
+  opacity: 0.5;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 7px;
+}
+.has-scroll-dragging .c-scrollbar_thumb {
+  cursor: grabbing;
+}

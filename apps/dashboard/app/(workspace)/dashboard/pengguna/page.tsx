@@ -68,6 +68,7 @@ export default function PenggunaPage() {
   const canInvite = perms ? hasPermission(perms, "memberships.write") : false;
   const canManage = perms ? hasPermission(perms, "memberships.manage") : false;
   const canReadRoles = perms ? hasPermission(perms, "roles.read") : true;
+  const hasSidePanels = canInvite || (canReadRoles && roles.length > 0);
 
   async function onInvite(event: React.FormEvent) {
     event.preventDefault();
@@ -131,7 +132,7 @@ export default function PenggunaPage() {
 
   if (noAccess) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div className="workspace-page">
         <h1 className="text-2xl font-bold">Pengguna & Role</h1>
         <div className="mt-6">
           <EmptyState
@@ -144,7 +145,7 @@ export default function PenggunaPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="workspace-page">
       <h1 className="text-2xl font-bold">Pengguna & Role</h1>
       <p className="mt-1 text-sm text-muted">
         Kelola staf travel dan peran mereka (Owner dapat mengubah role dan
@@ -162,7 +163,8 @@ export default function PenggunaPage() {
         </div>
       ) : null}
 
-      <section className="card mt-6 p-6">
+      <div className="workspace-columns mt-6">
+      <section className={`card p-6 ${hasSidePanels ? "" : "lg:col-span-2"}`}>
         <h2 className="font-semibold">Anggota workspace</h2>
         {rows === null ? (
           <div className="mt-4">
@@ -193,7 +195,7 @@ export default function PenggunaPage() {
                       {canManage && roles.length > 0 ? (
                         <FormSelect
                           htmlFor={`role-${row.id}`}
-                          className="w-full pb-1 text-sm"
+                          className="w-full min-w-24 pb-1 text-sm"
                           value={row.role_id ?? ""}
                           onChange={(event) => onChangeRole(row, event.target.value)}
                           aria-label={`Ubah peran ${row.user.email}`}
@@ -230,15 +232,15 @@ export default function PenggunaPage() {
         )}
       </section>
 
+      {hasSidePanels ? <div className="space-y-6">
       {canInvite ? (
-        <section className="card mt-4 p-6">
+        <section className="card p-6">
           <h2 className="font-semibold">Undang staf baru</h2>
           <p className="mt-1 text-xs text-muted">
             Pengguna baru menerima undangan email; ia aktif setelah verifikasi
             email (anti-enumeration — pesan sukses sama untuk email baru/lama).
           </p>
-          {/* Field = form-control 1:1 form kontak; ritme dari .form-group. */}
-          <form onSubmit={onInvite} className="mt-8">
+          <form onSubmit={onInvite} className="mt-6">
             <FormField
               label="Email"
               htmlFor="invite-email"
@@ -273,7 +275,7 @@ export default function PenggunaPage() {
       ) : null}
 
       {canReadRoles && roles.length > 0 ? (
-        <section className="card mt-4 p-6">
+        <section className="card p-6">
           <h2 className="font-semibold">Peran</h2>
           <ul className="mt-3 space-y-3">
             {roles.map((role) => (
@@ -288,7 +290,7 @@ export default function PenggunaPage() {
                   {(role.permissions.length > 0 ? role.permissions : ["(tanpa permission)"]).map((perm) => (
                     <code
                       key={perm}
-                      className="border border-border bg-background px-1.5 py-0.5 text-[0.7rem] text-muted"
+                      className="break-all border border-border bg-background px-1.5 py-0.5 text-[0.7rem] text-muted"
                     >
                       {perm}
                     </code>
@@ -299,6 +301,8 @@ export default function PenggunaPage() {
           </ul>
         </section>
       ) : null}
+      </div> : null}
+      </div>
 
       <p className="mt-4 text-xs text-muted">
         Batas uji coba: maksimal 3 pengguna internal (TR04) — penambahan di atas
