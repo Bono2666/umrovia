@@ -85,7 +85,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Operasional",
     items: [
-      { href: "/dashboard/leads", label: "Leads", soon: "S09", icon: Target },
+      { href: "/dashboard/leads", label: "Leads", soon: "P1", icon: Target },
       { href: "/dashboard/jamaah", label: "Jamaah", permission: "pilgrims.read", icon: Users },
       { href: "/dashboard/paket", label: "Paket", permission: "packages.read", icon: Package },
       {
@@ -94,7 +94,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         permission: "departures.read",
         icon: PlaneTakeoff,
       },
-      { href: "/dashboard/booking", label: "Booking", soon: "S09", icon: ClipboardList },
+      { href: "/dashboard/booking", label: "Booking", permission: "bookings.read", icon: ClipboardList },
     ],
   },
   {

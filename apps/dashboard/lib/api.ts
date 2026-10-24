@@ -121,6 +121,59 @@ export type Departure = {
   notes: string;
 };
 
+/** Peserta booking (S09, §6.2 + PRD MOD-07 saverules). */
+export type BookingParticipant = {
+  id: string;
+  pilgrim_id: string;
+  pilgrim_code: string;
+  pilgrim_name: string;
+  /** UUID permanen unit billing "booking-jamaah" (POL-02/POL-04). */
+  booking_passenger_id: string;
+  participant_status: string;
+  saas_charge_state: string;
+  dp_eligible_at: string | null;
+  pricing_snapshot: Record<string, unknown>;
+};
+
+/** Baris snapshot harga booking (S09, §5.2; UAT-04). */
+export type BookingPriceLine = {
+  id: string;
+  item_type: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+  amount: number;
+};
+
+/**
+ * Payload booking (S09, §5.2/§8.3/UI-07): status header MOD-07, peserta
+ * §6.2, kursi di-reserve atomik saat DRAFT → RESERVED, snapshot harga bebas
+ * perubahan harga paket (UAT-04).
+ */
+export type Booking = {
+  id: string;
+  environment: string;
+  code: string;
+  departure_id: string;
+  departure_code: string;
+  departure_start_at: string;
+  departure_status: string;
+  available_seats: number;
+  package_id: string;
+  package_code: string;
+  package_name: string;
+  status: string;
+  booked_at: string;
+  notes: string;
+  cancel_reason: string;
+  canceled_by_name: string | null;
+  created_by_name: string | null;
+  participant_count: number;
+  participants: BookingParticipant[];
+  price_lines: BookingPriceLine[];
+  total_amount: number;
+};
+
 /** Payload GET /trial/status (Spec §8.7). */
 export type TrialStatus = {
   trial_status: string;
