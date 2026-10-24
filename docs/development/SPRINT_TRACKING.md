@@ -264,6 +264,49 @@ kamar (QUAD/TRIPLE) → S11 (snapshot per peserta sudah ada); invoice dari
 → S16/S17 (counter kini diperbarui atomik lewat reservasi/pelepasan);
 penanganan massal booking saat keberangkatan CANCELED → tundaan operasional.
 
+## Sprint S10 — Minggu 10 — Manifest base & checklist operasional (F05)
+
+**Goal:** "Basic departure manifests export" — checklist dokumen wajib per
+paket menggerakkan gerbang kesiapan (Roadmap S10; Spec §5.2 `document_requirements`
++ `manifest_versions`, §6.5, §7.6, §8.3, UI-11/UI-12; PRD MOD-08, MOD-12,
+OPS-02, OPS-03, UAT-14).
+
+| ID | Task | Spec § | Status | Bukti |
+|---|---|---|---|---|
+| S10-01 | App `modules.manifest`: `DocumentRequirement` (global `package null` / per paket, partial UNIQUE per lingkup, `mandatory` + `deadline_rule before_ready/before_departure`) + `ManifestVersion` (UNIQUE(departure,version_no), `published_by`, `snapshot_object_key`, `checksum`, append-only) + **RLS 2 tabel sejak migrasi pertama** | §5.2, §5.6 | DONE | `manifest/0001` + RunSQL; test RLS 2 tabel |
+| S10-02 | Hook S08/S09 terisi riil: `departures.checklist_complete` (gerbang READY dari requirement `before_ready` vs dokumen APPROVED **versi terakhir** tiap peserta booking aktif; tanpa requirement → lulus), `booking.documents_complete` (gerbang READY_TO_DEPART, strict tanpa exception) + gerbang baru `before_departure` pada transisi DEPARTED | §6.5, MOD-08 | DONE | `manifest/services.py`; `departures/services.py`, `booking/services.py` |
+| S10-03 | *Approved exception* §6.5 (OPS-02): flag `checklist_exception` pada `POST /departures/{id}/transition` — wajib `reason`, gate dilewati dengan jejak `departure_events.reason` + audit `departures.transitioned` (`checklist_exception: true`); tanpa exception → 400 `field_errors.checklist` | §6.5, OPS-02 | DONE | serializer+view transisi; test ditolak/wajib alasan/teraudit |
+| S10-04 | `GET /departures/{id}/manifest` (`manifest.read`): roster **hanya peserta booking aktif departure itu** (UAT-14), field selalu masked (§10.1), filter MOD-12 `?q/?document=complete\|incomplete/?participant_status/?charge_state`, envelope = metadata + rows + versi + checklist efektif + `?checklist_gaps=1` | §8.3, UI-12, MOD-12 | DONE | `manifest/views.py`; test rows/filter/mask/RBAC/IDOR |
+| S10-05 | `POST /departures/{id}/manifest/publish` (`manifest.publish`): snapshot JSON roster di storage (`manifests/{tenant}/{env}/{dep}/v{n}.json`) + `ManifestVersion` bernomor urut unik di bawah lock departure + checksum sha256; audit `manifest.published`; read-only env 403 | §7.6, OPS-04 | DONE | `services.py::publish_manifest`; test versi 1→2, file+checksum, unik, audit |
+| S10-06 | **Exit gate:** ekspor CSV `GET /departures/{id}/manifest/export` (`manifest.export`): BOM UTF-8, prefiks nama `DEMO-manifest-` (§7.2), filter MOD-12, audit `manifest.exported` (format/pii/rows/filters); `?pii=1` menuntut `manifest.export_pii` → tanpa izin **403 + audit `manifest.export_denied`** (OPS-03), dengan izin → NIK/paspor hasil dekripsi + kebutuhan khusus | §7.6, §3, OPS-03, UAT-14 | DONE | `services.py::export_csv`; test masked/denied+audit/Owner-full |
+| S10-07 | CRUD `/document-requirements` (`documents.requirements.manage`): create duplikat per lingkup 400, override per-kind paket menimpa global, PATCH/DELETE, guard environment (tulis 403 saat read-only), audit `document_requirements.*` | §5.2, UI-11, MOD-08 | DONE | `manifest/views.py`; test CRUD+override+RBAC+read-only |
+| S10-08 | Matriks RBAC §3: Admin/Ops += `manifest.read/publish/export` + `documents.requirements.manage` (§8.3 Ops/Admin); **`manifest.export_pii` hanya Owner** (Admin/Ops = S → tidak di-grant v1); Sales/Finance tanpa `manifest.*` | §3, §8.3 | DONE | `rbac.py::DEFAULT_ROLE_PERMISSIONS`; test matriks. *Catatan: role lama di DB hidup memakai grant saat pembuatan — Owner wildcard tetap menang; role baru/buat ulang memakai default baru.* |
+| S10-09 | Halaman `/dashboard/manifest` (UI-11/UI-12): pemilih keberangkatan + filter q/status dokumen, roster dengan badge kelengkapan & identitas masked, banner kekurangan checklist (petunjuk approved exception), tombol publikasi versi + daftar versi (checksum), panel checklist per paket (tambah/hapus, `before_ready`/`before_departure`), ekspor CSV dengan checkbox "Sertakan PII" bila `manifest.export_pii`; sidebar Manifest aktif `manifest.read` (penanda S10 dilepas) | §4.1, UI-11, UI-12 | DONE | `dashboard/manifest/page.tsx`, `lib/api.ts` (tipe Manifest*), `WorkspaceShell.tsx` |
+
+**Exit gate S10 (Basic departure manifests export):** `pytest` 203/203 ✓
+(18 baru: CRUD checklist + override + duplikat lingkup, gerbang READY
+ditolak/lulus + flag `mandatory`, approved exception wajib alasan + audit,
+gerbang DEPARTED `before_departure`, gerbang booking READY_TO_DEPART, roster
+manifest rows/filter/masking/checklist_gaps, RBAC+IDOR manifest, publish
+versi 1→2 + file snapshot + checksum + unik + read-only, CSV masked UAT-14 +
+DEMO- prefix, OPS-03 denied+audited, PII Owner, RLS 2 tabel) · `ruff` clean ✓ ·
+`makemigrations --check` no-change ✓ · `tsc --noEmit` + `npm run lint` ✓ ·
+`npm run build` ✓ (rute /dashboard/manifest) · schema spectacular OK (hanya
+graceful-fallback APIView pre-existing) ✓
+
+**Catatan/tundaan:** role lama di DB hidup tidak otomatis mendapat grant baru
+(default hanya dipakai saat role dibuat — Owner wildcard menutup semua;
+buat ulang/assign role untuk memakai default S10); PII pada **tampilan**
+manifest (bukan ekspor) sengaja tidak dibuka — §10.1 default masked, kebutuhan
+buka di layar menyusul bila ada permintaan; ekspor PDF/XLSX + antrean
+`POST /exports` (§8.3 job) → sprint export (S17); generator dokumen cetak
+MOD-12 (formulir/invoice/amplop KBIH/rooming list) → S11+; filter manifest per
+penerbangan/grup ketika data dimuat; approval exception via alur multi-step
+(disetujui role lain) bila PRD menuntut — kini satu langkah transisi dengan
+alasan wajib + audit penuh (cukup untuk OPS-02 v1); dokumen melekat pada
+jamaah (S07) — pemindahan FK ke `booking_participant` (§5.2 `pilgrim_documents`)
+menyusul bila kontrak per-participant dibutuhkan.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -276,7 +319,8 @@ penanganan massal booking saat keberangkatan CANCELED → tundaan operasional.
 | S07 | 7 | Master Jamaah + dokumen secured (PII terenkripsi, duplikat, RLS) | DONE |
 | S08 | 8 | Paket, keberangkatan & alokasi kursi (capacity concurrency tests) | DONE |
 | S09 | 9 | Booking status, linking pilgrims to departures (booking end-to-end) | DONE |
-| S10–S19 | 10–19 | mengikuti Roadmap §3 | TODO |
+| S10 | 10 | Manifest base & checklist operasional (ekspor manifest dasar) | DONE |
+| S11–S19 | 11–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
