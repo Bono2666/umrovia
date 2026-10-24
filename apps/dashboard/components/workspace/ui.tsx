@@ -113,6 +113,19 @@ type FormControlLabelProps = {
   hint?: string;
 };
 
+/**
+ * Tipe input dengan placeholder native yang SELALU tampil walau kosong
+ * (date → "dd/mm/yyyy", time → "hh:mm", dst.). Float-label wajib dianggap
+ * terisi agar label tidak bertumpang tindih dengan teks placeholder native.
+ */
+const NATIVE_PLACEHOLDER_TYPES = new Set([
+  "date",
+  "datetime-local",
+  "month",
+  "time",
+  "week",
+]);
+
 function controlClass(
   kind: "input" | "select" | "textarea",
   focused: boolean,
@@ -192,16 +205,14 @@ export function FormField({
   const [typed, setTyped] = useState(false);
   const notEmpty =
     value !== undefined ? String(value).trim().length > 0 : typed;
+  // Date/time native menampilkan placeholder-nya sendiri ("dd/mm/yyyy")
+  // bahkan saat kosong → label dianggap terangkat agar tidak bertabrakan.
+  const labelUp =
+    notEmpty || NATIVE_PLACEHOLDER_TYPES.has(String(rest.type ?? "text"));
 
   return (
     <ControlShell
-      wrapperClass={controlClass(
-        "input",
-        focused,
-        notEmpty,
-        error,
-        suffix !== undefined,
-      )}
+      wrapperClass={controlClass("input", focused, labelUp, error, suffix !== undefined)}
       id={htmlFor}
       label={label}
       hint={hint}
