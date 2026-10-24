@@ -108,8 +108,8 @@ export default function RegisterPage() {
               required
               label={
                 <>
-                  Saya menyetujui Syarat Layanan dan Kebijakan Privasi
-                  Umrovia.
+                  Saya menyetujui Syarat Layanan dan{" "}
+                  <Link href="/kebijakan-privasi" target="_blank" rel="noreferrer" className="text-primary hover:text-primary-hover">Kebijakan Privasi Umrovia</Link>.
                 </>
               }
             />
@@ -128,7 +128,7 @@ export default function RegisterPage() {
                 href={devUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 break-all font-medium text-primary underline"
+                className="mt-1 break-all font-medium text-primary hover:text-primary-hover"
               >
                 Buka link verifikasi (mode pengembangan)
               </a>

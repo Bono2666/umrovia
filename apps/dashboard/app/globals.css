@@ -104,7 +104,7 @@
      rgba(25,27,29,.1), hover teks #fff, disabled 30% alpha, fokus ring
      2px var(--t-text)
    - varian kitа dipetakan ke kelas template:
-     "solid" = template --secondary (CTA pill hitam pekat),
+      "solid" = template --secondary (CTA pill hijau brand),
      "tint" = template --primary (tint + slide-fill + teks→putih),
      "danger" = adaptasi nada danger dengan mekanisme identik
    - skala fluid (100vw) dipakai pada viewport kecil/pendek — media asli
@@ -458,8 +458,7 @@
     }
   }
 
-  /* Varian — warna persis tema light template
-     (--t-text #191b1d, --c-black-10 rgba(25,27,29,.1), hover #fff) */
+  /* Varian — tint netral template, aksi solid dan hover hijau brand. */
   .btn--primary {
     color: var(--brand-ink);
   }
@@ -467,7 +466,7 @@
     background-color: rgb(25 27 29 / 0.1);
   }
   .btn--primary::before {
-    background-color: var(--brand-ink);
+    background-color: var(--brand-primary);
   }
   .btn--primary:disabled {
     color: rgb(25 27 29 / 0.3);
@@ -477,10 +476,10 @@
     color: #fff;
   }
   .btn--secondary::after {
-    background-color: var(--brand-ink);
+    background-color: var(--brand-primary);
   }
   .btn--secondary::before {
-    border-color: hsla(0, 0%, 100%, 0.4); /* tanpa border-width → iner, persis sumber */
+    background-color: var(--brand-primary-hover);
   }
   .btn--secondary:disabled {
     color: rgb(255 255 255 / 0.3);
@@ -948,6 +947,9 @@
     font-size: calc(var(--scale-rem) * 1.6);
     letter-spacing: -0.04em;
     line-height: 1.25;
+  }
+  .form-control-checkbox__label::after {
+    pointer-events: none;
   }
   .form-control-checkbox__label small {
     color: var(--form-small);

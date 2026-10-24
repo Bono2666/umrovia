@@ -2,9 +2,11 @@
 
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
-import { Parallax } from "@/components/marketing/Parallax";
+import { SectionScroller } from "@/components/marketing/SectionScroller";
+import { MarketingSection } from "@/components/marketing/MarketingSection";
+import { ModuleAccordion } from "@/components/marketing/ModuleAccordion";
+import { RevealText } from "@/components/marketing/RevealText";
 import {
-  CircleArrow,
   MockCard,
   NumberBadge,
   type MockKind,
@@ -23,8 +25,8 @@ type FiturSegmen = {
  * pita gelap pernyataan dengan mock produk, empat segmen fitur bernomor
  * (2 kolom ala expertise), daftar modul gelap (ala capabilities), pita
  * uji coba abu-abu dengan angka besar (ala company), tiga langkah mulai
- * (ala insights), dan footer terang. Elemen bervariasi di tiap section
- * digerakkan paralaks (locomotive-style) lewat `data-scroll-speed`.
+ * (ala insights), dan footer terang. Setiap section bergerak sebagai blok
+ * mengikuti pola parallax `section-out` dan smooth scroll web_template.
  */
 const FITUR: FiturSegmen[] = [
   {
@@ -66,25 +68,6 @@ const FITUR: FiturSegmen[] = [
       { kind: "chart", title: "Kuota jadwal", tags: "Seat, Hari-H" },
       { kind: "list", title: "Manifest final", tags: "Ekspor, PDF" },
     ],
-  },
-];
-
-const MODUL: Array<{ title: string; desc: string }> = [
-  {
-    title: "Dasbor real-time",
-    desc: "Penjualan, kas, dan keberangkatan hari ini tersaji dalam satu tampilan.",
-  },
-  {
-    title: "Katalog & paket",
-    desc: "Susun paket, harga, kuota, dan periode keberangkatan tanpa spreadsheet terpisah.",
-  },
-  {
-    title: "Laporan keuangan",
-    desc: "Arus kas, piutang, dan laporan bulanan yang bisa langsung diekspor kapan pun.",
-  },
-  {
-    title: "Tim & peran",
-    desc: "Struktur cabang, peran, dan izin akses yang bisa diatur sendiri oleh Anda.",
   },
 ];
 
@@ -175,63 +158,67 @@ function ProductMock() {
 
 export default function Home() {
   return (
-    <>
-      <Parallax />
+    <div data-marketing-page="Beranda" className="contents">
+      <SectionScroller />
       <MarketingHeader />
 
       <main>
         {/* Hero — judul dua baris (baris kedua muted) + wordmark yang
             lebih kecil, rapat, dan rata kiri */}
-        <section className="mkt-container flex min-h-[480px] flex-col pt-16 md:min-h-[760px] md:pt-32">
-          <h1 className="text--lead max-w-[760px]">
+        <MarketingSection
+          className="bg-white"
+          innerClassName="mkt-container flex flex-col py-12 md:py-16"
+        >
+          <RevealText as="h1" variant="title" delay={100} className="text--lead max-w-[760px]">
             Pendaftaran. Pembayaran. Manifest.
             <span className="block text--color-small">
               Satu ruang kerja untuk travel Anda.
             </span>
-          </h1>
+          </RevealText>
 
-          <div className="mt-auto pt-14 md:pt-20 md:pb-14">
-            <p
-              data-scroll-speed="1"
-              className="text-[56px] font-medium leading-none tracking-[-0.04em] text-[#191b1d] md:text-[120px]"
-            >
-              Umrovia
-            </p>
-          </div>
-        </section>
+          <RevealText variant="title" delay={180} className="mt-4 text-[56px] font-medium leading-none tracking-[-0.04em] text-primary md:mt-6 md:text-[120px]">
+            Umrovia
+          </RevealText>
+        </MarketingSection>
 
         {/* Pita gelap — pernyataan besar (ala awards) + mock produk */}
-        <section className="bg-[#191b1d] py-16 text-white md:py-28">
+        <MarketingSection
+          className="bg-primary text-white"
+          innerClassName="pt-12 pb-16 md:pt-16 md:pb-28"
+        >
           <div className="mkt-container">
-            <div className="grid gap-6 md:grid-cols-12 md:gap-10">
-              <p className="text--t3-md text-white/50 md:col-span-3">
+            <div className="grid gap-6 xl:grid-cols-12 xl:gap-10">
+              <RevealText className="text--t3-md text-white/50 xl:col-span-3">
                 Untuk travel modern
-              </p>
+              </RevealText>
               {/* Pernyataan di separuh kanan — komposisi awards template */}
-              <h2
-                data-scroll-speed="1"
-                className="text--h2 md:col-span-6 md:col-start-7"
-              >
+              <RevealText as="h2" className="text--h2 xl:col-span-6 xl:col-start-7">
                 Satu layar untuk seluruh operasi travel.
-              </h2>
+              </RevealText>
             </div>
-            <div className="mt-12 md:mt-20" data-scroll-speed="1.5">
+            <div className="mt-12 md:mt-20">
               <ProductMock />
             </div>
           </div>
-        </section>
+        </MarketingSection>
 
         {/* Segmen fitur bernomor01–04 — dua kolom ala expertise */}
-        <section id="fitur" className="mkt-container scroll-mt-16 pt-16 md:pt-24">
-          <h2 className="sr-only">Fitur</h2>
+        <section
+          aria-labelledby="fitur-title"
+          className="bg-white pt-16 md:pt-24"
+        >
+          <h2 id="fitur-title" className="sr-only">Fitur</h2>
           {FITUR.map((segmen, index) => (
-            <div
+            <MarketingSection
               key={segmen.n}
-              className={`grid gap-10 py-14 md:grid-cols-[1fr_320px] md:gap-16 md:py-24 ${
+              id={index === 0 ? "fitur" : undefined}
+              aria-label={segmen.title}
+              className="scroll-mt-16 bg-white"
+              innerClassName={`mkt-container grid gap-10 py-14 md:grid-cols-[1fr_320px] md:gap-16 md:py-24 ${
                 index > 0 ? "border-t border-black/10" : ""
               }`}
             >
-              <div className="order-2 md:order-none" data-scroll-speed="1">
+              <div className="order-2 md:order-none">
                 <div className="flex items-center gap-3">
                   <NumberBadge n={segmen.n} />
                   <BtnLink href="#modul" variant="tint">
@@ -246,84 +233,42 @@ export default function Home() {
               </div>
 
               <div className="order-1 flex flex-col gap-5 md:order-none">
-                <h3 className="text--h3">{segmen.title}</h3>
-                <p className="text--t3-md text--color-small">{segmen.desc}</p>
+                <RevealText as="h3" variant="title" className="text--h3">{segmen.title}</RevealText>
+                <RevealText delay={100} className="text--t3-md text--color-small">{segmen.desc}</RevealText>
               </div>
-            </div>
+            </MarketingSection>
           ))}
         </section>
 
-        {/* Daftar modul gelap — ala capabilities (label + elips di kiri,
-            baris judul + panah lingkaran di kanan) */}
-        <section id="modul" className="scroll-mt-16 bg-[#191b1d] text-white">
-          <div className="mkt-container grid gap-12 py-16 md:grid-cols-12 md:py-28">
-            <div className="md:col-span-4">
-              <h2 className="text--t3-md text-white/50">
-                Satu aplikasi
-                <br />
-                untuk operasional
-              </h2>
-              <div
-                className="mt-12 hidden md:flex"
-                aria-hidden="true"
-                data-scroll-speed="2"
-              >
-                {[0, 1, 2, 3].map((i) => (
-                  <span
-                    key={i}
-                    className="h-16 w-28 rounded-[50%] border border-white/25"
-                    style={{ marginLeft: i ? "-40px" : undefined }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="md:col-span-8">
-              {MODUL.map((modul) => (
-                <div
-                  key={modul.title}
-                  className="group border-t border-white/15 py-8 first:border-t-0 first:pt-0"
-                >
-                  <div className="flex items-start justify-between gap-6">
-                    <h3 className="text--h3">{modul.title}</h3>
-                    <CircleArrow />
-                  </div>
-                  <p className="mt-4 max-w-[560px] text--t3-md text-white/70">
-                    {modul.desc}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        {/* Accordion dan ilustrasi terhubung — capabilities web_template. */}
+        <MarketingSection
+          id="modul"
+          aria-labelledby="modul-title"
+          className="scroll-mt-16 bg-primary text-white"
+        >
+          <ModuleAccordion />
+        </MarketingSection>
 
         {/* Pita uji coba abu-abu — ala company: pernyataan + angka raksasa
             putih + garis + CTA */}
-        <section className="relative overflow-hidden bg-[#cdcfd0] text-[#191b1d]">
-          <span
-            aria-hidden="true"
-            data-scroll-speed="2"
-            className="absolute -left-40 top-10 hidden h-96 w-96 rounded-full bg-[#191b1d] md:block"
-          />
+        <MarketingSection className="bg-[#cdcfd0] text-[#191b1d]">
           <div className="mkt-container relative scroll-mt-16 py-16 md:py-28">
             <div className="grid gap-8 md:grid-cols-12">
-              {/* Label putih karena duduk di atas lingkaran dekoratif hitam
-                  (mobile: lingkaran disembunyikan → label tetap soft-black) */}
-              <p className="text--t3-md text-[#191b1d] md:col-span-3 md:text-white">
+              <RevealText className="text--t3-md text-black md:col-span-3">
                 Uji coba
-              </p>
+              </RevealText>
               <div className="md:col-span-9">
-                <h2 className="text--h3 max-w-[880px]">
+                <RevealText as="h2" className="text--h3 max-w-[880px]">
                   Semua fitur terbuka selama 30 hari—tanpa kartu kredit, tanpa
                   instalasi.
-                </h2>
+                </RevealText>
                 <div className="mt-14 flex items-end justify-between gap-6">
-                  <span className="text--h1 text-white">30</span>
-                  <span className="pb-1 text--t3-md text-right">
+                  <RevealText as="span" variant="title" className="text--h1 text-white">30</RevealText>
+                  <RevealText as="span" className="pb-1 text--t3-md text-right">
                     Hari uji coba
                     <br />
                     gratis
-                  </span>
+                  </RevealText>
                 </div>
               </div>
             </div>
@@ -334,32 +279,30 @@ export default function Home() {
               </BtnLink>
             </div>
           </div>
-        </section>
+        </MarketingSection>
 
         {/* Tiga langkah — ala insights: judul raksasa + pill, tiga kartu */}
-        <section
+        <MarketingSection
           id="mulai"
-          className="mkt-container scroll-mt-16 py-16 md:py-24"
+          className="scroll-mt-16 bg-white"
+          innerClassName="mkt-container py-16 md:py-24"
         >
           <div className="flex flex-wrap items-end justify-between gap-6">
-            <h2 className="text--h2">Cara mulai</h2>
+            <RevealText as="h2" variant="title" className="text--h2">Cara mulai</RevealText>
             <BtnLink href="/register" variant="tint">
               Daftar sekarang
             </BtnLink>
           </div>
 
-          <div
-            className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3"
-            data-scroll-speed="1"
-          >
+          <div className="mt-12 grid gap-5 md:mt-16 md:grid-cols-3">
             {LANGKAH.map((langkah) => (
               <article
                 key={langkah.tag}
                 className="flex min-h-[320px] flex-col rounded-[6px] border border-black/10 p-6 md:min-h-[400px] md:p-8"
               >
-                <p className="text-[17px] leading-[1.4] tracking-[-0.04em]">
+                <RevealText className="text-[17px] leading-[1.4] tracking-[-0.04em]">
                   {langkah.title}
-                </p>
+                </RevealText>
                 <div className="mt-auto pt-10">
                   <p className="text--t3-md text--color-small">
                     {langkah.time}
@@ -369,10 +312,10 @@ export default function Home() {
               </article>
             ))}
           </div>
-        </section>
+        </MarketingSection>
       </main>
 
       <MarketingFooter />
-    </>
+    </div>
   );
 }
