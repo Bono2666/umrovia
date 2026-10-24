@@ -32,6 +32,49 @@ export type UserPayload = {
   active_tenant_slug?: string | null;
 };
 
+/** Payload jamaah (S07, Spec §8.3) — field sensitif SELALU masked (§10.1). */
+export type Pilgrim = {
+  id: string;
+  code: string;
+  environment: string;
+  name: string;
+  gender: string;
+  birth_date: string | null;
+  birth_place: string;
+  nationality: string;
+  marital_status: string;
+  address: string;
+  email: string;
+  phone: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  guardian_name: string;
+  guardian_relation: string;
+  special_needs?: string;
+  identity_masked: string;
+  passport_masked: string;
+  passport_name: string;
+  passport_issued_at: string | null;
+  passport_expires_at: string | null;
+  passport_place_of_issue: string;
+  status: string;
+  possible_duplicate_of: string | null;
+};
+
+/** Metadata dokumen jamaah (S07) — object_key ber-prefix tenant/environment. */
+export type PilgrimDocument = {
+  id: string;
+  pilgrim_id: string;
+  environment: string;
+  kind: string;
+  object_key: string;
+  version: number;
+  status: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reason: string;
+};
+
 /** Payload GET /trial/status (Spec §8.7). */
 export type TrialStatus = {
   trial_status: string;
