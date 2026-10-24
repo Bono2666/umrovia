@@ -75,7 +75,7 @@ export default function ForgotPasswordPage() {
                 href={devUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="break-all font-medium text-primary underline"
+                className="break-all font-medium text-primary hover:text-primary-hover"
               >
                 Buka tautan reset (mode pengembangan)
               </a>

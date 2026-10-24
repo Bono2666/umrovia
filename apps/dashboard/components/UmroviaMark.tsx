@@ -3,10 +3,9 @@ type UmroviaMarkProps = {
 };
 
 /**
- * Monogram Umrovia — mengikuti logo referensi: lingkaran solid soft-black
- * (`--brand-ink`, padanan `--c-black` web_template) dengan inisial putih
- * huruf kecil "um" (Poppins 700, tracking -0.035em, rasio 0.53×diameter —
- * konsisten dengan `app/favicon.ico`).
+ * Monogram Umrovia — lingkaran solid hijau brand
+ * (`--brand-primary`) dengan inisial putih
+ * huruf kecil "um" (Poppins 700, tracking -0.035em, rasio 0.53×diameter).
  *
  * Berupa SVG inline agar tajam di segala DPI dan memakai font halaman
  * (`var(--font-poppins)` dari next/font/local di `<html>`).
@@ -19,13 +18,13 @@ export function UmroviaMark({ className = "h-7 w-7" }: UmroviaMarkProps) {
       focusable="false"
       className={className}
     >
-      <circle cx="16" cy="16" r="16" fill="var(--brand-ink)" />
+      <circle cx="16" cy="16" r="16" fill="var(--umrovia-mark-background, var(--brand-primary))" />
       <text
         x="16"
         y="16"
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill="var(--umrovia-mark-text, #fff)"
         fontSize={17}
         fontWeight={700}
         letterSpacing="-0.035em"

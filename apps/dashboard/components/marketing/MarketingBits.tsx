@@ -12,13 +12,13 @@ const ROLL =
 /** Badge lingkaran bernomor "01" (padanan counter segmen template). */
 export function NumberBadge({ n }: { n: string }) {
   return (
-    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[#191b1d] text-[11px] font-semibold leading-none tracking-[-0.02em] text-white">
+    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold leading-none tracking-[-0.02em] text-white">
       {n}
     </span>
   );
 }
 
-function ArrowGlyph() {
+export function ArrowGlyph() {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -30,7 +30,7 @@ function ArrowGlyph() {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M8 3.5v9M4.5 9.5 8 13l3.5-3.5" />
+      <path d="M8 3v10M4 9l4 4 4-4" />
     </svg>
   );
 }
@@ -38,20 +38,21 @@ function ArrowGlyph() {
 /**
  * Tombol lingkaran berisi panah bawah — roll dua panah (satuan bergulir
  * keluar ke atas, berikutnya masuk dari bawah) ala panah awards/capabilities
- * template. Letakkan pada elemen induk berkelas `group`.
+ * template. Area potong dan jarak gulir mengikuti diameter lingkaran, bukan
+ * ukuran SVG. Letakkan pada elemen induk berkelas `group`.
  */
-export function CircleArrow() {
+export function CircleArrow({ className = "" }: { className?: string }) {
   return (
     <span
-      className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e4e4e4] text-[#191b1d]"
+      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e4e4e4] text-[#191b1d] ${className}`}
       aria-hidden="true"
     >
-      <span className="relative block h-4 w-4 overflow-hidden">
+      <span className="relative block h-full w-full overflow-hidden rounded-full">
         <span
-          className={`absolute inset-x-0 top-0 flex flex-col ${ROLL} group-hover:-translate-y-4`}
+          className={`absolute inset-x-0 top-0 flex flex-col ${ROLL} group-hover:-translate-y-1/2 group-focus-visible:-translate-y-1/2`}
         >
-          <ArrowGlyph />
-          <ArrowGlyph />
+          <span className="grid h-10 w-10 shrink-0 place-items-center"><ArrowGlyph /></span>
+          <span className="grid h-10 w-10 shrink-0 place-items-center"><ArrowGlyph /></span>
         </span>
       </span>
     </span>
