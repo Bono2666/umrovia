@@ -10,14 +10,20 @@ Seat (UAT-02, PRD BR-002):
   di bawah 0 (untuk pembatalan booking, S09).
 
 Transisi (§6.5): DRAFT → OPEN → READY → DEPARTED → COMPLETED atau CANCELED
-dari DRAFT/OPEN/READY. `READY` dijaga kelengkapan checklist — hook
-`checklist_complete` saat ini selalu True, diisi riil pada S10 (modul
-manifest/checklist) sesuai catatan "approved exception" §6.5.
+dari DRAFT/OPEN/READY. Dua gerbang checklist (diisi S10 — modul `manifest`):
+- `READY` dijaga `checklist_complete` (dokumen wajib `before_ready` milik
+  seluruh peserta booking aktif harus APPROVED). *Approved exception* §6.5 =
+  flag `checklist_exception` + wajib alasan pada transisi → gate dilewati
+  dengan jejak `departure_events` + audit (OPS02: tanpa exception, READY
+  dengan dokumen belum lengkap = ditolak).
+- `DEPARTED` dijaga kekurangan requirement `before_departure` (strict —
+  tanpa exception, sesuai §7.6 keberangkatan fisik).
 """
 from django.core.exceptions import ValidationError
 from django.db.models import F
 
 from modules.departures.models import Departure, DepartureEvent, DepartureStatus
+from modules.manifest.services import checklist_gaps, gap_message
 
 # Graf transisi sah §6.5 (terminal: COMPLETED, CANCELED).
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -33,17 +39,32 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 def checklist_complete(departure: Departure) -> tuple[bool, str]:
     """Gerbang READY (§6.5): kelengkapan checklist / approved exception.
 
-    Hook untuk modul checklist S10 — selama checklist belum ada dianggap
-    lengkap (tidak ada yang bisa kurang). Mengembalikan (lengkap, alasan).
+    Diisi riil pada S10 lewat `modules.manifest` — menghitung dokumen wajib
+    (`deadline_rule=before_ready`) milik setiap peserta booking aktif; tanpa
+    requirement yang berlaku dianggap lengkap (tidak ada yang bisa kurang).
+    Pengecualian resmi ditangani pemanggil via `checklist_exception`.
     """
+    gaps = checklist_gaps(departure, stage="before_ready")
+    if gaps:
+        return False, gap_message(gaps)
     return True, ""
 
 
-def transition_departure(*, departure: Departure, target: str, actor=None, reason: str = "") -> Departure:
+def transition_departure(
+    *,
+    departure: Departure,
+    target: str,
+    actor=None,
+    reason: str = "",
+    checklist_exception: bool = False,
+) -> Departure:
     """Transisi status dengan guard state machine + tulis `departure_events`.
 
     `CANCELED` mewajibkan `reason` (MOD-06: pembatalan dengan approval —
   approval diwakili permission `departures.manage` + alasan tercatat).
+    `checklist_exception` (§6.5 *approved exception*, OPS02) hanya berlaku
+    untuk `READY` dan wajib menyertai `reason` — tercatat di
+    `departure_events.reason` + audit perubahan.
     """
     current = departure.status
     if target not in {c for c, _ in DepartureStatus.choices}:
@@ -61,7 +82,16 @@ def transition_departure(*, departure: Departure, target: str, actor=None, reaso
     if target == DepartureStatus.READY:
         complete, why = checklist_complete(departure)
         if not complete:
-            raise ValidationError({"checklist": why})
+            if not checklist_exception:
+                raise ValidationError({"checklist": why})
+            if not (reason or "").strip():
+                raise ValidationError(
+                    {"reason": "Approved exception checklist wajib menyertai alasan."}
+                )
+    if target == DepartureStatus.DEPARTED:
+        gaps = checklist_gaps(departure, stage="before_departure")
+        if gaps:
+            raise ValidationError({"checklist": gap_message(gaps)})
 
     departure.status = target
     departure.save(update_fields=["status", "updated_at"])

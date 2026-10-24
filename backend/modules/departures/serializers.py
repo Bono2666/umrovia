@@ -80,7 +80,13 @@ class DepartureWriteSerializer(serializers.ModelSerializer):
 
 
 class DepartureTransitionSerializer(serializers.Serializer):
-    """POST /departures/{id}/transition — target wajib; alasan wajib saat cancel."""
+    """POST /departures/{id}/transition — target wajib; alasan wajib saat cancel.
+
+    `checklist_exception` (§6.5 *approved exception*, OPS02): izin melewati
+    gerbang READY saat dokumen wajib belum lengkap — wajib menyertai `reason`
+    dan tercatat di `departure_events` + audit.
+    """
 
     target = serializers.ChoiceField(choices=DepartureStatus.choices)
     reason = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=1000)
+    checklist_exception = serializers.BooleanField(required=False, default=False)

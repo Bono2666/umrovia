@@ -44,6 +44,7 @@ from modules.booking.models import (
 )
 from modules.departures.models import Departure, DepartureStatus
 from modules.departures.services import release_seats, reserve_seats
+from modules.manifest.services import booking_documents_complete
 from modules.pilgrims.models import Pilgrim
 from modules.trial.exceptions import TrialQuotaExceeded
 from modules.trial.models import TenantTrial
@@ -163,9 +164,15 @@ def dp_confirmed(booking: Booking) -> tuple[bool, str]:
 
 def documents_complete(booking: Booking) -> tuple[bool, str]:
     """Gerbang READY_TO_DEPART — kelengkapan dokumen peserta (§6.5 pola
-    "approved exception"). Hook modul dokumen/manifest S10: selama checklist
-    belum ada dianggap lengkap (tidak ada yang bisa kurang)."""
-    return True, ""
+    "approved exception" level keberangkatan).
+
+    Diisi riil pada S10 lewat `modules.manifest`: setiap peserta booking
+    wajib punya dokumen jenis wajib (`before_ready`) ber-APPROVED pada
+    versi terakhir. Tanpa requirement yang berlaku → lengkap (tidak ada
+    yang bisa kurang). Level booking sengaja TANPA exception — bila aturan
+    tidak berlaku, uncheck `mandatory` pada DocumentRequirement.
+    """
+    return booking_documents_complete(booking)
 
 
 def registration_closed(departure: Departure) -> bool:
@@ -535,7 +542,7 @@ def transition_booking(
     elif target == BookingStatus.READY_TO_DEPART:
         ok, why = documents_complete(booking)
         if not ok:
-            raise ValidationError({"target": why})
+            raise ValidationError({"checklist": why})
     elif target == BookingStatus.DEPARTED:
         if departure.status not in (DepartureStatus.DEPARTED, DepartureStatus.COMPLETED):
             raise ValidationError(

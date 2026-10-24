@@ -169,12 +169,14 @@ class DepartureTransitionView(APIView):
         serializer.is_valid(raise_exception=True)
 
         prior = dep.status
+        checklist_exception = bool(serializer.validated_data.get("checklist_exception"))
         try:
             transition_departure(
                 departure=dep,
                 target=serializer.validated_data["target"],
                 actor=request.user,
                 reason=serializer.validated_data.get("reason") or "",
+                checklist_exception=checklist_exception,
             )
         except DjangoValidationError as exc:
             # service memakai DjangoValidationError (domain) → petakan ke DRF 400
@@ -182,15 +184,23 @@ class DepartureTransitionView(APIView):
                 exc.message_dict if hasattr(exc, "message_dict") else exc.messages
             ) from exc
 
+        changes = {
+            "code": dep.code,
+            "transition": [prior, dep.status],
+            **(
+                {"reason": serializer.validated_data["reason"]}
+                if serializer.validated_data.get("reason")
+                else {}
+            ),
+        }
+        if checklist_exception:
+            # jejak *approved exception* §6.5/OPS02 di audit
+            changes["checklist_exception"] = True
         log_event(
             action="departures.transitioned",
             request=request,
             object_type="departure",
             object_id=dep.pk,
-            changes={
-                "code": dep.code,
-                "transition": [prior, dep.status],
-                **({"reason": serializer.validated_data["reason"]} if serializer.validated_data.get("reason") else {}),
-            },
+            changes=changes,
         )
         return Response(departure_payload(dep))

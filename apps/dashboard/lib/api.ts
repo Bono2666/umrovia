@@ -174,6 +174,88 @@ export type Booking = {
   total_amount: number;
 };
 
+/**
+ * Syarat dokumen / checklist operasional (S10, §5.2 `document_requirements`,
+ * UI-11; MOD-08): global (`package_id` null) atau per paket — spesifikasi
+ * paket menimpa global per `kind`; `deadline_rule` menggerakkan gerbang
+ * `before_ready` (READY keberangkatan + booking READY_TO_DEPART) /
+ * `before_departure` (DEPARTED).
+ */
+export type ManifestRequirement = {
+  id: string;
+  environment: string;
+  package_id: string | null;
+  package_code: string | null;
+  kind: "ktp" | "passport" | "photo" | "kk" | "other";
+  mandatory: boolean;
+  deadline_rule: "before_ready" | "before_departure";
+};
+
+/** Versi snapshot manifest (S10, §5.2 `manifest_versions`, §7.6; UI-12). */
+export type ManifestVersion = {
+  id: string;
+  version_no: number;
+  published_by_name: string | null;
+  checksum: string;
+  snapshot_object_key: string;
+  created_at: string;
+};
+
+/**
+ * Baris roster manifest (S10, §8.3/UI-12; UAT-14: hanya peserta keberangkatan
+ * terkait, booking CANCELED/EXPIRED dikeluarkan). Field SELALU masked (§10.1);
+ * nilai mentah NIK/paspor + kebutuhan khusus hanya di ekspor `pii=1` yang
+ * berizin & diaudit (OPS-03).
+ */
+export type ManifestRow = {
+  booking_id: string;
+  booking_code: string;
+  participant_id: string;
+  participant_status: string;
+  saas_charge_state: string;
+  pilgrim_id: string;
+  pilgrim_code: string;
+  name: string;
+  gender: string;
+  birth_date: string | null;
+  phone: string;
+  identity_masked: string;
+  passport_masked: string;
+  docs: Record<string, string>;
+  docs_required: string[];
+  docs_missing: string[];
+  docs_complete: boolean;
+  /** Hanya terisi pada respons ekspor ber-PII. */
+  identity_number?: string;
+  passport_number?: string;
+  address?: string;
+  special_needs?: string;
+};
+
+/** Envelope GET /departures/{id}/manifest (S10; UI-11 checklist + UI-12 roster). */
+export type ManifestEnvelope = {
+  departure: {
+    id: string;
+    code: string;
+    package_id: string;
+    package_code: string;
+    package_name: string;
+    start_at: string;
+    city_of_origin: string;
+    route: string;
+    status: string;
+    seat_capacity: number;
+    seats_taken: number;
+    available_seats: number;
+  };
+  rows: ManifestRow[];
+  row_count: number;
+  versions: ManifestVersion[];
+  requirements: ManifestRequirement[];
+  /** Hanya ada bila `?checklist_gaps=1` — kekurangan gerbang READY. */
+  checklist_gaps?: string[];
+};
+
 /** Payload GET /trial/status (Spec §8.7). */
 export type TrialStatus = {
   trial_status: string;
