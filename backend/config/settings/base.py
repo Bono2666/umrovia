@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "modules.pilgrims",
     "modules.catalog",
     "modules.departures",
+    "modules.booking",
     "modules.audit",
     "modules.documents",
 ]

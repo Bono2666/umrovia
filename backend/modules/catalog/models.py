@@ -10,8 +10,9 @@ Aturan:
 - `published` = siap ditampilkan/dipesan (kolom esensial §5.2); `status`
   = lifecycle MOD-05 (DRAFT/ACTIVE/INACTIVE/ARCHIVED). Publish hanya sah
   dari status ACTIVE (divalidasi serializer).
-- Varian harga per tipe kamar/dewasa-anak-bayi → menyusul S09 (snapshot
-  harga per booking_participant, §5.2 booking_price_lines).
+- Varian harga per tipe kamar/dewasa-anak-bayi → menyusul S11 (varian harga);
+  snapshot harga per booking sudah tersedia sejak S09 (`booking_price_lines`
+  + `pricing_snapshot_json` per peserta, §5.2).
 """
 import uuid
 
