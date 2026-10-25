@@ -7,6 +7,7 @@ import {
   ErrorState,
   FormField,
   FormSelect,
+  FormTextarea,
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
@@ -16,6 +17,26 @@ import {
   type Pilgrim,
   type PilgrimDocument,
 } from "@/lib/api";
+
+const EMPTY_PROFILE = {
+  nationality: "ID", marital_status: "", address: "",
+  emergency_contact_name: "", emergency_contact_phone: "",
+  guardian_name: "", guardian_relation: "", special_needs: "",
+  passport_name: "", passport_issued_at: "", passport_expires_at: "", passport_place_of_issue: "",
+};
+
+const PROFILE_FIELDS = [
+  ["nationality", "Kewarganegaraan (kode negara)"],
+  ["marital_status", "Status perkawinan"],
+  ["emergency_contact_name", "Nama kontak darurat"],
+  ["emergency_contact_phone", "Telepon kontak darurat"],
+  ["guardian_name", "Nama wali / mahram"],
+  ["guardian_relation", "Hubungan wali / mahram"],
+  ["passport_name", "Nama sesuai paspor"],
+  ["passport_issued_at", "Tanggal terbit paspor"],
+  ["passport_expires_at", "Tanggal kedaluwarsa paspor"],
+  ["passport_place_of_issue", "Tempat terbit paspor"],
+] as const;
 
 /**
  * Master Jamaah (S07, Spec §8.3/UI-06): daftar + pencarian, tambah, dan
@@ -41,6 +62,7 @@ export default function JamaahPage() {
   const [email, setEmail] = useState("");
   const [identityNumber, setIdentityNumber] = useState("");
   const [passportNumber, setPassportNumber] = useState("");
+  const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
 
@@ -57,13 +79,27 @@ export default function JamaahPage() {
     load(query);
   }, [load, query]);
 
-  async function openDetail(pilgrim: Pilgrim) {
+  function openDetail(pilgrim: Pilgrim) {
     setSelected(pilgrim);
-    const result = await apiFetch<{ results: PilgrimDocument[] }>(
-      `/pilgrims/${pilgrim.id}/documents`,
-    );
-    if (result.ok) setDocuments(result.data.results);
+    setDocuments([]);
   }
+
+  const selectedId = selected?.id;
+  useEffect(() => {
+    if (!selectedId) return;
+    let cancelled = false;
+    Promise.all([
+      apiFetch<Pilgrim>(`/pilgrims/${selectedId}`),
+      apiFetch<{ results: PilgrimDocument[] }>(`/pilgrims/${selectedId}/documents`),
+    ]).then(([detail, docs]) => {
+      if (cancelled) return;
+      if (detail.ok) setSelected(detail.data);
+      else setError(problemMessage(detail.error));
+      if (docs.ok) setDocuments(docs.data.results);
+      else setError(problemMessage(docs.error));
+    });
+    return () => { cancelled = true; };
+  }, [selectedId]);
 
   async function onAdd(event: React.FormEvent) {
     event.preventDefault();
@@ -83,6 +119,9 @@ export default function JamaahPage() {
     const result = await apiFetch<Pilgrim>("/pilgrims", {
       method: "POST",
       body: JSON.stringify({
+        ...profile,
+        passport_issued_at: profile.passport_issued_at || null,
+        passport_expires_at: profile.passport_expires_at || null,
         name: name.trim(),
         gender,
         birth_date: birthDate,
@@ -106,6 +145,7 @@ export default function JamaahPage() {
     setEmail("");
     setIdentityNumber("");
     setPassportNumber("");
+    setProfile(EMPTY_PROFILE);
     const created = result.data;
     setMessage(
       created.possible_duplicate_of
@@ -354,6 +394,36 @@ export default function JamaahPage() {
             onChange={(event) => setPassportNumber(event.target.value)}
             placeholder="C1234567"
           />
+          <details className="my-6 border-t border-border pt-4">
+            <summary className="cursor-pointer text-sm font-semibold">
+              Data tambahan, kontak darurat &amp; paspor
+            </summary>
+            <div className="mt-6">
+              {PROFILE_FIELDS.map(([key, label]) => (
+                <FormField
+                  key={key}
+                  label={label}
+                  htmlFor={`pilgrim-${key}`}
+                  type={key.endsWith("_at") ? "date" : "text"}
+                  value={profile[key]}
+                  onChange={(event) => setProfile((prev) => ({ ...prev, [key]: event.target.value }))}
+                />
+              ))}
+              <FormTextarea
+                label="Alamat"
+                htmlFor="pilgrim-address"
+                value={profile.address}
+                onChange={(event) => setProfile((prev) => ({ ...prev, address: event.target.value }))}
+              />
+              <FormTextarea
+                label="Catatan kebutuhan khusus"
+                htmlFor="pilgrim-special-needs"
+                hint="Ditampilkan pada detail jamaah untuk staf yang memiliki akses."
+                value={profile.special_needs}
+                onChange={(event) => setProfile((prev) => ({ ...prev, special_needs: event.target.value }))}
+              />
+            </div>
+          </details>
           {formErrors.form ? (
             <p className="error-message" role="alert">
               {formErrors.form}

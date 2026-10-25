@@ -2,6 +2,7 @@
 from rest_framework import serializers
 
 from modules.booking.models import Booking, BookingStatus
+from modules.catalog.models import RoomType
 from modules.departures.models import Departure
 
 
@@ -73,6 +74,7 @@ class BookingCreateSerializer(serializers.Serializer):
     # class body); dievaluasi DRF saat validasi → ref lintas-tenant ditolak 400.
     departure = serializers.PrimaryKeyRelatedField(queryset=Departure.objects)
     participants = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
+    room_types = serializers.DictField(child=serializers.ChoiceField(choices=RoomType.choices), required=False)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
     allow_duplicate = serializers.BooleanField(required=False, default=False)
 
@@ -87,6 +89,7 @@ class BookingUpdateSerializer(serializers.Serializer):
 
     departure = serializers.PrimaryKeyRelatedField(queryset=Departure.objects, required=False)
     participants = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=False)
+    room_types = serializers.DictField(child=serializers.ChoiceField(choices=RoomType.choices), required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     allow_duplicate = serializers.BooleanField(required=False, default=False)
 

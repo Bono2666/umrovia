@@ -87,3 +87,29 @@ def token_from_mail(mail) -> str:
     match = re.search(r"token=([A-Za-z0-9_\-]+)", body)
     assert match, f"token tidak ditemukan di email: {body[:200]}"
     return match.group(1)
+
+
+@pytest.fixture
+def settle_demo_dp():
+    """S11: integrasi lama melewati alur invoice/DP nyata pada environment demo."""
+    from uuid import uuid4
+
+    def fund(client, booking_id):
+        csrf = client.get("/api/v1/auth/csrf").json()["csrfToken"]
+
+        def post(url, data):
+            response = client.post(url, data, content_type="application/json", HTTP_X_CSRFTOKEN=csrf, HTTP_IDEMPOTENCY_KEY=str(uuid4()))
+            assert response.status_code in (200, 201), response.content
+            return response.json()
+
+        invoice = post(f"/api/v1/bookings/{booking_id}/issue-invoice", {})
+        assert invoice["environment"] == "demo"
+        allocations = [{"booking_participant_id": line["participant_id"], "amount_idr": 1} for line in invoice["lines"]]
+        payment = post("/api/v1/payments", {
+            "invoice": invoice["id"], "amount_idr": len(allocations), "kind": "DP", "method": "CASH",
+            "received_at": timezone.now().isoformat(), "reference": f"DEMO-{uuid4().hex}",
+            "allocations": allocations, "simulate": True,
+        })
+        return post(f"/api/v1/payments/{payment['id']}/verify", {})
+
+    return fund

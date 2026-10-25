@@ -85,6 +85,7 @@ export type TravelPackage = {
   description: string;
   duration_days: number;
   price_idr: number;
+  room_prices: RoomPrice[];
   inclusions: string[];
   exclusions: string[];
   cancellation_policy: string;
@@ -105,6 +106,8 @@ export type Departure = {
   package_id: string;
   package_code: string;
   package_name: string;
+  package_price_idr: number;
+  room_prices: RoomPrice[];
   start_at: string;
   end_at: string | null;
   city_of_origin: string;
@@ -119,6 +122,50 @@ export type Departure = {
   lead_staff_name: string | null;
   status: string;
   notes: string;
+};
+
+export type DepartureStaff = { id: string; name: string };
+
+export type RoomType = "QUAD" | "TRIPLE" | "DOUBLE" | "SINGLE";
+export type RoomPrice = { room_type: RoomType; price_idr: number };
+export type TravelInvoice = {
+  id: string; environment: string; booking_id: string; booking_code: string;
+  invoice_number: string; status: string; issue_at: string; due_at: string;
+  total_idr: number; paid_idr: number; balance_idr: number; overdue: boolean;
+  buyer_name: string; checksum: string;
+  lines: {participant_id: string; pilgrim_name: string; description: string; amount_idr: number; room_type: string}[];
+  dp_policy: PaymentRules;
+};
+export type PaymentRules = {dp_policy?: "any_positive"; dp_minimum_idr?: number; maker_checker?: boolean};
+export type SaasWallet = {
+  id: string | null; currency: "IDR"; environment: "demo" | "production";
+  status: string; balance_idr: number; standard_rate_idr: number;
+  estimated_participant_capacity: number; pending_participant_count: number;
+  version: number; ledger_balance_idr: number; balance_matches_ledger: boolean;
+  topup_available: boolean; provider: "manual"; topup_minimum_idr: number | null;
+  last_reconciliation: {at: string; consistent: boolean; variance_idr: number} | null;
+};
+export type WalletTopup = {
+  id: string; number: string; amount_idr: number; status: string; provider: string;
+  instructions: {bank_name: string; account_name: string; account_number: string};
+  payment_reference: string; evidence_ref: string; provider_txn_id: string;
+  expires_at: string; created_at: string; paid_at: string | null;
+  ledger_entry_id: string | null; reason: string;
+};
+export type WalletLedger = {
+  id: string; sequence: number; kind: string; signed_amount_idr: number;
+  balance_after_idr: number; reference_type: string; reference_id: string;
+  description: string; created_at: string;
+};
+export type Paginated<T> = {count: number; next: string | null; previous: string | null; results: T[]};
+export type TravelPayment = {
+  id: string; environment: string; booking_id: string; booking_code: string;
+  invoice_id: string; invoice_number: string; amount_idr: number; status: string;
+  kind: string; method: string; received_at: string; reference: string; evidence_ref: string;
+  simulated: boolean; reason: string; verified_at: string | null; verified_by_name: string | null;
+  receipt: {id: string; receipt_no: string; status: string; checksum: string; issued_at: string} | null;
+  allocations: {booking_participant_id: string; pilgrim_name: string; amount_idr: number}[];
+  participants: {id: string; status: string; saas_charge_state: string; dp_eligible_at: string | null}[];
 };
 
 /** Peserta booking (S09, §6.2 + PRD MOD-07 saverules). */

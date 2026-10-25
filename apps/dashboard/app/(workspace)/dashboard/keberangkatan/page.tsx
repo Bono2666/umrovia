@@ -15,6 +15,7 @@ import {
   apiFetch,
   problemMessage,
   type Departure,
+  type DepartureStaff,
   type TravelPackage,
 } from "@/lib/api";
 
@@ -55,6 +56,8 @@ const NEXT_ACTIONS: Record<string, { target: string; label: string }[]> = {
 export default function KeberangkatanPage() {
   const [rows, setRows] = useState<Departure[] | null>(null);
   const [packages, setPackages] = useState<TravelPackage[]>([]);
+  const [staff, setStaff] = useState<DepartureStaff[]>([]);
+  const [leadStaff, setLeadStaff] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [noAccess, setNoAccess] = useState(false);
@@ -93,14 +96,17 @@ export default function KeberangkatanPage() {
     apiFetch<{ results: TravelPackage[] }>("/packages").then((result) => {
       if (result.ok) setPackages(result.data.results);
     });
+    apiFetch<{ results: DepartureStaff[] }>("/departures/staff").then((result) => {
+      if (result.ok) setStaff(result.data.results);
+    });
   }, []);
 
-  async function transition(dep: Departure, target: string, reason?: string) {
+  async function transition(dep: Departure, target: string, reason?: string, checklistException = false) {
     setBusyId(dep.id);
     setError(null);
     const result = await apiFetch<Departure>(`/departures/${dep.id}/transition`, {
       method: "POST",
-      body: JSON.stringify(reason ? { target, reason } : { target }),
+      body: JSON.stringify({ target, reason, checklist_exception: checklistException }),
     });
     setBusyId(null);
     if (!result.ok) {
@@ -109,6 +115,16 @@ export default function KeberangkatanPage() {
     }
     setMessage(`${dep.code}: status → ${STATUS_LABEL[target] ?? target}.`);
     load(query);
+  }
+
+  function prepareWithException(dep: Departure) {
+    const reason = window.prompt(`Alasan pengecualian dokumen wajib untuk ${dep.code} (tercatat dalam riwayat):`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setError("Alasan pengecualian dokumen wajib diisi.");
+      return;
+    }
+    transition(dep, "READY", reason.trim(), true);
   }
 
   function cancel(dep: Departure) {
@@ -184,6 +200,7 @@ export default function KeberangkatanPage() {
         seat_capacity: capacity,
         seats_blocked: blocked,
         registration_deadline: deadline || null,
+        lead_staff: leadStaff || null,
       }),
     });
     setBusy(false);
@@ -200,6 +217,7 @@ export default function KeberangkatanPage() {
     setSeatCapacity("");
     setSeatsBlocked("");
     setDeadline("");
+    setLeadStaff("");
     setMessage(
       `Keberangkatan ${result.data.code} dibuat — ${result.data.available_seats} kursi tersedia.`,
     );
@@ -320,6 +338,16 @@ export default function KeberangkatanPage() {
                         {action.label}
                       </Btn>
                     ))}
+                    {dep.status === "OPEN" ? (
+                      <Btn
+                        variant="tint"
+                        size="xs"
+                        disabled={busyId === dep.id}
+                        onClick={() => prepareWithException(dep)}
+                      >
+                        Siapkan dengan pengecualian
+                      </Btn>
+                    ) : null}
                     {["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
                       <Btn
                         variant="danger"
@@ -370,6 +398,15 @@ export default function KeberangkatanPage() {
                 Belum ada paket terlihat — buka menu Paket dan buat katalog dulu.
               </p>
             ) : null}
+            <FormSelect
+              label="PIC keberangkatan"
+              htmlFor="departure-lead-staff"
+              value={leadStaff}
+              onChange={(event) => setLeadStaff(event.target.value)}
+            >
+              <option value="">— belum ditentukan —</option>
+              {staff.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+            </FormSelect>
             <FormField
               label="Keberangkatan"
               htmlFor="departure-start"

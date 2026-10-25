@@ -10,6 +10,8 @@ UI-07).
 - transition: guard MOD-07 + peserta §6.2 + kursi atomik (UAT-02 booking).
 """
 from django.core.exceptions import ValidationError as DjangoValidationError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -44,6 +46,7 @@ class BookingListCreateView(APIView):
             return [IsAuthenticated(), require_permission("bookings.create")()]
         return [IsAuthenticated(), require_permission("bookings.read")()]
 
+    @extend_schema(operation_id="bookings_list", responses=OpenApiTypes.OBJECT)
     def get(self, request):
         qs = Booking.objects.all()
         env = request.query_params.get("environment", "").strip()
@@ -75,6 +78,7 @@ class BookingListCreateView(APIView):
         )
         return Response({"results": [booking_payload(b) for b in rows]})
 
+    @extend_schema(request=BookingCreateSerializer, responses={201: OpenApiTypes.OBJECT})
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -87,6 +91,7 @@ class BookingListCreateView(APIView):
                 environment=environment,
                 departure_id=serializer.validated_data["departure"].pk,
                 pilgrim_ids=serializer.validated_data["participants"],
+                room_types=serializer.validated_data.get("room_types"),
                 notes=serializer.validated_data.get("notes", ""),
                 allow_duplicate=serializer.validated_data.get("allow_duplicate", False),
                 actor=request.user,
@@ -119,10 +124,12 @@ class BookingDetailView(APIView):
             return [IsAuthenticated(), require_permission("bookings.create")()]
         return [IsAuthenticated(), require_permission("bookings.read")()]
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request, booking_id):
         booking = _get_booking(booking_id)
         return Response(booking_payload(booking))
 
+    @extend_schema(request=BookingUpdateSerializer, responses=OpenApiTypes.OBJECT)
     def patch(self, request, booking_id):
         booking = _get_booking(booking_id)
         assert_environment_writable(request.tenant, booking.environment)
@@ -135,6 +142,7 @@ class BookingDetailView(APIView):
                 environment=booking.environment,
                 departure_id=validated["departure"].pk if "departure" in validated else None,
                 pilgrim_ids=validated.get("participants"),
+                room_types=validated.get("room_types"),
                 notes=validated.get("notes") if "notes" in validated else None,
                 allow_duplicate=validated.get("allow_duplicate", False),
             )
@@ -159,6 +167,7 @@ class BookingTransitionView(APIView):
 
     permission_classes = [IsAuthenticated, require_permission("bookings.create")]
 
+    @extend_schema(request=BookingTransitionSerializer, responses=OpenApiTypes.OBJECT)
     def post(self, request, booking_id):
         booking = _get_booking(booking_id)
         assert_environment_writable(request.tenant, booking.environment)

@@ -24,6 +24,7 @@ from modules.departures.serializers import (
 )
 from modules.departures.services import transition_departure
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
+from modules.tenants.models import MembershipStatus, TenantMembership
 from modules.tenants.rbac import require_permission
 
 
@@ -32,6 +33,22 @@ def _get_departure(departure_id) -> Departure:
         return Departure.objects.get(pk=departure_id)
     except (Departure.DoesNotExist, ValueError, ValidationError):
         raise NotFound("Keberangkatan tidak ditemukan.") from None
+
+
+class DepartureStaffView(APIView):
+    """Pemilih PIC; tidak membuka role, grant, atau daftar staf tenant lain."""
+
+    permission_classes = [IsAuthenticated, require_permission("departures.write")]
+
+    def get(self, request):
+        staff = (
+            TenantMembership.objects.filter(status=MembershipStatus.ACTIVE, user__status="ACTIVE")
+            .select_related("user").order_by("user__full_name", "user__email")
+        )
+        return Response({"results": [
+            {"id": str(row.user_id), "name": row.user.full_name or row.user.email}
+            for row in staff
+        ]})
 
 
 class DepartureListCreateView(APIView):
@@ -67,7 +84,7 @@ class DepartureListCreateView(APIView):
                 | Q(package__name__icontains=q)
                 | Q(package__code__icontains=q)
             )
-        rows = qs.select_related("package", "lead_staff").order_by("start_at", "code")[:200]
+        rows = qs.select_related("package", "lead_staff").prefetch_related("package__room_prices").order_by("start_at", "code")[:200]
         return Response({"results": [departure_payload(d) for d in rows]})
 
     def post(self, request):

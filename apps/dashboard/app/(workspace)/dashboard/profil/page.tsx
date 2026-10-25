@@ -26,7 +26,7 @@ const SECTIONS: { key: SectionKey; label: string; hint: string }[] = [
   {
     key: "invoice_config_json",
     label: "Konfigurasi invoice",
-    hint: "Pengaturan dokumen (mis. due_days, notes, pajak). Maks 16KB.",
+    hint: "Jangka jatuh tempo (due_days, 0–365 hari) dan catatan (notes). Maks 16KB.",
   },
   {
     key: "rules_json",

@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/workspace/ui";
-import { apiFetch, type BankAccount, type MembershipRow, type RoleRow, type TrialStatus } from "@/lib/api";
-import { formatDate, formatRemaining } from "@/lib/format";
+import { apiFetch, type BankAccount, type MembershipRow, type RoleRow, type TrialStatus, type SaasWallet } from "@/lib/api";
+import { formatDate, formatIdr, formatRemaining } from "@/lib/format";
 
 const CHECKLIST = [
   { step: "01", label: "Lengkapi profil travel", note: "Branding & invoice → halaman Profil Travel", href: "/dashboard/profil" },
   { step: "02", label: "Daftarkan rekening bank resmi", note: "Untuk instruksi DP — halaman Kas & Bank", href: "/dashboard/rekening" },
   { step: "03", label: "Undang staf & atur role", note: "Owner/Admin/Sales/Finance → Pengguna & Role", href: "/dashboard/pengguna" },
-  { step: "04", label: "Buat paket & jadwal keberangkatan", note: "Menyusul di Sprint S08", href: null },
-  { step: "05", label: "Simulasikan booking, DP & invoice", note: "Booking S09 · Pembayaran S11", href: null },
+  { step: "04", label: "Buat paket & jadwal keberangkatan", note: "Atur harga standar atau Quad/Triple/Double", href: "/dashboard/paket" },
+  { step: "05", label: "Buat booking jamaah", note: "Pilih tipe kamar per peserta dan reservasi kursi", href: "/dashboard/booking" },
+  { step: "06", label: "Terbitkan invoice & simulasikan DP", note: "Invoice → alokasi pembayaran → verifikasi → kuitansi", href: "/dashboard/invoice" },
 ];
 
 /** Ambil data opsional; 403/404 → `forbidden` (tile disembunyikan). */
@@ -29,15 +30,14 @@ function useOptional<T>(path: string) {
 
 /**
  * Ringkasan workspace (S06, UI-02/UI-03): data live trial + status config
- * travel (staf, role, rekening) + quick-start. Modul operasional (paket,
- * booking, manifest) menyusul S07–S11 — checklist menunjuk halaman config
- * yang sudah tersedia.
+ * travel (staf, role, rekening) + quick-start hingga simulasi DP S11.
  */
 export default function DashboardPage() {
   const trial = useOptional<TrialStatus>("/trial/status");
   const memberships = useOptional<{ results: MembershipRow[] }>("/memberships");
   const roles = useOptional<{ results: RoleRow[] }>("/roles");
   const bank = useOptional<{ results: BankAccount[] }>("/bank-accounts");
+  const wallet = useOptional<SaasWallet>("/wallet");
 
   const tiles: { label: string; value: string; note?: string }[] = [];
   if (memberships.data) {
@@ -57,7 +57,7 @@ export default function DashboardPage() {
       value: `${bank.data.results.filter((r) => r.active).length} aktif`,
     });
   }
-  const hasSummary = Boolean(trial.data) || tiles.length > 0;
+  const hasSummary = Boolean(trial.data) || Boolean(wallet.data) || tiles.length > 0;
 
   return (
     <div className="workspace-page">
@@ -69,6 +69,12 @@ export default function DashboardPage() {
 
       <div className="workspace-columns mt-6">
       {hasSummary ? <div className="space-y-4">
+      {wallet.data ? <section className="card p-6">
+        <h2 className="font-semibold">SaaS Wallet</h2>
+        <p className="mt-2 text-2xl font-bold">{formatIdr(wallet.data.balance_idr)}</p>
+        <p className="mt-2 text-sm text-muted">{wallet.data.environment === "demo" ? "Mode demo tanpa transaksi wallet nyata." : `Perkiraan kapasitas ${wallet.data.estimated_participant_capacity} jamaah · ${wallet.data.pending_participant_count} DP menunggu charge.`}</p>
+        <Link href="/dashboard/wallet" className="mt-3 inline-block text-sm text-primary underline">Lihat saldo, top-up & mutasi</Link>
+      </section> : null}
       {trial.data ? (
         <section className="card p-6">
           <div className="flex flex-wrap items-center gap-2">

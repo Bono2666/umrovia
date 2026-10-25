@@ -1,6 +1,7 @@
 asgiref==3.12.1
 attrs==26.1.0
 cffi==2.1.1
+charset-normalizer==3.5.2
 cfgv==3.5.0
 cryptography==46.0.7
 distlib==0.4.4
@@ -19,6 +20,7 @@ jsonschema-specifications==2025.9.1
 nodeenv==1.11.0
 packaging==26.3
 platformdirs==4.13.5
+pillow==13.0.0
 pluggy==1.7.0
 pre_commit==4.7.0
 psycopg==3.3.6
@@ -31,6 +33,7 @@ pycparser==3.12
 PyYAML==6.0.3
 referencing==0.37.0
 redis==8.1.0
+reportlab==5.1.0
 rpds-py==2026.9.1
 ruff==0.17.1
 sqlparse==0.6.0

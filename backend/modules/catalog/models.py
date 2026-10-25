@@ -46,7 +46,7 @@ class TravelPackage(TenantScopedModel, BaseAppModel):
     kind = models.CharField(max_length=16, choices=PackageKind.choices, default=PackageKind.UMROH)
     description = models.TextField(blank=True, default="")
     duration_days = models.PositiveIntegerField(default=0)
-    price_idr = models.PositiveIntegerField(default=0)  # rupiah integer (§10.1)
+    price_idr = models.PositiveBigIntegerField(default=0)  # rupiah integer (§10.1)
     inclusions_json = models.JSONField(default=list, blank=True)  # fasilitas (MOD-05)
     exclusions_json = models.JSONField(default=list, blank=True)  # non-fasilitas
     cancellation_policy = models.TextField(blank=True, default="")
@@ -74,3 +74,24 @@ class TravelPackage(TenantScopedModel, BaseAppModel):
 def generate_package_code() -> str:
     """Kode paket auto, konsisten pola JM- jamaah (S07)."""
     return f"PKT-{uuid.uuid4().hex[:8].upper()}"
+
+
+class RoomType(models.TextChoices):
+    QUAD = "QUAD", "Quad"
+    TRIPLE = "TRIPLE", "Triple"
+    DOUBLE = "DOUBLE", "Double"
+    SINGLE = "SINGLE", "Single"
+
+
+class PackageRoomPrice(TenantScopedModel, BaseAppModel):
+    environment = models.CharField(max_length=16, choices=[("demo", "Demo"), ("production", "Produksi")])
+    package = models.ForeignKey(TravelPackage, on_delete=models.CASCADE, related_name="room_prices")
+    room_type = models.CharField(max_length=8, choices=RoomType.choices)
+    price_idr = models.PositiveBigIntegerField()
+
+    class Meta:
+        ordering = ["price_idr", "room_type"]
+        constraints = [
+            models.UniqueConstraint(fields=["package", "room_type"], name="uq_package_room_type"),
+            models.CheckConstraint(condition=models.Q(price_idr__lte=10_000_000_000), name="ck_room_price_max"),
+        ]

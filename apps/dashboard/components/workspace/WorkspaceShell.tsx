@@ -101,14 +101,15 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Keuangan",
     items: [
-      { href: "/dashboard/pembayaran", label: "Pembayaran", soon: "S11", icon: CreditCard },
+      { href: "/dashboard/invoice", label: "Invoice", permission: "invoices.read", icon: FileText },
+      { href: "/dashboard/pembayaran", label: "Pembayaran", permission: "payments.read", icon: CreditCard },
       {
         href: "/dashboard/rekening",
         label: "Kas & Bank",
         permission: "bank_accounts.read",
         icon: Landmark,
       },
-      { href: "/dashboard/wallet", label: "SaaS Wallet", soon: "S12", icon: Wallet },
+      { href: "/dashboard/wallet", label: "SaaS Wallet", permission: "wallet.read", icon: Wallet },
     ],
   },
   {
@@ -163,15 +164,25 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   // event khusus agar render ulang terjadi di tab yang sama.
   const collapsed = useSyncExternalStore(
     (cb) => {
+      const mobile = window.matchMedia("(max-width: 639px)");
       window.addEventListener("umrovia-sidebar-change", cb);
-      return () => window.removeEventListener("umrovia-sidebar-change", cb);
+      mobile.addEventListener("change", cb);
+      return () => {
+        window.removeEventListener("umrovia-sidebar-change", cb);
+        mobile.removeEventListener("change", cb);
+      };
     },
-    () => window.localStorage.getItem("umrovia.sidebar") === "collapsed",
+    () => {
+      const preference = window.localStorage.getItem("umrovia.sidebar");
+      return preference ? preference === "collapsed" : window.matchMedia("(max-width: 639px)").matches;
+    },
     () => false,
   );
 
   const toggleSidebar = useCallback(() => {
-    const next = window.localStorage.getItem("umrovia.sidebar") !== "collapsed";
+    const preference = window.localStorage.getItem("umrovia.sidebar");
+    const isCollapsed = preference ? preference === "collapsed" : window.matchMedia("(max-width: 639px)").matches;
+    const next = !isCollapsed;
     window.localStorage.setItem("umrovia.sidebar", next ? "collapsed" : "expanded");
     window.dispatchEvent(new Event("umrovia-sidebar-change"));
     setArrowReady(true);
@@ -311,11 +322,16 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       <div className="flex">
         {/* Sidebar navigasi (sticky, scroll sendiri; bisa collapse jadi rail ikon) */}
         <aside
-          className={`sticky top-14 -mt-px h-[calc(100vh-3.5rem)] shrink-0 self-start overflow-y-auto border-r border-border bg-surface transition-[width] duration-300 ${
+          className={`fixed left-0 top-14 z-20 -mt-px h-[calc(100vh-3.5rem)] shrink-0 self-start overflow-y-auto border-r border-border bg-surface transition-[width] duration-300 sm:sticky ${
             collapsed ? "w-16 py-2" : "w-60 py-4"
           }`}
         >
-          <nav className="flex flex-col gap-4">
+          <nav className="flex flex-col gap-4" onClick={(event) => {
+            if ((event.target as HTMLElement).closest("a") && window.matchMedia("(max-width: 639px)").matches) {
+              window.localStorage.setItem("umrovia.sidebar", "collapsed");
+              window.dispatchEvent(new Event("umrovia-sidebar-change"));
+            }
+          }}>
             {NAV_GROUPS.map((group) => {
               const items = group.items.filter(
                 (item) => !item.permission || hasPermission(permissions, item.permission),
@@ -400,7 +416,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Konten halaman */}
-        <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6">
+        <main className="ml-16 min-w-0 flex-1 space-y-4 p-4 sm:ml-0 sm:p-6">
           <TrialBanner
             canConvert={hasPermission(permissions, "trial.convert")}
             onConverted={loadMe}
