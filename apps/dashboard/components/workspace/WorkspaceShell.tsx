@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { UmroviaMark } from "@/components/UmroviaMark";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
+import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { Btn, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
 
@@ -206,7 +207,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
   if (phase === "loading") {
     return (
-      <div className="p-8">
+      <div className="workspace-shell min-h-screen p-8">
         <LoadingState label="Memuat workspace…" />
       </div>
     );
@@ -214,7 +215,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
   if (phase !== "ok" || !me || !active) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-8">
+      <div className="workspace-shell flex min-h-screen items-center justify-center p-8">
         <div className="card max-w-md p-8 text-center">
           <p className="font-semibold">Tidak ada workspace aktif</p>
           <p className="mt-2 text-sm text-muted">
@@ -273,7 +274,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             <UmroviaMark className="h-7 w-7 shrink-0" />
             Umrovia<span className="text-primary">.</span>
           </Link>
-          <div className="flex items-center gap-2 border-l border-border pl-3">
+          <div className="hidden min-w-0 items-center gap-2 border-l border-border pl-3 sm:flex">
             <span className="max-w-48 truncate text-sm font-semibold" title={active.tenant.display_name}>
               {active.tenant.display_name}
             </span>
@@ -300,6 +301,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             </span>
           ) : null}
           <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
             <span className="hidden text-sm text-muted sm:inline">{me.email}</span>
             <LogoutButton />
           </div>

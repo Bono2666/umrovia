@@ -278,7 +278,7 @@ export default function ManifestPage() {
       ) : null}
 
       <section className="card mt-6 p-6">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="manifest-filters grid gap-x-3 gap-y-8 md:grid-cols-3">
           <FormSelect
             label="Keberangkatan"
             htmlFor="manifest-departure"

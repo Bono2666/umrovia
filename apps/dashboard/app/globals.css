@@ -15,6 +15,11 @@
   --brand-accent: #c9a227;
   --brand-ink: #191b1d; /* soft-black ala template (--c-black) */
   --brand-muted: #6f7377; /* ~rgba(25,27,29,.55) */
+  --button-fill: var(--brand-primary);
+  --button-fill-hover: var(--brand-primary-hover);
+  --button-tint: rgb(25 27 29 / 0.1);
+  --button-disabled: rgb(25 27 29 / 0.3);
+  --danger-fill: var(--status-danger);
 
   /* Surface & border — hairline (template --t-line: black-10) */
   --background: #ffffff;
@@ -463,23 +468,23 @@
     color: var(--brand-ink);
   }
   .btn--primary::after {
-    background-color: rgb(25 27 29 / 0.1);
+    background-color: var(--button-tint);
   }
   .btn--primary::before {
-    background-color: var(--brand-primary);
+    background-color: var(--button-fill);
   }
   .btn--primary:disabled {
-    color: rgb(25 27 29 / 0.3);
+    color: var(--button-disabled);
   }
 
   .btn--secondary {
     color: #fff;
   }
   .btn--secondary::after {
-    background-color: var(--brand-primary);
+    background-color: var(--button-fill);
   }
   .btn--secondary::before {
-    background-color: var(--brand-primary-hover);
+    background-color: var(--button-fill-hover);
   }
   .btn--secondary:disabled {
     color: rgb(255 255 255 / 0.3);
@@ -493,7 +498,7 @@
     background-color: rgb(180 35 24 / 0.1);
   }
   .btn--danger::before {
-    background-color: var(--status-danger);
+    background-color: var(--danger-fill);
   }
   .btn--danger:disabled {
     color: rgb(180 35 24 / 0.3);
@@ -1112,6 +1117,46 @@
 
 /* Compact application layout and controls. Public/marketing forms retain
    their editorial spacing and typography; root font/scale tokens stay intact. */
+.workspace-shell {
+  color-scheme: light;
+  background: var(--background);
+  color: var(--brand-ink);
+}
+:root[data-theme="dark"] .workspace-shell {
+  color-scheme: dark;
+  --background: #111619;
+  --surface: #1b2327;
+  --brand-ink: #edf2f4;
+  --brand-muted: #abb8bf;
+  --brand-primary: #6dd4b7;
+  --brand-primary-hover: #9ce5ce;
+  --brand-accent: #e4c35c;
+  --border: rgb(237 242 244 / 0.14);
+  --border-strong: rgb(237 242 244 / 0.35);
+  --status-success: #7bddaa;
+  --status-warning: #f2cb70;
+  --status-danger: #ff9e96;
+  --status-info: #94baff;
+  --form-text: #edf2f4;
+  --form-small: #abb8bf;
+  --form-line-20: rgb(237 242 244 / 0.25);
+  --form-line-100: #edf2f4;
+  --form-error: #ff9e96;
+  --button-fill: #0e6b5c;
+  --button-fill-hover: #0a564a;
+  --button-tint: rgb(237 242 244 / 0.1);
+  --button-disabled: rgb(237 242 244 / 0.3);
+  --danger-fill: #b42318;
+  --umrovia-mark-background: #0e6b5c;
+}
+:root[data-theme="dark"] .workspace-shell .form-control-checkbox__icon::before,
+:root[data-theme="dark"] .workspace-shell .form-control__line::after {
+  filter: invert(1);
+}
+.workspace-shell select option {
+  background: var(--surface);
+  color: var(--brand-ink);
+}
 .workspace-shell .workspace-page {
   width: 100%;
   max-width: 1280px;
@@ -1141,6 +1186,10 @@
   margin-bottom: 0;
 }
 .workspace-shell .form-group--unlabelled {
+  margin-block: 0;
+}
+/* Grid spacing replaces the vertical margins used by stacked fields. */
+.workspace-shell .manifest-filters > .form-group {
   margin-block: 0;
 }
 .workspace-shell .form-control--input input,
