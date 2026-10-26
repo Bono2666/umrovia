@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
+  BtnLink,
   EmptyState,
   ErrorState,
   FormField,
@@ -361,6 +362,7 @@ export default function KeberangkatanPage() {
                       </Btn>
                     ) : null}
                     {can("departures.write") ? <Btn size="xs" variant="tint" disabled={busy} onClick={() => editDeparture(dep)}>Ubah keberangkatan</Btn> : null}
+                    {can("manifest.read") ? <BtnLink size="xs" variant="tint" href={`/dashboard/manifest?departure=${dep.id}`}>Manifest & cetak</BtnLink> : null}
                     {can("departures.write") && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
                       <Btn variant="tint" size="xs" disabled={busyId === dep.id} onClick={() => editBlocked(dep)}>
                         Ubah blokir
