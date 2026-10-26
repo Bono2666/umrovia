@@ -135,7 +135,7 @@ class DepartureDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method == "PATCH":
+        if self.request.method in {"PATCH", "DELETE"}:
             return [IsAuthenticated(), require_permission("departures.write")()]
         return [IsAuthenticated(), require_permission("departures.read")()]
 
@@ -184,6 +184,17 @@ class DepartureDetailView(APIView):
             changes=changes,
         )
         return Response(departure_payload(dep))
+
+    @transaction.atomic
+    def delete(self, request, departure_id):
+        """Hapus hanya draf yang belum pernah dibuka; selebihnya gunakan transisi CANCELED."""
+        dep = _get_departure(departure_id, for_update=True)
+        assert_environment_writable(request.tenant, dep.environment)
+        if dep.status != "DRAFT" or Booking.objects.filter(departure=dep).exists() or dep.events.exists() or dep.manifest_versions.exists():
+            raise ValidationError({"departure": "Keberangkatan sudah dibuka, memiliki riwayat, booking atau manifest. Gunakan pembatalan agar histori tetap tersimpan."})
+        log_event(action="departures.deleted", request=request, object_type="departure", object_id=dep.pk, changes={"code": dep.code})
+        dep.delete()
+        return Response(status=204)
 
 
 class DepartureTransitionView(APIView):

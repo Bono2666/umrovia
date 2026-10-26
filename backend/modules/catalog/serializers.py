@@ -21,6 +21,7 @@ def package_payload(pkg: TravelPackage) -> dict:
         "payment_terms": pkg.payment_terms,
         "status": pkg.status,
         "published": pkg.published,
+        "deletable": not (pkg.has_departures if hasattr(pkg, "has_departures") else pkg.departures.exists()),
     }
 
 

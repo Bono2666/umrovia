@@ -463,6 +463,21 @@ def update_draft_booking(
     return booking
 
 
+@transaction.atomic
+def delete_draft_booking(*, booking_id) -> str:
+    """Hapus booking DRAFT (belum menahan kursi, belum ada invoice/pembayaran).
+
+    Peserta dan baris harga ikut terhapus (CASCADE). Kuota trial yang sudah
+    terpakai tidak dikembalikan (TR03). Booking non-draf memakai pembatalan.
+    """
+    booking = Booking.objects.select_for_update().get(pk=booking_id)
+    if booking.status != BookingStatus.DRAFT:
+        raise ValidationError({"booking": "Hanya booking draf yang dapat dihapus. Booking yang sudah direservasi memakai pembatalan."})
+    code = booking.code
+    booking.delete()
+    return code
+
+
 def advance_participant(*, participant: BookingParticipant, target: str) -> BookingParticipant:
     """Advance satu peserta mengikuti graph §6.2 — dipakai layanan pembayaran
     S11/S12 (DP verified → DP_VERIFIED_PENDING_CHARGE → CONFIRMED) dan review

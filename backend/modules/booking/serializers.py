@@ -51,6 +51,7 @@ def booking_payload(booking: Booking) -> dict:
         "package_code": dep.package.code,
         "package_name": dep.package.name,
         "status": booking.status,
+        "deletable": booking.status == "DRAFT",
         "booked_at": booking.booked_at.isoformat(),
         "notes": booking.notes,
         "cancel_reason": booking.cancel_reason,

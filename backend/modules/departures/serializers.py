@@ -8,8 +8,11 @@ from modules.tenants.models import MembershipStatus, TenantMembership
 def departure_payload(dep: Departure) -> dict:
     from modules.booking.models import Booking
 
+    has_bookings = dep.has_bookings if hasattr(dep, "has_bookings") else Booking.objects.filter(departure=dep).exists()
     return {
-        "has_bookings": dep.has_bookings if hasattr(dep, "has_bookings") else Booking.objects.filter(departure=dep).exists(),
+        "has_bookings": has_bookings,
+        # Perkiraan untuk UI; DELETE juga memeriksa riwayat status dan manifest.
+        "deletable": dep.status == "DRAFT" and not has_bookings,
         "id": str(dep.id),
         "environment": dep.environment,
         "code": dep.code,

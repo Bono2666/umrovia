@@ -230,6 +230,16 @@ export default function KeberangkatanPage() {
     setDeadline(""); setLeadStaff(""); setNotes(""); setFormErrors({});
   }
 
+  async function removeDeparture(dep: Departure) {
+    if (!window.confirm(`Hapus keberangkatan draf ${dep.code}? Data yang belum pernah dipakai dihapus permanen.`)) return;
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/departures/${dep.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`Keberangkatan ${dep.code} dihapus.`);
+    load(query);
+  }
+
   async function editDeparture(row: Departure) {
     setBusy(true); setError(null);
     const result = await apiFetch<Departure>(`/departures/${row.id}`);
@@ -348,6 +358,7 @@ export default function KeberangkatanPage() {
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {can("departures.write") && canEditEnvironment(dep.environment) ? <Btn size="xs" variant="tint" disabled={busy} onClick={() => editDeparture(dep)}>Ubah keberangkatan</Btn> : null}
+                    {dep.deletable && can("departures.write") && canEditEnvironment(dep.environment) ? <Btn size="xs" variant="danger" disabled={busy || editing?.id === dep.id} onClick={() => void removeDeparture(dep)}>Hapus</Btn> : null}
                     {(can("departures.manage") && canEditEnvironment(dep.environment) ? NEXT_ACTIONS[dep.status] ?? [] : []).map((action) => (
                       <Btn
                         key={action.target}

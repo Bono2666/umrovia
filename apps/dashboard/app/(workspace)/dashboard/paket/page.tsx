@@ -144,6 +144,16 @@ export default function PaketPage() {
     load(query);
   }
 
+  async function removePackage(pkg: TravelPackage) {
+    if (!window.confirm(`Hapus paket ${pkg.code} — ${pkg.name}? Data yang belum pernah dipakai dihapus permanen.`)) return;
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/packages/${pkg.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`Paket ${pkg.code} dihapus.`);
+    load(query);
+  }
+
   function editPackage(pkg: TravelPackage) {
     setEditing(pkg); setCancellationPolicy(pkg.cancellation_policy); setPaymentTerms(pkg.payment_terms);
     focusForm("package-form");
@@ -230,6 +240,7 @@ export default function PaketPage() {
                   {pkg.published ? <StatusBadge tone="success">TERBIT</StatusBadge> : null}
                   {can("packages.write") && canEditEnvironment(pkg.environment) ? <span className="ml-auto flex flex-wrap gap-1.5">
                     <Btn variant="tint" size="xs" disabled={busy} onClick={() => editPackage(pkg)}>Ubah paket / harga</Btn>
+                    {pkg.deletable ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === pkg.id} onClick={() => void removePackage(pkg)}>Hapus</Btn> : null}
                     {pkg.status === "DRAFT" ? (
                       <Btn
                         variant="tint"

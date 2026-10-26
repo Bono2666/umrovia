@@ -224,6 +224,16 @@ export default function BookingPage() {
     setPilgrimQuery(""); setPilgrimResults([]); setFormErrors({});
   }
 
+  async function removeBooking(booking: Booking) {
+    if (!window.confirm(`Hapus booking draf ${booking.code}? Kuota trial yang terpakai tidak dikembalikan. Data yang belum pernah dipakai dihapus permanen.`)) return;
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/bookings/${booking.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`Booking ${booking.code} dihapus.`);
+    load(query);
+  }
+
   async function editBooking(row: Booking) {
     setBusy(true); setError(null);
     const result = await apiFetch<Booking>(`/bookings/${row.id}`);
@@ -365,6 +375,7 @@ export default function BookingPage() {
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {booking.status === "DRAFT" && can("bookings.create") && canEditEnvironment(booking.environment) ? <Btn variant="tint" size="xs" disabled={busy} onClick={() => editBooking(booking)}>Ubah booking</Btn> : null}
+                    {booking.deletable && can("bookings.create") && canEditEnvironment(booking.environment) ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === booking.id} onClick={() => void removeBooking(booking)}>Hapus draf</Btn> : null}
                     {(can("bookings.create") && canEditEnvironment(booking.environment) ? NEXT_ACTIONS[booking.status] ?? [] : []).map((action) => (
                       <Btn
                         key={action.target}

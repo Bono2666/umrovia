@@ -7,6 +7,7 @@ Environment write di-resolve server-side (trial → demo; pasca-konversi →
 production; demo READ_ONLY ditolak — §2.2).
 """
 from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
@@ -15,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.booking.models import BookingParticipant
 from modules.pilgrims.crypto import encrypt_pii, identity_hash, mask_last4
 from modules.pilgrims.models import (
     Pilgrim,
@@ -93,7 +95,10 @@ class PilgrimListCreateView(APIView):
     def get(self, request):
         """Daftar + pencarian normalisasi aman (§5.2): nama/kode/telepon, atau
         NIK exact via hash — tanpa pernah mengekspos/men-dekripsi nilai mentah."""
-        qs = Pilgrim.objects.all()
+        qs = Pilgrim.objects.annotate(
+            in_booking=Exists(BookingParticipant.objects.filter(pilgrim_id=OuterRef("pk"))),
+            has_documents=Exists(PilgrimDocument.objects.filter(pilgrim_id=OuterRef("pk"))),
+        )
         env = request.query_params.get("environment", "").strip()
         if env:
             if env not in Environment.values:
@@ -153,7 +158,7 @@ class PilgrimDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method == "PATCH":
+        if self.request.method in {"PATCH", "DELETE"}:
             return [IsAuthenticated(), require_permission("pilgrims.write")()]
         return [IsAuthenticated(), require_permission("pilgrims.read")()]
 
@@ -184,6 +189,18 @@ class PilgrimDetailView(APIView):
             changes=changes,
         )
         return Response(pilgrim_payload(pilgrim))
+
+    @transaction.atomic
+    def delete(self, request, pilgrim_id):
+        """Hapus entri keliru/duplikat yang belum dipakai; selebihnya arsipkan."""
+        pilgrim = _get_pilgrim(pilgrim_id, for_update=True)
+        assert_environment_writable(request.tenant, pilgrim.environment)
+        if pilgrim.booking_participations.exists() or pilgrim.documents.exists():
+            raise ValidationError({"pilgrim": "Jamaah sudah memiliki booking atau dokumen. Ubah status menjadi Arsip agar riwayat tetap utuh."})
+        # Kode saja: audit tidak menyimpan nama/NIK jamaah yang dihapus.
+        log_event(action="pilgrims.deleted", request=request, object_type="pilgrim", object_id=pilgrim.pk, changes={"code": pilgrim.code})
+        pilgrim.delete()
+        return Response(status=204)
 
 
 class PilgrimDocumentListCreateView(APIView):

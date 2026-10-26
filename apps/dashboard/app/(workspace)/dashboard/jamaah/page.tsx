@@ -173,6 +173,16 @@ export default function JamaahPage() {
     setProfile(EMPTY_PROFILE);
   }
 
+  async function removePilgrim(pilgrim: Pilgrim) {
+    if (!window.confirm(`Hapus jamaah ${pilgrim.code} — ${pilgrim.name}? Gunakan Arsip bila data ini benar. Data yang belum pernah dipakai dihapus permanen.`)) return;
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/pilgrims/${pilgrim.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`Jamaah ${pilgrim.code} dihapus.`);
+    load(query);
+  }
+
   async function editPilgrim(pilgrim: Pilgrim) {
     setBusy(true); setError(null);
     const result = await apiFetch<Pilgrim>(`/pilgrims/${pilgrim.id}`);
@@ -266,6 +276,7 @@ export default function JamaahPage() {
                   Detail
                 </Btn>
                 {can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="tint" disabled={busy} onClick={() => editPilgrim(pilgrim)}>Ubah jamaah</Btn> : null}
+                {pilgrim.deletable && can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="danger" disabled={busy || editing?.id === pilgrim.id} onClick={() => void removePilgrim(pilgrim)}>Hapus</Btn> : null}
               </li>
             ))}
           </ul>
