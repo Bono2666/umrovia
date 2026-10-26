@@ -34,7 +34,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
-    environment:
+    environment: &api-environment
       DJANGO_SETTINGS_MODULE: config.settings.local
       DATABASE_URL: postgres://${POSTGRES_USER:-umrovia}:${POSTGRES_PASSWORD:-umrovia}@db:5432/${POSTGRES_DB:-umrovia}
       REDIS_URL: redis://redis:6379/0
@@ -70,6 +70,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  # S16: worker latar — antrean email notifikasi (retry/backoff/DLQ), expiry &
+  # pengingat trial, retry pending charge. Migrasi dijalankan service api.
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    entrypoint: ["python", "manage.py", "run_worker"]
+    environment: *api-environment
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
   web:
     build:

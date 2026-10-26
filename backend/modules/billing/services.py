@@ -100,6 +100,9 @@ def _mark_pending(charge, participant, reason, *, attempted):
         participant.save(update_fields=["saas_charge_state", "updated_at"])
     # Satu alert per charge (= peserta + epoch pending), Spec §11 dedupe.
     _event(charge.tenant, "saas.charge.pending", f"saas.charge.pending:{charge.pk}", {**_charge_payload(charge, participant), "reason": reason})
+    from modules.notifications.services import charge_pending
+
+    charge_pending(charge, participant, reason)
 
 
 def _post(charge, participant, wallet, actor):

@@ -303,6 +303,7 @@ def test_role_migration_preserves_custom_grants(wallet_setup):
     custom = Role.objects.create(name="Finance", permissions_json=["payments.verify"])
     with connection.schema_editor() as editor:
         migration.upgrade(apps, editor)
+        import_module("modules.tenants.migrations.0008_notification_role_defaults").upgrade(apps, editor)  # S16 grants
     normal.refresh_from_db()
     custom.refresh_from_db()
     assert set(normal.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS["Finance"])

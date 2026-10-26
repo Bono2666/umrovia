@@ -25,6 +25,7 @@ from modules.departures.serializers import (
     departure_payload,
 )
 from modules.departures.services import transition_departure
+from modules.notifications.services import departure_changed, departure_snapshot
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.models import MembershipStatus, TenantMembership
 from modules.tenants.rbac import require_permission
@@ -162,6 +163,7 @@ class DepartureDetailView(APIView):
                     {"package": f"Paket harus berasal dari environment '{dep.environment}'."}
                 )
         before_capacity = dep.seat_capacity
+        before = departure_snapshot(dep)
         for field, value in serializer.validated_data.items():
             setattr(dep, field, value)
         try:
@@ -173,6 +175,7 @@ class DepartureDetailView(APIView):
                 {"seat_capacity": "Kapasitas tidak boleh di bawah kursi terpakai + terblokir."}
             ) from None
 
+        departure_changed(dep, before)  # OPS-06 / NTF-01: jamaah terdampak menerima jadwal terbaru
         changes = {"code": dep.code, "fields": sorted(set(request.data.keys()))}
         if dep.seat_capacity != before_capacity:
             changes["seat_capacity"] = [before_capacity, dep.seat_capacity]

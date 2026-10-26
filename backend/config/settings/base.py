@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "modules.wallet",
     "modules.billing",
     "modules.portal",
+    "modules.notifications",
     "modules.audit",
     "modules.documents",
 ]
@@ -215,6 +216,13 @@ PORTAL_INVITE_TTL_DAYS = int(env("PORTAL_INVITE_TTL_DAYS", "7") or "7")
 BRAND_NAME = env("BRAND_NAME", "Umrovia")
 PUBLIC_SITE_URL = env("PUBLIC_SITE_URL", "http://localhost:3001")
 TENANT_APP_URL = env("TENANT_APP_URL", "http://localhost:3000")
+
+# S16 notifikasi (Spec §11.2 notification_sender): jeda retry (detik) per percobaan
+# gagal; setelah habis → DEAD (dead-letter). Lease = lama job disembunyikan saat dikirim.
+NOTIFICATION_RETRY_DELAYS = env("NOTIFICATION_RETRY_DELAYS", "60,300,1800,7200")
+NOTIFICATION_BATCH_SIZE = int(env("NOTIFICATION_BATCH_SIZE", "50") or "50")
+NOTIFICATION_LEASE_SECONDS = int(env("NOTIFICATION_LEASE_SECONDS", "300") or "300")
+WORKER_INTERVAL_SECONDS = float(env("WORKER_INTERVAL_SECONDS", "5") or "5")
 # Basis domain tempat subdomain = slug tenant (Spec §2.2 resolver): <slug>.<base>
 TENANT_DOMAIN_BASES = [b.strip().lower() for b in env("TENANT_DOMAIN_BASES", "umrovia.com,localhost").split(",") if b.strip()]
 PLATFORM_ADMIN_URL = env("PLATFORM_ADMIN_URL", "http://localhost:3002")

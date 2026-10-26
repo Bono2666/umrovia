@@ -19,5 +19,6 @@ urlpatterns = [
     path("api/v1/", include("modules.wallet.urls", namespace="wallet")),
     path("api/v1/", include("modules.billing.urls", namespace="billing")),
     path("api/v1/", include("modules.portal.urls", namespace="portal")),
+    path("api/v1/", include("modules.notifications.urls", namespace="notifications")),
     path("api/v1/", include("modules.trial.urls", namespace="trial")),
 ]

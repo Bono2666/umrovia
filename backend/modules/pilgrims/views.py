@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 
 from modules.audit.services import log_event
 from modules.booking.models import BookingParticipant
+from modules.notifications.services import document_reviewed
 from modules.pilgrims.crypto import encrypt_pii, identity_hash, mask_last4
 from modules.pilgrims.models import (
     Pilgrim,
@@ -263,6 +264,7 @@ class PilgrimDocumentReviewView(APIView):
         doc.reviewed_by = request.user
         doc.reviewed_at = timezone.now()
         doc.save()
+        document_reviewed(doc)
         log_event(
             action="pilgrim_documents.reviewed",
             request=request,

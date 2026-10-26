@@ -96,6 +96,10 @@ for _name in ("Admin", "Finance"):
 DEFAULT_ROLE_PERMISSIONS["Sales"] += ["payments.create", "payments.read", "receipts.read"]
 DEFAULT_ROLE_PERMISSIONS["Finance"] += ["payments.reverse"]
 DEFAULT_ROLE_PERMISSIONS["Finance"] += ["wallet.read", "wallet.export"]
+# S16: log pengiriman notifikasi (baca) dan template/kirim ulang (kelola).
+for _name in ("Admin", "Finance", "Operations"):
+    DEFAULT_ROLE_PERMISSIONS[_name] += ["notifications.read"]
+DEFAULT_ROLE_PERMISSIONS["Admin"] += ["notifications.manage"]
 
 
 def permission_list(role) -> list[str]:
