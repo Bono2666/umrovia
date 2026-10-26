@@ -392,6 +392,20 @@ belum dihubungkan sesuai pilihan transfer manual. Upload/scan file bukti,
 worker umum dan platform console menyeluruh mengikuti sprint berikutnya.
 Top-up nyata tetap nonaktif sampai rekening penerima platform dikonfigurasi.
 
+## Pemeliharaan setelah S12 — koreksi data
+
+**Status:** DONE (26 Oktober 2026), branch `feat/data-corrections`.
+Alur Ubah/Simpan/Batal dilengkapi pada Jamaah, Paket, Keberangkatan, Booking
+draf, Kas & Bank, Pengguna/Role dan Profil Travel. Identitas masked tetap,
+snapshot harga/UUID peserta dan riwayat rekening terlindungi; editor mengikuti
+izin serta environment aktif. Role custom tidak dapat menambah grant di luar
+scope actor. Panduan dan bukti: [Koreksi data](DATA_CORRECTIONS.md).
+
+Verifikasi: **303/303 test backend**, 52 targeted, lint/TypeScript/Ruff,
+browser API nyata ketujuh form + readonly/dark/mobile, build Docker,
+runtime/API healthy dan smoke browser build produksi lulus. Tidak ada migrasi
+database baru. Database QA sudah dibersihkan. Status S13 tetap TODO.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
