@@ -148,6 +148,17 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
  * Permission klien hanya untuk UX; server tetap otoritas (semua endpoint
  * menegakkan permission + tenant context sendiri).
  */
+/** Status tenant → label header. RESTRICTED tetap produksi (charge menunggu saldo). */
+const TENANT_STATE: Record<string, { label: string; tone: "neutral" | "success" | "warning" | "danger" }> = {
+  TRIAL: { label: "DEMO", tone: "warning" },
+  ACTIVE: { label: "PRODUKSI", tone: "success" },
+  RESTRICTED: { label: "PRODUKSI", tone: "success" },
+  SUSPENDED: { label: "DITANGGUHKAN", tone: "danger" },
+  TERMINATED: { label: "DIAKHIRI", tone: "danger" },
+  PENDING_EMAIL: { label: "MENYIAPKAN", tone: "neutral" },
+  PROVISIONING: { label: "MENYIAPKAN", tone: "neutral" },
+};
+
 export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -242,12 +253,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   }
 
   const permissions = active.permissions;
-  const environment =
-    active.tenant.state === "TRIAL"
-      ? { label: "DEMO", tone: "warning" as const }
-      : active.tenant.state === "ACTIVE"
-        ? { label: "PRODUCTION", tone: "success" as const }
-        : { label: active.tenant.state, tone: "neutral" as const };
+  const environment = TENANT_STATE[active.tenant.state] ?? { label: active.tenant.state, tone: "neutral" as const };
 
   async function onSwitch(slug: string) {
     if (!slug || slug === active?.tenant.slug) return;
@@ -290,6 +296,11 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               {active.tenant.display_name}
             </span>
             <StatusBadge tone={environment.tone}>{environment.label}</StatusBadge>
+            {active.tenant.state === "RESTRICTED" ? (
+              <Link href="/dashboard/wallet" title="Ada biaya layanan yang menunggu saldo SaaS Wallet" className="text-xs font-semibold text-warning underline">
+                Biaya tertunda
+              </Link>
+            ) : null}
           </div>
           {activeList.length > 1 ? (
             <FormSelect
@@ -365,18 +376,14 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
                         <span
                           key={item.href}
                           className={`flex w-full items-center gap-2 py-1.5 text-sm text-muted/60 ${inset} ${center}`}
-                          title={
-                            collapsed
-                              ? `${item.label} — menyusul ${item.soon}`
-                              : `Modul ${item.label} menyusul ${item.soon}`
-                          }
+                          title={`${item.label} segera tersedia`}
                         >
                           {icon}
                           {collapsed ? null : (
                             <>
                               <span className="truncate">{item.label}</span>
-                              <span className="ml-auto text-[0.6rem] font-semibold">
-                                {item.soon}+
+                              <span className="ml-auto text-[0.6rem] font-semibold uppercase">
+                                Segera
                               </span>
                             </>
                           )}

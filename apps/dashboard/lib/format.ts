@@ -4,7 +4,11 @@
  */
 
 export function formatIdr(amount: number): string {
-  return `Rp${Math.round(amount)}`.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  // Kelompokkan digit saja: regex pada "Rp…" menyisipkan titik setelah "Rp"
+  // bila jumlah digit kelipatan tiga (mis. "Rp.100.000").
+  const value = Math.round(amount);
+  const digits = String(Math.abs(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${value < 0 ? "−" : ""}Rp${digits}`;
 }
 
 /** Tanggal absolut, contoh: "20 November 2026". */
@@ -29,4 +33,9 @@ export function formatRemaining(iso: string, now: number = Date.now()): string {
   if (days > 0) return `${days} hari ${hours} jam lagi`;
   if (hours > 0) return `${hours} jam ${minutes} menit lagi`;
   return `${minutes} menit lagi`;
+}
+
+/** Nomor tersamar dari server ("************0001") → ringkas "•••• 0001". */
+export function formatMasked(value: string): string {
+  return value.replace(/^\*+/, "•••• ");
 }

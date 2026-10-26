@@ -29,6 +29,13 @@ const KIND_LABEL: Record<string, string> = {
   ziarah: "Ziarah",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draf",
+  ACTIVE: "Aktif",
+  INACTIVE: "Nonaktif",
+  ARCHIVED: "Diarsipkan",
+};
+
 const STATUS_TONE: Record<string, "neutral" | "success" | "warning"> = {
   DRAFT: "neutral",
   ACTIVE: "success",
@@ -171,7 +178,7 @@ export default function PaketPage() {
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf dengan akses katalog"
-            description="Peran Anda tidak memiliki permission packages.read."
+            description="Peran Anda belum diberi akses melihat paket. Hubungi Owner travel."
           />
         </div>
       </div>
@@ -182,10 +189,9 @@ export default function PaketPage() {
     <div className="workspace-page">
       <h1 className="text-2xl font-bold">Paket</h1>
       <p className="mt-1 text-sm text-muted">
-        Katalog paket perjalanan (MOD-05). Harga dasar disimpan sebagai integer
-        rupiah (§10.1); publish hanya bisa dari status Aktif, dan penarikan
-        publikasi kapan pun. Perubahan harga tidak mengubah invoice yang sudah
-        terbit.
+        Katalog paket perjalanan beserta harganya. Aktifkan paket sebelum
+        menerbitkannya. Perubahan harga hanya berlaku untuk booking baru; booking
+        dan invoice yang sudah ada tidak berubah.
       </p>
 
       {message ? (
@@ -225,25 +231,23 @@ export default function PaketPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
               {rows.map((pkg) => (
-                <li key={pkg.id} className="flex flex-wrap items-center gap-2 py-3 text-sm">
-                  <div className="min-w-44">
-                    <p className="font-semibold">{pkg.name}</p>
+                <li key={pkg.id} className="py-4 text-sm">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 font-semibold">
+                      {pkg.name}
+                      <StatusBadge tone={STATUS_TONE[pkg.status] ?? "neutral"}>{STATUS_LABEL[pkg.status] ?? pkg.status}</StatusBadge>
+                      {pkg.published ? <StatusBadge tone="success">Terbit</StatusBadge> : null}
+                    </p>
                     <p className="text-xs text-muted">
                       {pkg.code} · {KIND_LABEL[pkg.kind] ?? pkg.kind} ·{" "}
-                      {pkg.duration_days} hari · {(pkg.room_prices ?? []).length ? "Mulai " : ""}{formatIdr(pkg.price_idr)}
+                      {pkg.duration_days ? `${pkg.duration_days} hari · ` : ""}{(pkg.room_prices ?? []).length ? "Mulai " : ""}{formatIdr(pkg.price_idr)}
                     </p>
                     {(pkg.room_prices ?? []).length ? <p className="mt-1 text-xs text-muted">{pkg.room_prices.map((room) => `${ROOM_LABELS[room.room_type]} ${formatIdr(room.price_idr)}`).join(" · ")}</p> : null}
                   </div>
-                  <StatusBadge tone={STATUS_TONE[pkg.status] ?? "neutral"}>
-                    {pkg.status}
-                  </StatusBadge>
-                  {pkg.published ? <StatusBadge tone="success">TERBIT</StatusBadge> : null}
-                  {can("packages.write") && canEditEnvironment(pkg.environment) ? <span className="ml-auto flex flex-wrap gap-1.5">
-                    <Btn variant="tint" size="xs" disabled={busy} onClick={() => editPackage(pkg)}>Ubah paket / harga</Btn>
-                    {pkg.deletable ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === pkg.id} onClick={() => void removePackage(pkg)}>Hapus</Btn> : null}
+                  {can("packages.write") && canEditEnvironment(pkg.environment) ? <div className="mt-3 flex flex-wrap gap-1.5">
                     {pkg.status === "DRAFT" ? (
                       <Btn
-                        variant="tint"
+                        variant="solid"
                         size="xs"
                         disabled={busyId === pkg.id}
                         onClick={() => patch(pkg, { status: "ACTIVE" }, "diaktifkan")}
@@ -253,7 +257,7 @@ export default function PaketPage() {
                     ) : null}
                     {pkg.status === "ACTIVE" && !pkg.published ? (
                       <Btn
-                        variant="tint"
+                        variant="solid"
                         size="xs"
                         disabled={busyId === pkg.id}
                         onClick={() => patch(pkg, { published: true }, "dipublikasikan")}
@@ -291,7 +295,9 @@ export default function PaketPage() {
                         Aktifkan
                       </Btn>
                     ) : null}
-                  </span> : null}
+                    <Btn variant="tint" size="xs" disabled={busy} onClick={() => editPackage(pkg)}>Ubah paket / harga</Btn>
+                    {pkg.deletable ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === pkg.id} onClick={() => void removePackage(pkg)}>Hapus</Btn> : null}
+                  </div> : null}
                 </li>
               ))}
             </ul>

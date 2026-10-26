@@ -34,6 +34,8 @@ def price_line_payload(row) -> dict:
 def booking_payload(booking: Booking) -> dict:
     """Payload booking — peserta + baris harga ikut untuk list & detail
     (list dibatasi 200 baris, §8.3)."""
+    from modules.booking.services import registration_closed
+
     dep = booking.departure
     participants = list(booking.participants.all())
     lines = list(booking.price_lines.all())
@@ -46,6 +48,8 @@ def booking_payload(booking: Booking) -> dict:
         "departure_code": dep.code,
         "departure_start_at": dep.start_at.isoformat(),
         "departure_status": dep.status,
+        # Sama dengan guard EXPIRED di layanan; UI hanya menawarkan aksi yang sah.
+        "registration_closed": registration_closed(dep),
         "available_seats": dep.available_seats,
         "package_id": str(dep.package_id),
         "package_code": dep.package.code,

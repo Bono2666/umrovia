@@ -224,6 +224,8 @@ export type BookingPriceLine = {
 export type Booking = {
   /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
   deletable: boolean;
+  /** Pendaftaran keberangkatan ditutup → booking boleh ditandai kedaluwarsa. */
+  registration_closed: boolean;
   id: string;
   environment: string;
   code: string;

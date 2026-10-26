@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
@@ -11,7 +12,7 @@ import {
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatIdr } from "@/lib/format";
 import {
   apiFetch,
   problemMessage,
@@ -83,12 +84,17 @@ const NEXT_ACTIONS: Record<string, { target: string; label: string }[]> = {
 const CANCELABLE = ["DRAFT", "RESERVED", "CONFIRMED", "DOCUMENT_PROCESS", "READY_TO_DEPART"];
 const EXPIRABLE = ["DRAFT", "RESERVED"];
 
-function formatIdr(value: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
+const CONFIRMED_LIKE = ["CONFIRMED", "READY", "DEPARTED", "COMPLETED"];
+const activeParticipants = (booking: Booking) => booking.participants.filter((p) => p.participant_status !== "CANCELED");
+const confirmedCount = (booking: Booking) => activeParticipants(booking).filter((p) => CONFIRMED_LIKE.includes(p.participant_status)).length;
+/** Server mewajibkan DP (dan biaya layanan produksi) tiap peserta sebelum konfirmasi. */
+const readyToConfirm = (booking: Booking) => activeParticipants(booking).length > 0 && confirmedCount(booking) === activeParticipants(booking).length;
+
+function confirmHint(booking: Booking) {
+  const waitingFee = activeParticipants(booking).filter((p) => p.participant_status === "DP_VERIFIED_PENDING_CHARGE").length;
+  const waitingDp = activeParticipants(booking).length - confirmedCount(booking) - waitingFee;
+  if (waitingDp > 0) return `Konfirmasi setelah DP semua peserta terverifikasi (${confirmedCount(booking) + waitingFee}/${activeParticipants(booking).length} sudah DP).`;
+  return <>DP lengkap; {waitingFee} peserta menunggu saldo <Link className="text-primary underline" href="/dashboard/wallet">SaaS Wallet</Link>.</>;
 }
 
 export default function BookingPage() {
@@ -263,7 +269,7 @@ export default function BookingPage() {
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf penjualan"
-            description="Peran Anda tidak memiliki permission bookings.read."
+            description="Peran Anda belum diberi akses melihat booking. Hubungi Owner travel."
           />
         </div>
       </div>
@@ -281,9 +287,10 @@ export default function BookingPage() {
     <div className="workspace-page">
       <h1 className="text-2xl font-bold">Booking</h1>
       <p className="mt-1 text-sm text-muted">
-        Pendaftaran jamaah pada keberangkatan (MOD-07, UI-07). Booking lahir sebagai draf;
-        “Reservasi kursi” menahan kursi secara atomik (UAT-02), pembatalan melepasnya kembali.
-        Harga di-snapshot saat dibuat — perubahan harga paket tidak mengubah booking (UAT-04).
+        Pendaftaran jamaah ke keberangkatan. Booking dimulai sebagai draf; klik
+        “Reservasi kursi” untuk menahan kursi, dan pembatalan melepasnya kembali.
+        Harga dikunci saat booking dibuat, sehingga perubahan harga paket tidak
+        memengaruhinya.
       </p>
 
       {message ? (
@@ -337,22 +344,24 @@ export default function BookingPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
               {visible.map((booking) => (
-                <li key={booking.id} className="py-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="min-w-44">
-                      <p className="font-semibold">{booking.code}</p>
+                <li key={booking.id} className="py-4 text-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                    <div className="min-w-0">
+                      <p className="flex flex-wrap items-center gap-2 font-semibold">
+                        {booking.code}
+                        <StatusBadge tone={STATUS_TONE[booking.status] ?? "neutral"}>
+                          {STATUS_LABEL[booking.status] ?? booking.status}
+                        </StatusBadge>
+                      </p>
                       <p className="text-xs text-muted">
-                        {booking.package_name} · {booking.departure_code} ·{" "}
-                        {formatDate(booking.departure_start_at)}
+                        {booking.package_name} · {booking.departure_code} · {formatDate(booking.departure_start_at)}
                       </p>
                     </div>
-                    <StatusBadge tone={STATUS_TONE[booking.status] ?? "neutral"}>
-                      {STATUS_LABEL[booking.status] ?? booking.status}
-                    </StatusBadge>
-                    <span className="ml-auto text-xs text-muted">
-                      {booking.participant_count} peserta · {formatIdr(booking.total_amount)} ·{" "}
-                      {booking.available_seats} kursi tersisa
-                    </span>
+                    <p className="text-xs text-muted sm:text-right">
+                      <strong className="text-sm text-foreground">{formatIdr(booking.total_amount)}</strong>
+                      <br />
+                      {booking.participant_count} peserta · {booking.available_seats} kursi tersisa
+                    </p>
                   </div>
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {booking.participants.map((p) => (
@@ -362,7 +371,7 @@ export default function BookingPage() {
                       >
                         {p.pilgrim_name}
                         <span className="text-muted">
-                          · {String(p.pricing_snapshot.room_type || "Standar")} · {formatIdr(Number(p.pricing_snapshot.unit_price_idr ?? 0))} · {PARTICIPANT_LABEL[p.participant_status] ?? p.participant_status}
+                          · {ROOM_LABELS[p.pricing_snapshot.room_type as RoomType] ?? "Standar"} · {formatIdr(Number(p.pricing_snapshot.unit_price_idr ?? 0))} · {PARTICIPANT_LABEL[p.participant_status] ?? p.participant_status}
                         </span>
                       </li>
                     ))}
@@ -373,41 +382,27 @@ export default function BookingPage() {
                       {booking.canceled_by_name ? ` — ${booking.canceled_by_name}` : ""}
                     </p>
                   ) : null}
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {booking.status === "DRAFT" && can("bookings.create") && canEditEnvironment(booking.environment) ? <Btn variant="tint" size="xs" disabled={busy} onClick={() => editBooking(booking)}>Ubah booking</Btn> : null}
-                    {booking.deletable && can("bookings.create") && canEditEnvironment(booking.environment) ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === booking.id} onClick={() => void removeBooking(booking)}>Hapus draf</Btn> : null}
-                    {(can("bookings.create") && canEditEnvironment(booking.environment) ? NEXT_ACTIONS[booking.status] ?? [] : []).map((action) => (
-                      <Btn
-                        key={action.target}
-                        variant="tint"
-                        size="xs"
-                        disabled={busyId === booking.id}
-                        onClick={() => transition(booking, action.target)}
-                      >
+                  {can("bookings.create") && canEditEnvironment(booking.environment) ? <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {(NEXT_ACTIONS[booking.status] ?? []).map((action) => action.target === "CONFIRMED" && !readyToConfirm(booking) ? (
+                      <span key={action.target} className="text-xs text-muted">{confirmHint(booking)}</span>
+                    ) : (
+                      <Btn key={action.target} size="xs" disabled={busyId === booking.id} onClick={() => transition(booking, action.target)}>
                         {action.label}
                       </Btn>
                     ))}
-                    {can("bookings.create") && canEditEnvironment(booking.environment) && CANCELABLE.includes(booking.status) ? (
-                      <Btn
-                        variant="danger"
-                        size="xs"
-                        disabled={busyId === booking.id}
-                        onClick={() => cancel(booking)}
-                      >
+                    {booking.status === "DRAFT" ? <Btn variant="tint" size="xs" disabled={busy} onClick={() => editBooking(booking)}>Ubah booking</Btn> : null}
+                    {EXPIRABLE.includes(booking.status) && booking.registration_closed ? (
+                      <Btn variant="tint" size="xs" disabled={busyId === booking.id} onClick={() => expire(booking)}>
+                        Tandai kedaluwarsa
+                      </Btn>
+                    ) : null}
+                    {booking.deletable ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === booking.id} onClick={() => void removeBooking(booking)}>Hapus draf</Btn> : null}
+                    {CANCELABLE.includes(booking.status) && booking.status !== "DRAFT" ? (
+                      <Btn variant="danger" size="xs" disabled={busyId === booking.id} onClick={() => cancel(booking)}>
                         Batalkan
                       </Btn>
                     ) : null}
-                    {can("bookings.create") && canEditEnvironment(booking.environment) && EXPIRABLE.includes(booking.status) ? (
-                      <Btn
-                        variant="tint"
-                        size="xs"
-                        disabled={busyId === booking.id}
-                        onClick={() => expire(booking)}
-                      >
-                        Kedaluwarsa
-                      </Btn>
-                    ) : null}
-                  </div>
+                  </div> : null}
                 </li>
               ))}
             </ul>
@@ -421,7 +416,7 @@ export default function BookingPage() {
             <FormSelect
               label="Keberangkatan"
               htmlFor="booking-departure"
-              hint="Hanya keberangkatan dengan pendaftaran dibuka (OPEN)."
+              hint="Hanya keberangkatan yang pendaftarannya dibuka."
               error={formErrors.departure}
               value={departureId}
               onChange={(event) => {

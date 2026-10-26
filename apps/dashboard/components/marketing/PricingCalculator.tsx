@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { formatIdr } from "@/lib/format";
 
-const rupiah = (value: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
+const rupiah = formatIdr;
 
 export function PricingCalculator() {
   const [count, setCount] = useState(20);
