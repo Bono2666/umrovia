@@ -1190,6 +1190,7 @@
 }
 /* Grid spacing replaces the vertical margins used by stacked fields. */
 .workspace-shell .manifest-filters > .form-group,
+.workspace-shell .notification-filters > .form-group,
 .workspace-shell .wallet-filters > .form-group {
   margin-block: 0;
 }
