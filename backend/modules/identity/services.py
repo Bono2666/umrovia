@@ -119,6 +119,7 @@ def membership_summary(user: User) -> list[dict]:
         TenantMembership.objects.without_tenant_guard()
         .filter(user=user)
         .select_related("tenant", "role")
+        .prefetch_related("tenant__environments")
         .order_by("created_at")
     )
     return [
@@ -128,6 +129,7 @@ def membership_summary(user: User) -> list[dict]:
                 "slug": m.tenant.slug,
                 "display_name": m.tenant.display_name,
                 "state": m.tenant.state,
+                "writable_environments": [row.environment for row in m.tenant.environments.all() if row.state == "ACTIVE"],
             },
             "role": m.role.name if m.role else None,
             "status": m.status,

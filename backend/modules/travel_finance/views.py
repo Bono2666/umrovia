@@ -5,7 +5,8 @@ Keamanan: endpoint HANYA menerima `account_number` (write-only) dan menyimpan
 kembali; audit memakai nilai masked. Role: Finance/Owner (matriks §3);
 Admin/Sales tanpa akses rekening.
 """
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef
 from rest_framework import serializers, status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.payments.models import TravelPayment
 from modules.tenants.rbac import require_permission
 from modules.travel_finance.models import TravelBankAccount, mask_account_number
 
@@ -24,6 +26,7 @@ def _payload(account: TravelBankAccount) -> dict:
         "account_name": account.account_name,
         "account_masked": account.account_masked,
         "active": account.active,
+        "number_editable": not (account.has_payments if hasattr(account, "has_payments") else TravelPayment.objects.filter(bank_account=account).exists()),
     }
 
 
@@ -37,6 +40,7 @@ class PatchBankAccountSerializer(serializers.Serializer):
     bank_name = serializers.CharField(max_length=100, required=False)
     account_name = serializers.CharField(max_length=160, required=False)
     active = serializers.BooleanField(required=False)
+    account_number = serializers.RegexField(r"^\d{8,32}$", required=False, write_only=True)
 
 
 class BankAccountsListCreateView(APIView):
@@ -48,7 +52,7 @@ class BankAccountsListCreateView(APIView):
         return [IsAuthenticated(), require_permission("bank_accounts.read")()]
 
     def get(self, request):
-        accounts = TravelBankAccount.objects.all()  # manager scoped ke context
+        accounts = TravelBankAccount.objects.annotate(has_payments=Exists(TravelPayment.objects.filter(bank_account_id=OuterRef("pk"))))
         return Response({"results": [_payload(a) for a in accounts]}, status=status.HTTP_200_OK)
 
     def post(self, request):
@@ -89,27 +93,38 @@ class BankAccountsListCreateView(APIView):
 
 
 class BankAccountDetailView(APIView):
-    """PATCH /bank-accounts/{id} — ubah nama/aktif (nomor rekening tak bisa diubah:
-    hapus & buat ulang)."""
+    """Correct metadata; number corrections only before the first payment.
+
+    Used accounts retain their number. Deactivate and add a new account instead.
+    """
 
     permission_classes = [IsAuthenticated, require_permission("bank_accounts.write")]
 
+    @transaction.atomic
     def patch(self, request, bank_account_id):
-        account = TravelBankAccount.objects.filter(pk=bank_account_id).first()
+        account = TravelBankAccount.objects.select_for_update().filter(pk=bank_account_id).first()
         if account is None:
             raise NotFound("Rekening tidak ditemukan di workspace ini.")
         serializer = PatchBankAccountSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         if not serializer.validated_data:
             raise serializers.ValidationError({"detail": "Tidak ada perubahan yang dikirim."})
+        if "account_number" in serializer.validated_data:
+            if TravelPayment.objects.filter(bank_account=account).exists():
+                raise ValidationError({"account_number": "Nomor rekening telah dipakai pada pembayaran. Nonaktifkan rekening lama dan tambahkan rekening baru untuk mempertahankan riwayat."})
+            account.account_masked = mask_account_number(serializer.validated_data.pop("account_number"))
         for field, value in serializer.validated_data.items():
             setattr(account, field, value)
-        account.save()
+        try:
+            with transaction.atomic():
+                account.save()
+        except IntegrityError:
+            raise ValidationError({"account_number": "Rekening dengan nama bank dan nomor terakhir sama sudah terdaftar."}) from None
         log_event(
             action="bank_accounts.updated",
             request=request,
             object_type="travel_bank_account",
             object_id=account.id,
-            changes={"updated_fields": sorted(serializer.validated_data.keys())},
+            changes={"updated_fields": sorted(request.data.keys())},
         )
         return Response({"bank_account": _payload(account)}, status=status.HTTP_200_OK)

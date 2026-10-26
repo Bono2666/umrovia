@@ -103,8 +103,8 @@ class PilgrimWriteSerializer(serializers.ModelSerializer):
         birth = attrs.get("birth_date")
         if birth and birth > date.today():
             raise serializers.ValidationError({"birth_date": "Tanggal lahir tidak boleh di masa depan."})
-        expires = attrs.get("passport_expires_at")
-        issued = attrs.get("passport_issued_at")
+        expires = attrs.get("passport_expires_at", getattr(self.instance, "passport_expires_at", None))
+        issued = attrs.get("passport_issued_at", getattr(self.instance, "passport_issued_at", None))
         if expires and issued and expires < issued:
             raise serializers.ValidationError({"passport_expires_at": "Tanggal kedaluwarsa sebelum terbit."})
         return attrs
