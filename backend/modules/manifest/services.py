@@ -34,7 +34,7 @@ import json
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Sum
 from django.utils import timezone
 from rest_framework.exceptions import APIException
 
@@ -44,6 +44,7 @@ from modules.manifest.models import (
     DocumentRequirementDeadline,
     ManifestVersion,
 )
+from modules.payments.models import InvoiceLine, PaymentAllocation
 from modules.pilgrims.crypto import PIIDecryptionError, decrypt_pii
 from modules.pilgrims.models import (
     Pilgrim,
@@ -196,6 +197,29 @@ def booking_documents_complete(booking) -> tuple[bool, str]:
 # ------------------------------------------------------------------ manifest --
 
 
+CONFIRMED_LIKE = {"CONFIRMED", "READY", "DEPARTED", "COMPLETED"}
+PAYMENT_FILTERS = {"", "paid", "partial", "unpaid"}
+
+
+def payment_by_participant(participants) -> dict:
+    """Tagihan (baris invoice aktif atau snapshot harga) dan alokasi VERIFIED per peserta — 2 query."""
+    ids = [p.pk for p in participants]
+    lines = dict(
+        InvoiceLine.objects.filter(participant_id__in=ids).exclude(invoice__status="VOIDED").values_list("participant_id", "amount_idr")
+    )
+    paid = dict(
+        PaymentAllocation.objects.filter(participant_id__in=ids, payment__status="VERIFIED")
+        .values("participant_id").annotate(total=Sum("amount_idr")).values_list("participant_id", "total")
+    )
+    result = {}
+    for p in participants:
+        amount = lines.get(p.pk, int(p.pricing_snapshot_json.get("unit_price_idr") or 0))
+        received = paid.get(p.pk, 0) or 0
+        status = "paid" if amount and received >= amount else "partial" if received else "unpaid"
+        result[p.pk] = {"amount_idr": amount, "paid_idr": received, "balance_idr": max(amount - received, 0), "payment_status": status}
+    return result
+
+
 def manifest_rows(
     departure,
     *,
@@ -204,6 +228,8 @@ def manifest_rows(
     document: str = "",
     participant_status: str = "",
     charge_state: str = "",
+    payment: str = "",
+    booking: str = "",
 ) -> list[dict]:
     """Roster manifest peserta aktif `departure` (UAT-14) dengan filter MOD-12.
 
@@ -214,6 +240,7 @@ def manifest_rows(
     required_kinds = [r.kind for r in requirements if r.mandatory]
     rows = list(active_participants(departure))
     statuses = latest_doc_statuses([r.pilgrim_id for r in rows])
+    payments = payment_by_participant(rows)
 
     out: list[dict] = []
     for row in rows:
@@ -240,6 +267,9 @@ def manifest_rows(
             "docs_required": required_kinds,
             "docs_missing": missing,
             "docs_complete": not missing,
+            "room_type": row.pricing_snapshot_json.get("room_type") or "",
+            "dp_received": row.dp_eligible_at is not None,
+            **payments[row.pk],
         }
         if pii:
             try:
@@ -258,6 +288,10 @@ def manifest_rows(
             continue
         if charge_state and row.saas_charge_state != charge_state:
             continue
+        if payment and entry["payment_status"] != payment:
+            continue
+        if booking and str(row.booking_id) != booking:
+            continue
         if q:
             needle = q.lower()
             hay = " ".join(
@@ -267,6 +301,30 @@ def manifest_rows(
                 continue
         out.append(entry)
     return out
+
+
+def readiness(departure, rows=None) -> dict:
+    """Ringkasan kesiapan (OPS-06): dokumen, pembayaran, konfirmasi dan gerbang READY."""
+    rows = manifest_rows(departure) if rows is None else rows
+    gaps = checklist_gaps(departure, stage="before_ready")
+
+    def count(predicate):
+        return sum(1 for row in rows if predicate(row))
+
+    return {
+        "participants": len(rows),
+        "docs_complete": count(lambda r: r["docs_complete"]),
+        "dp_received": count(lambda r: r["dp_received"]),
+        "fully_paid": count(lambda r: r["payment_status"] == "paid"),
+        "confirmed": count(lambda r: r["participant_status"] in CONFIRMED_LIKE),
+        "pending_charge": count(lambda r: r["saas_charge_state"] == "pending_charge"),
+        "outstanding_idr": sum(r["balance_idr"] for r in rows),
+        "seat_capacity": departure.seat_capacity,
+        "seats_taken": departure.seats_taken,
+        "available_seats": departure.available_seats,
+        "checklist_ready": not gaps,
+        "gap_count": len(gaps),
+    }
 
 
 def publish_manifest(*, departure, actor=None) -> ManifestVersion:

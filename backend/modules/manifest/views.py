@@ -9,7 +9,12 @@ Pola mengikuti modul lain: permission `domain.object.action` via
 `require_permission`, payload problem-detail `field_errors` untuk 400,
 audit `log_event` per tindakan, guard environment writable untuk tulis.
 """
+import hashlib
+import json
+from uuid import UUID
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.files.storage import default_storage
 from django.db import IntegrityError
 from django.http import HttpResponse
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -20,6 +25,7 @@ from rest_framework.views import APIView
 from modules.audit.services import log_event
 from modules.booking.models import ParticipantStatus, SaasChargeState
 from modules.departures.models import Departure
+from modules.manifest import printing
 from modules.manifest.models import DocumentRequirement, ManifestVersion
 from modules.manifest.serializers import (
     DocumentRequirementSerializer,
@@ -28,13 +34,18 @@ from modules.manifest.serializers import (
     version_payload,
 )
 from modules.manifest.services import (
+    PAYMENT_FILTERS,
+    active_participants,
     checklist_gaps,
     effective_requirements,
     export_csv,
     export_filename,
     manifest_rows,
     publish_manifest,
+    readiness,
 )
+from modules.payments.services import issuer_snapshot
+from modules.pilgrims.crypto import PIIDecryptionError, decrypt_pii
 from modules.tenants.environment import (
     assert_environment_writable,
     resolve_active_environment,
@@ -65,12 +76,51 @@ def _filters(params) -> dict:
     charge_state = (params.get("charge_state") or "").strip()
     if charge_state and charge_state not in _CHARGE_STATES:
         raise ValidationError({"charge_state": "Status charge tidak dikenal."})
+    payment = (params.get("payment") or "").strip()
+    if payment not in PAYMENT_FILTERS:
+        raise ValidationError({"payment": "Filter pembayaran harus paid, partial atau unpaid."})
+    booking = (params.get("booking") or "").strip()
+    if booking:
+        try:
+            booking = str(UUID(booking))
+        except ValueError:
+            raise ValidationError({"booking": "ID booking tidak valid."}) from None
     return {
         "q": (params.get("q") or "").strip(),
         "document": document,
         "participant_status": participant_status,
         "charge_state": charge_state,
+        "payment": payment,
+        "booking": booking,
     }
+
+
+def _flag(params, name):
+    return (params.get(name) or "").strip().lower() in ("1", "true", "yes")
+
+
+def _departure_meta(dep) -> dict:
+    return {
+        "id": str(dep.pk), "code": dep.code, "package_code": dep.package.code, "package_name": dep.package.name,
+        "start_at": dep.start_at.isoformat(), "end_at": dep.end_at.isoformat() if dep.end_at else None,
+        "city_of_origin": dep.city_of_origin, "route": dep.route, "meeting_point": dep.meeting_point,
+    }
+
+
+def _require_pii(request, dep, *, action, changes):
+    """OPS-03: data pribadi lengkap hanya `manifest.export_pii`; penolakan diaudit."""
+    if has_permission(permission_list(request.membership.role), "manifest.export_pii"):
+        return
+    log_event(action=action, request=request, object_type="departure", object_id=str(dep.pk), changes={"pii": True, **changes})
+    raise PermissionDenied("Data pribadi lengkap memerlukan permission 'manifest.export_pii'.")
+
+
+def _file_response(data, content_type, filename):
+    response = HttpResponse(data, content_type=content_type)
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 class ManifestView(APIView):
@@ -96,6 +146,8 @@ class ManifestView(APIView):
         )
         if (request.query_params.get("checklist_gaps") or "").strip() in ("1", "true", "yes"):
             payload["checklist_gaps"] = checklist_gaps(dep, stage="before_ready")
+        # Ringkasan kesiapan selalu atas seluruh roster, bukan hasil filter.
+        payload["readiness"] = readiness(dep, None if any(filters.values()) else rows)
         return Response(payload)
 
 
@@ -135,31 +187,119 @@ class ManifestExportView(APIView):
         filters = _filters(request.query_params)
         pii = (request.query_params.get("pii") or "").strip().lower() in ("1", "true", "yes")
 
-        if pii and not has_permission(
-            permission_list(request.membership.role), "manifest.export_pii"
-        ):
-            log_event(
-                action="manifest.export_denied",
-                request=request,
-                object_type="departure",
-                object_id=str(dep.pk),
-                changes={"pii": True, "filters": filters},
-            )
-            raise PermissionDenied(
-                "Ekspor manifest dengan PII memerlukan permission 'manifest.export_pii'."
-            )
+        if pii:
+            _require_pii(request, dep, action="manifest.export_denied", changes={"filters": filters})
 
-        csv_text, row_count = export_csv(dep, pii=pii, **filters)
+        kind = (request.query_params.get("file") or "csv").strip().lower()
+        if kind not in {"csv", "xlsx", "pdf"}:
+            raise ValidationError({"file": "Pilih csv, xlsx atau pdf."})
+        name = export_filename(dep).rsplit(".", 1)[0]
+        if kind == "csv":
+            body, row_count = export_csv(dep, pii=pii, **filters)
+            response = _file_response(body, "text/csv; charset=utf-8", f"{name}.csv")
+        else:
+            rows = manifest_rows(dep, pii=pii, **filters)
+            row_count = len(rows)
+            meta = printing.print_meta(title="Manifest jamaah", travel=request.tenant.display_name, environment=dep.environment, actor=request.user, zone=request.tenant.timezone)
+            if kind == "xlsx":
+                response = _file_response(printing.manifest_xlsx(departure=_departure_meta(dep), rows=rows, pii=pii, meta=meta), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", f"{name}.xlsx")
+            else:
+                response = _file_response(printing.manifest_pdf(departure=_departure_meta(dep), rows=rows, pii=pii, meta=meta), "application/pdf", f"{name}.pdf")
         log_event(
             action="manifest.exported",
             request=request,
             object_type="departure",
             object_id=str(dep.pk),
-            changes={"format": "csv", "pii": pii, "rows": row_count, "filters": filters},
+            changes={"format": kind, "pii": pii, "rows": row_count, "filters": filters},
         )
-        response = HttpResponse(csv_text, content_type="text/csv; charset=utf-8")
-        response["Content-Disposition"] = f'attachment; filename="{export_filename(dep)}"'
         return response
+
+
+class ManifestVersionPdfView(APIView):
+    """GET /departures/{id}/manifest/versions/{n}/pdf — cetak versi terbit dari
+    snapshot beku (OPS-04: versi, waktu, penerbit). Checksum diverifikasi."""
+
+    permission_classes = [IsAuthenticated, require_permission("manifest.export")]
+
+    def get(self, request, departure_id, version_no):
+        dep = _get_departure(departure_id)
+        version = ManifestVersion.objects.filter(departure=dep, version_no=version_no).select_related("published_by").first()
+        if version is None:
+            raise NotFound("Versi manifest tidak ditemukan.")
+        with default_storage.open(version.snapshot_object_key, "rb") as handle:
+            raw = handle.read()
+        if hashlib.sha256(raw).hexdigest() != version.checksum:
+            raise ValidationError({"version": "Checksum snapshot tidak cocok; versi tidak dapat dicetak."})
+        snapshot = json.loads(raw)
+        meta = printing.print_meta(title=f"Manifest v{version_no}", travel=request.tenant.display_name, environment=dep.environment, actor=request.user, zone=request.tenant.timezone)
+        published = {
+            "version_no": version_no,
+            "published_at": printing.document_date(snapshot["published_at"], request.tenant.timezone, with_time=True),
+            "published_by": (version.published_by.full_name or version.published_by.email) if version.published_by_id else "sistem",
+        }
+        departure = {**_departure_meta(dep), **{k: v for k, v in snapshot["departure"].items() if k in {"code", "package_name", "start_at", "city_of_origin", "route"}}}
+        pdf = printing.manifest_pdf(departure=departure, rows=snapshot["rows"], pii=False, meta=meta, version=published)
+        log_event(action="manifest.version_printed", request=request, object_type="departure", object_id=str(dep.pk), changes={"version_no": version_no})
+        prefix = "DEMO-manifest" if dep.environment == "demo" else "manifest"
+        return _file_response(pdf, "application/pdf", f"{prefix}-{dep.code}-v{version_no}.pdf")
+
+
+PRINT_KINDS = {"registration-forms": "Formulir pendaftaran", "labels": "Label jamaah", "envelopes": "Amplop jamaah"}
+
+
+def _people(dep, *, booking="", pii=False):
+    people = []
+    for row in active_participants(dep):
+        if booking and str(row.booking_id) != booking:
+            continue
+        p = row.pilgrim
+        person = {
+            "code": p.code, "name": p.name, "gender": p.gender, "birth_place": p.birth_place,
+            "birth_date": p.birth_date.isoformat() if p.birth_date else None,
+            "passport_expires_at": p.passport_expires_at.isoformat() if p.passport_expires_at else None,
+            "identity_masked": p.identity_masked, "passport_masked": p.passport_masked,
+            "address": p.address, "phone": p.phone, "email": p.email,
+            "guardian_name": p.guardian_name, "guardian_relation": p.guardian_relation,
+            "emergency_contact_name": p.emergency_contact_name, "emergency_contact_phone": p.emergency_contact_phone,
+            "booking_code": row.booking.code, "room_type": row.pricing_snapshot_json.get("room_type") or "",
+        }
+        if pii:
+            try:
+                person["identity_number"] = decrypt_pii(p.identity_encrypted)
+                person["passport_number"] = decrypt_pii(p.passport_encrypted)
+            except PIIDecryptionError as exc:
+                raise ValidationError({"pii": "Dekripsi data pribadi gagal; periksa kunci enkripsi."}) from exc
+        people.append(person)
+    return people
+
+
+class DeparturePrintView(APIView):
+    """GET /departures/{id}/print/{kind} — formulir pendaftaran, label koper,
+    amplop (PRD MOD-12). `?booking=` membatasi satu booking; `?pii=1` (hanya
+    formulir) menampilkan NIK/paspor lengkap dengan izin `manifest.export_pii`."""
+
+    permission_classes = [IsAuthenticated, require_permission("manifest.export")]
+
+    def get(self, request, departure_id, kind):
+        if kind not in PRINT_KINDS:
+            raise NotFound("Jenis dokumen cetak tidak dikenal.")
+        dep = _get_departure(departure_id)
+        booking = _filters({"booking": request.query_params.get("booking", "")})["booking"]
+        pii = kind == "registration-forms" and _flag(request.query_params, "pii")
+        if pii:
+            _require_pii(request, dep, action="manifest.print_denied", changes={"kind": kind})
+        people = _people(dep, booking=booking, pii=pii)
+        meta = printing.print_meta(title=PRINT_KINDS[kind], travel=request.tenant.display_name, environment=dep.environment, actor=request.user, zone=request.tenant.timezone)
+        departure = _departure_meta(dep)
+        if kind == "registration-forms":
+            pdf = printing.registration_forms_pdf(departure=departure, people=people, pii=pii, meta=meta, issuer=issuer_snapshot(request.tenant))
+        elif kind == "labels":
+            pdf = printing.labels_pdf(departure=departure, people=people, meta=meta)
+        else:
+            pdf = printing.envelopes_pdf(people=people, meta=meta, issuer=issuer_snapshot(request.tenant))
+        log_event(action="manifest.printed", request=request, object_type="departure", object_id=str(dep.pk), changes={"kind": kind, "pii": pii, "rows": len(people), "booking": booking})
+        prefix = "DEMO-" if dep.environment == "demo" else ""
+        return _file_response(pdf, "application/pdf", f"{prefix}{kind}-{dep.code}.pdf")
 
 
 class DocumentRequirementListCreateView(APIView):
