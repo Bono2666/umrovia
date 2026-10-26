@@ -98,7 +98,7 @@ function DeliveryLog({canManage, onError, onMessage}: {canManage: boolean; onErr
       ))}
     </div>
     <section className="card mt-6 p-6">
-      <form className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-4" onSubmit={(event) => {event.preventDefault(); update({q: search.trim()});}}>
+      <form className="notification-filters grid items-end gap-x-4 gap-y-8 md:grid-cols-2 xl:grid-cols-4" onSubmit={(event) => {event.preventDefault(); update({q: search.trim()});}}>
         <FormField label="Cari penerima atau subjek" htmlFor="notif-q" value={search} onChange={(event) => setSearch(event.target.value)} onBlur={() => update({q: search.trim()})} />
         <FormSelect label="Jenis pesan" htmlFor="notif-template" value={filters.template} onChange={(event) => update({template: event.target.value})}>
           <option value="">Semua</option>
