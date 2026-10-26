@@ -51,8 +51,8 @@ const STATUS_TONE: Record<string, "neutral" | "success" | "warning" | "danger"> 
 /** Transisi sah §6.5 — tombol per status; CANCELED hanya dari DRAFT/OPEN/READY. */
 const NEXT_ACTIONS: Record<string, { target: string; label: string }[]> = {
   DRAFT: [{ target: "OPEN", label: "Buka pendaftaran" }],
-  OPEN: [{ target: "READY", label: "Siapkan" }],
-  READY: [{ target: "DEPARTED", label: "Berangkat" }],
+  OPEN: [{ target: "READY", label: "Tandai siap berangkat" }],
+  READY: [{ target: "DEPARTED", label: "Tandai berangkat" }],
   DEPARTED: [{ target: "COMPLETED", label: "Tandai selesai" }],
 };
 
@@ -179,7 +179,7 @@ export default function KeberangkatanPage() {
       start_at: startAt ? null : "Tanggal keberangkatan wajib diisi.",
       end_at:
         endAt && startAt && new Date(endAt) <= new Date(startAt)
-          ? "Kepulangan harus setelah keberangkatan (§10.1)."
+          ? "Tanggal kepulangan harus setelah keberangkatan."
           : null,
       city_of_origin: cityOfOrigin.trim() ? null : "Kota asal wajib diisi.",
       seat_capacity:
@@ -261,7 +261,7 @@ export default function KeberangkatanPage() {
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf operasional"
-            description="Peran Anda tidak memiliki permission departures.read."
+            description="Peran Anda belum diberi akses melihat keberangkatan. Hubungi Owner travel."
           />
         </div>
       </div>
@@ -277,10 +277,9 @@ export default function KeberangkatanPage() {
     <div className="workspace-page">
       <h1 className="text-2xl font-bold">Keberangkatan</h1>
       <p className="mt-1 text-sm text-muted">
-        Jadwal keberangkatan &amp; kuota kursi (MOD-06). Ketersediaan dihitung
-        atomik — kapasitas − terpakai − terblokir (BR-002); status mengikuti
-        alur Draf → Pendaftaran dibuka → Siap berangkat → Berangkat → Selesai,
-        atau Dibatalkan dengan alasan.
+        Jadwal keberangkatan dan kuota kursi. Kursi tersisa = kapasitas − kursi
+        terpakai − kursi diblokir. Alur status: Draf → Pendaftaran dibuka → Siap
+        berangkat → Berangkat → Selesai (atau Dibatalkan dengan alasan).
       </p>
 
       {message ? (
@@ -334,73 +333,45 @@ export default function KeberangkatanPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
               {visible.map((dep) => (
-                <li key={dep.id} className="py-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="min-w-44">
-                      <p className="font-semibold">{dep.package_name}</p>
-                      <p className="text-xs text-muted">
-                        {dep.code} · {formatDate(dep.start_at)}
-                        {dep.city_of_origin ? ` · ${dep.city_of_origin}` : ""}
-                        {dep.lead_staff_name ? ` · PIC ${dep.lead_staff_name}` : ""}
-                      </p>
-                    </div>
+                <li key={dep.id} className="py-4 text-sm">
+                  <p className="flex flex-wrap items-center gap-2 font-semibold">
+                    {dep.package_name}
                     <StatusBadge tone={STATUS_TONE[dep.status] ?? "neutral"}>
                       {STATUS_LABEL[dep.status] ?? dep.status}
                     </StatusBadge>
-                    <span
-                      className={`ml-auto text-xs ${
-                        dep.available_seats === 0 ? "font-semibold text-danger" : "text-muted"
-                      }`}
-                    >
-                      {dep.available_seats} kursi tersisa · {dep.seats_taken} terpakai ·{" "}
-                      {dep.seats_blocked} diblokir / {dep.seat_capacity}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {can("departures.write") && canEditEnvironment(dep.environment) ? <Btn size="xs" variant="tint" disabled={busy} onClick={() => editDeparture(dep)}>Ubah keberangkatan</Btn> : null}
-                    {dep.deletable && can("departures.write") && canEditEnvironment(dep.environment) ? <Btn size="xs" variant="danger" disabled={busy || editing?.id === dep.id} onClick={() => void removeDeparture(dep)}>Hapus</Btn> : null}
-                    {(can("departures.manage") && canEditEnvironment(dep.environment) ? NEXT_ACTIONS[dep.status] ?? [] : []).map((action) => (
-                      <Btn
-                        key={action.target}
-                        variant="tint"
-                        size="xs"
-                        disabled={busyId === dep.id}
-                        onClick={() => transition(dep, action.target)}
-                      >
+                  </p>
+                  <p className="text-xs text-muted">
+                    {dep.code} · {formatDate(dep.start_at)}
+                    {dep.city_of_origin ? ` · ${dep.city_of_origin}` : ""}
+                    {dep.lead_staff_name ? ` · PIC ${dep.lead_staff_name}` : ""}
+                  </p>
+                  <p className={`mt-1 text-xs ${dep.available_seats === 0 ? "font-semibold text-danger" : "text-muted"}`}>
+                    <strong className={dep.available_seats === 0 ? "" : "text-foreground"}>{dep.available_seats} kursi tersisa</strong> dari {dep.seat_capacity} · {dep.seats_taken} terpakai · {dep.seats_blocked} diblokir
+                  </p>
+                  {canEditEnvironment(dep.environment) && (can("departures.write") || can("departures.manage")) ? <div className="mt-3 flex flex-wrap gap-1.5">
+                    {(can("departures.manage") ? NEXT_ACTIONS[dep.status] ?? [] : []).map((action) => (
+                      <Btn key={action.target} size="xs" disabled={busyId === dep.id} onClick={() => transition(dep, action.target)}>
                         {action.label}
                       </Btn>
                     ))}
-                    {can("departures.manage") && canEditEnvironment(dep.environment) && dep.status === "OPEN" ? (
-                      <Btn
-                        variant="tint"
-                        size="xs"
-                        disabled={busyId === dep.id}
-                        onClick={() => prepareWithException(dep)}
-                      >
-                        Siapkan dengan pengecualian
+                    {can("departures.manage") && dep.status === "OPEN" ? (
+                      <Btn variant="tint" size="xs" disabled={busyId === dep.id} onClick={() => prepareWithException(dep)}>
+                        Siap dengan pengecualian
                       </Btn>
                     ) : null}
-                    {can("departures.manage") && canEditEnvironment(dep.environment) && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
-                      <Btn
-                        variant="danger"
-                        size="xs"
-                        disabled={busyId === dep.id}
-                        onClick={() => cancel(dep)}
-                      >
-                        Batalkan
-                      </Btn>
-                    ) : null}
-                    {can("departures.write") && canEditEnvironment(dep.environment) && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
-                      <Btn
-                        variant="tint"
-                        size="xs"
-                        disabled={busyId === dep.id}
-                        onClick={() => editBlocked(dep)}
-                      >
+                    {can("departures.write") ? <Btn size="xs" variant="tint" disabled={busy} onClick={() => editDeparture(dep)}>Ubah keberangkatan</Btn> : null}
+                    {can("departures.write") && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
+                      <Btn variant="tint" size="xs" disabled={busyId === dep.id} onClick={() => editBlocked(dep)}>
                         Ubah blokir
                       </Btn>
                     ) : null}
-                  </div>
+                    {dep.deletable && can("departures.write") ? <Btn size="xs" variant="danger" disabled={busy || editing?.id === dep.id} onClick={() => void removeDeparture(dep)}>Hapus</Btn> : null}
+                    {can("departures.manage") && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
+                      <Btn variant="danger" size="xs" disabled={busyId === dep.id} onClick={() => cancel(dep)}>
+                        Batalkan
+                      </Btn>
+                    ) : null}
+                  </div> : null}
                 </li>
               ))}
             </ul>

@@ -11,7 +11,7 @@ import {
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMasked } from "@/lib/format";
 import {
   API_BASE,
   apiFetch,
@@ -48,8 +48,8 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 const DEADLINE_LABEL: Record<string, string> = {
-  before_ready: "Sebelum siap berangkat (READY)",
-  before_departure: "Sebelum keberangkatan (DEPARTED)",
+  before_ready: "Sebelum siap berangkat",
+  before_departure: "Sebelum berangkat",
 };
 
 const PARTICIPANT_LABEL: Record<string, string> = {
@@ -66,11 +66,11 @@ const PARTICIPANT_LABEL: Record<string, string> = {
 };
 
 const CHARGE_LABEL: Record<string, string> = {
-  not_eligible: "Belum eligible",
-  pending_charge: "Charge tertunda",
-  charged: "Tercharge",
-  waived: "Diwaive",
-  reversed: "Reversed",
+  not_eligible: "Belum ada DP",
+  pending_charge: "Biaya layanan tertunda",
+  charged: "Biaya layanan lunas",
+  waived: "Biaya dibebaskan",
+  reversed: "Biaya direfund",
 };
 
 const DOC_STATUS_LABEL: Record<string, string> = {
@@ -238,7 +238,7 @@ export default function ManifestPage() {
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus Operasional/Admin"
-            description="Peran Anda tidak memiliki permission manifest.read."
+            description="Peran Anda belum diberi akses melihat manifest. Hubungi Owner travel."
           />
         </div>
       </div>
@@ -257,10 +257,10 @@ export default function ManifestPage() {
     <div className="workspace-page">
       <h1 className="text-2xl font-bold">Manifest & checklist</h1>
       <p className="mt-1 text-sm text-muted">
-        Daftar jamaah per keberangkatan (UI-12) dan checklist dokumen wajib per paket (UI-11,
-        MOD-08). Roster hanya memuat peserta booking aktif (UAT-14) dengan identitas ter-mask;
-        nilai NIK/paspor penuh hanya lewat ekspor PII yang berizin dan diaudit (OPS-03).
-        Snapshot publikasi bersifat append-only — revisi selalu menjadi versi baru (§7.6).
+        Daftar jamaah per keberangkatan dan checklist dokumen wajib per paket.
+        Manifest hanya memuat peserta booking aktif dengan identitas tersamar.
+        Ekspor dengan NIK/paspor lengkap hanya untuk peran berwenang dan selalu
+        tercatat. Setiap publikasi disimpan sebagai versi baru.
       </p>
 
       {message ? (
@@ -316,7 +316,7 @@ export default function ManifestPage() {
         </div>
         {departures.length === 0 && permissions !== null ? (
           <p className="form-control__hint">
-            Belum ada keberangkatan — buat dulu di menu Keberangkatan (UI-05).
+            Belum ada keberangkatan — buat dulu di menu Keberangkatan.
           </p>
         ) : null}
       </section>
@@ -333,9 +333,9 @@ export default function ManifestPage() {
             {gaps.length > 6 ? <li>… dan {gaps.length - 6} lainnya</li> : null}
           </ul>
           <p className="mt-1 text-xs">
-            Transisi keberangkatan ke <strong>READY</strong> akan ditolak server kecuali memakai
-            <em> approved exception</em> dengan alasan (dicatat di audit, OPS-02) — ubah lewat menu
-            Keberangkatan melalui “Siapkan dengan pengecualian”, atau lengkapi dokumen jamaah.
+            Keberangkatan belum dapat ditandai <strong>Siap berangkat</strong> sampai dokumen di atas
+            lengkap. Bila perlu, gunakan “Siap dengan pengecualian” di menu Keberangkatan dengan
+            alasan yang dicatat di audit.
           </p>
         </div>
       ) : null}
@@ -376,8 +376,8 @@ export default function ManifestPage() {
           </div>
           {canExport && canExportPii ? (
             <p className="mt-1 text-xs text-muted">
-              Kolom PII (NIK/paspor penuh, kebutuhan khusus) memerlukan permission
-              manifest.export_pii dan selalu tercatat di audit.
+              Data pribadi lengkap (NIK/paspor penuh, kebutuhan khusus) hanya untuk
+              peran berwenang dan setiap ekspor tercatat di audit.
             </p>
           ) : null}
 
@@ -420,7 +420,7 @@ export default function ManifestPage() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
-                    NIK {row.identity_masked || "—"} · Paspor {row.passport_masked || "—"}
+                    NIK {row.identity_masked ? formatMasked(row.identity_masked) : "—"} · Paspor {row.passport_masked ? formatMasked(row.passport_masked) : "—"}
                   </p>
                 </li>
               ))}
@@ -434,9 +434,8 @@ export default function ManifestPage() {
             <p className="mt-1 text-xs text-muted">
               Berlaku untuk paket{" "}
               {envelope ? `${envelope.departure.package_code} — ${envelope.departure.package_name}` : "keberangkatan terpilih"}
-              ; syarat global dapat ditimpa per paket. <code>before_ready</code> menggerakkan
-              gerbang READY keberangkatan & booking siap berangkat; <code>before_departure</code>{" "}
-              menggerakkan gerbang DEPARTED.
+. Syarat bertanda <strong>wajib</strong> harus lengkap sebelum batas waktunya:
+              sebelum booking/keberangkatan ditandai siap berangkat, atau sebelum berangkat.
             </p>
             {envelope && envelope.requirements.length > 0 ? (
               <ul className="mt-3 divide-y divide-border/60">
@@ -465,8 +464,7 @@ export default function ManifestPage() {
               </ul>
             ) : (
               <p className="mt-3 text-sm text-muted">
-                Belum ada syarat dokumen — gerbang checklist lulus otomatis (belum ada yang bisa
-                kurang).
+                Belum ada syarat dokumen untuk paket ini, sehingga semua jamaah dianggap lengkap.
               </p>
             )}
 
@@ -504,7 +502,7 @@ export default function ManifestPage() {
                 <div className="mt-2">
                   <FormCheckbox
                     id="req-mandatory"
-                    label="Wajib (menggerakkan gerbang kesiapan)"
+                    label="Wajib dipenuhi sebelum batas waktu"
                     checked={reqMandatory}
                     onChange={setReqMandatory}
                   />
@@ -539,7 +537,7 @@ export default function ManifestPage() {
               </ul>
             ) : (
               <p className="mt-2 text-sm text-muted">
-                Belum ada versi terbit — publikasikan snapshot untuk membekukan roster (§7.6).
+                Belum ada versi terbit. Publikasikan untuk menyimpan salinan manifest saat ini.
               </p>
             )}
           </section>

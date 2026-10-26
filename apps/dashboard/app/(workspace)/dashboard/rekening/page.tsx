@@ -11,6 +11,7 @@ import {
   StatusBadge,
 } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type BankAccount } from "@/lib/api";
+import { formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
@@ -135,9 +136,9 @@ export default function RekeningPage() {
     <div className="workspace-page">
       <h1 className="text-2xl font-bold">Kas &amp; Bank</h1>
       <p className="mt-1 text-sm text-muted">
-        Rekening bank resmi travel untuk instruksi pembayaran DP. Nomor rekening
-        disimpan hanya sebagai 4 digit terakhir (masked, §5.3) — tidak pernah
-        dikembalikan utuh oleh API.
+        Rekening resmi travel yang dicantumkan pada invoice untuk pembayaran
+        jamaah. Demi keamanan, hanya 4 digit terakhir nomor rekening yang
+        disimpan dan ditampilkan.
       </p>
 
       {message ? (
@@ -168,22 +169,21 @@ export default function RekeningPage() {
         ) : (
           <ul className="mt-4 divide-y divide-border/60">
             {rows.map((account) => (
-              <li key={account.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-                <div className="min-w-40">
-                  <p className="font-semibold">{account.bank_name}</p>
-                  <p className="text-xs text-muted">{account.account_name}</p>
-                </div>
-                <code className="border border-border bg-background px-2 py-0.5 text-xs">
-                  {account.account_masked}
-                </code>
-                <StatusBadge tone={account.active ? "success" : "neutral"}>
-                  {account.active ? "AKTIF" : "NONAKTIF"}
-                </StatusBadge>
-                {can("bank_accounts.write") ? <><Btn variant="tint" className="ml-auto" disabled={busy} onClick={() => editAccount(account)}>Ubah rekening</Btn>
-                <Btn variant="tint" disabled={busy} onClick={() => onToggle(account)}>
-                  {account.active ? "Nonaktifkan" : "Aktifkan"}
-                </Btn>
-                {account.deletable ? <Btn variant="danger" disabled={busy || editing?.id === account.id} onClick={() => void removeAccount(account)}>Hapus</Btn> : null}</> : null}
+              <li key={account.id} className="py-4 text-sm">
+                <p className="flex flex-wrap items-center gap-2 font-semibold">
+                  {account.bank_name}
+                  <StatusBadge tone={account.active ? "success" : "neutral"}>
+                    {account.active ? "Aktif" : "Nonaktif"}
+                  </StatusBadge>
+                </p>
+                <p className="text-xs text-muted">{account.account_name} · {formatMasked(account.account_masked)}</p>
+                {can("bank_accounts.write") ? <div className="mt-3 flex flex-wrap gap-1.5">
+                  <Btn variant="tint" size="xs" disabled={busy} onClick={() => editAccount(account)}>Ubah rekening</Btn>
+                  <Btn variant="tint" size="xs" disabled={busy} onClick={() => onToggle(account)}>
+                    {account.active ? "Nonaktifkan" : "Aktifkan"}
+                  </Btn>
+                  {account.deletable ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === account.id} onClick={() => void removeAccount(account)}>Hapus</Btn> : null}
+                </div> : null}
               </li>
             ))}
           </ul>

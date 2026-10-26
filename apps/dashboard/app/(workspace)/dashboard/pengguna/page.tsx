@@ -26,8 +26,11 @@ import {
  * custom: tambah/ubah/hapus (POST/PATCH/DELETE /roles; hapus hanya bila tak dipakai). Aksi ditutup berdasarkan permission
  * klien (`memberships.write/.manage`) — server tetap menegaskan ulang.
  */
+const MEMBER_STATUS: Record<string, string> = { ACTIVE: "Aktif", INVITED: "Diundang", SUSPENDED: "Ditangguhkan", REVOKED: "Dicabut" };
+
 export default function PenggunaPage() {
   const [perms, setPerms] = useState<string[] | null>(null);
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [rows, setRows] = useState<MembershipRow[] | null>(null);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +57,7 @@ export default function PenggunaPage() {
         return;
       }
       const { memberships, active_tenant_slug } = result.data;
+      setCurrentEmail(result.data.email.toLowerCase());
       const active =
         memberships.find((m) => m.tenant.slug === (active_tenant_slug ?? "")) ??
         memberships.find((m) => m.status === "ACTIVE");
@@ -78,6 +82,9 @@ export default function PenggunaPage() {
   const canReadRoles = perms ? hasPermission(perms, "roles.read") : true;
   const canWriteRoles = perms ? hasPermission(perms, "roles.write") : false;
   const hasSidePanels = canInvite || (canReadRoles && roles.length > 0);
+  // Backend menolak mencabut/menurunkan Owner aktif terakhir; UI tidak menawarkannya.
+  const activeOwners = rows?.filter((row) => row.role === "Owner" && row.status === "ACTIVE").length ?? 0;
+  const isLastOwner = (row: MembershipRow) => row.role === "Owner" && row.status === "ACTIVE" && activeOwners <= 1;
 
   async function onInvite(event: React.FormEvent) {
     event.preventDefault();
@@ -138,8 +145,9 @@ export default function PenggunaPage() {
   }
 
   async function onRevoke(row: MembershipRow) {
+    const self = row.user.email.toLowerCase() === currentEmail;
     const confirmed = window.confirm(
-      `Cabut akses ${row.user.email} dari workspace ini?`,
+      self ? "Cabut akses Anda sendiri dari workspace ini? Anda akan kehilangan akses setelahnya." : `Cabut akses ${row.user.email} dari workspace ini?`,
     );
     if (!confirmed) return;
     setError(null);
@@ -186,7 +194,7 @@ export default function PenggunaPage() {
       ) : null}
 
       <div className="workspace-columns mt-6">
-      <section className={`card p-6 ${hasSidePanels ? "" : "lg:col-span-2"}`}>
+      <section className="card p-6 lg:col-span-2">
         <h2 className="font-semibold">Anggota workspace</h2>
         {rows === null ? (
           <div className="mt-4">
@@ -201,19 +209,27 @@ export default function PenggunaPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted">
-                  <th className="py-2 pr-4">Email</th>
-                  <th className="py-2 pr-4">Nama</th>
-                  <th className="py-2 pr-4">Peran</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2">Aksi</th>
+                  <th className="py-2 pr-4">Anggota</th>
+                  <th className="hidden py-2 pr-4 sm:table-cell">Peran</th>
+                  <th className="hidden py-2 pr-4 sm:table-cell">Status</th>
+                  <th className="w-px whitespace-nowrap py-2 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b border-border/60">
-                    <td className="py-2 pr-4">{row.user.email}</td>
-                    <td className="py-2 pr-4">{row.user.full_name || "-"}</td>
-                    <td className="py-2 pr-4">
+                    <td className="py-3 pr-4">
+                      <p className="font-medium">
+                        {row.user.full_name || row.user.email}
+                        {row.user.email.toLowerCase() === currentEmail ? <span className="ml-2 text-xs font-normal text-muted">(Anda)</span> : null}
+                      </p>
+                      {row.user.full_name ? <p className="mt-0.5 break-all text-xs text-muted">{row.user.email}</p> : null}
+                      {editingMember !== row.id ? <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs sm:hidden">
+                        <span>{row.role ?? "-"}</span>
+                        <StatusBadge tone={row.status === "ACTIVE" ? "success" : row.status === "REVOKED" ? "danger" : "warning"}>{MEMBER_STATUS[row.status] ?? row.status}</StatusBadge>
+                      </p> : null}
+                    </td>
+                    <td className={`${editingMember === row.id ? "table-cell" : "hidden"} py-3 pr-4 sm:table-cell`}>
                       {editingMember === row.id ? (
                         <div><FormSelect
                           htmlFor={`role-${row.id}`}
@@ -228,25 +244,30 @@ export default function PenggunaPage() {
                               {role.name}
                             </option>
                           ))}
-                        </FormSelect><div className="mt-2 flex flex-wrap gap-2"><Btn size="xs" disabled={roleBusy || !roleDraft || roleDraft === row.role_id} onClick={() => onChangeRole(row, roleDraft)}>Simpan perubahan</Btn><Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => setEditingMember(null)}>Batal ubah</Btn></div></div>
+                        </FormSelect></div>
                       ) : (
                         row.role ?? "-"
                       )}
                     </td>
-                    <td className="py-2 pr-4">
-                      <StatusBadge tone={row.status === "ACTIVE" ? "success" : "warning"}>
-                        {row.status}
+                    <td className="hidden py-3 pr-4 sm:table-cell">
+                      <StatusBadge tone={row.status === "ACTIVE" ? "success" : row.status === "REVOKED" ? "danger" : "warning"}>
+                        {MEMBER_STATUS[row.status] ?? row.status}
                       </StatusBadge>
                     </td>
-                    <td className="py-2">
-                      {canManage && roles.length > 0 && row.status !== "REVOKED" && editingMember !== row.id ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setEditingMember(row.id); setRoleDraft(row.role_id ?? ""); setError(null);}}>Ubah peran</Btn> : null}
-                      {canManage && row.status !== "REVOKED" ? (
-                        <Btn variant="danger" onClick={() => onRevoke(row)}>
-                          Cabut akses
-                        </Btn>
-                      ) : (
-                        <span className="text-xs text-muted">-</span>
-                      )}
+                    <td className="w-px whitespace-nowrap py-3 pl-4 text-right">
+                      <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end">
+                        {editingMember === row.id ? <>
+                          <Btn size="xs" disabled={roleBusy || !roleDraft || roleDraft === row.role_id} onClick={() => onChangeRole(row, roleDraft)}>Simpan</Btn>
+                          <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => setEditingMember(null)}>Batal</Btn>
+                        </> : !canManage || row.status === "REVOKED" ? (
+                          <span className="text-muted">—</span>
+                        ) : isLastOwner(row) ? (
+                          <span className="block max-w-20 whitespace-normal text-xs text-muted sm:max-w-none sm:whitespace-nowrap" title="Tambahkan Owner lain sebelum mengubah peran atau mencabut akses akun ini.">Owner terakhir</span>
+                        ) : <>
+                          {roles.length > 0 ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setEditingMember(row.id); setRoleDraft(row.role_id ?? ""); setError(null);}}>Ubah peran</Btn> : null}
+                          <Btn size="xs" variant="danger" disabled={roleBusy} onClick={() => onRevoke(row)}>Cabut akses</Btn>
+                        </>}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -256,7 +277,7 @@ export default function PenggunaPage() {
         )}
       </section>
 
-      {hasSidePanels ? <div className="space-y-6">
+      {hasSidePanels ? <div className="grid grid-cols-1 items-start gap-6 lg:col-span-2 lg:grid-cols-2">
       {canInvite ? (
         <section className="card p-6">
           <h2 className="font-semibold">Undang staf baru</h2>
@@ -340,8 +361,8 @@ export default function PenggunaPage() {
       </div>
 
       <p className="mt-4 text-xs text-muted">
-        Batas uji coba: maksimal 3 pengguna internal (TR04) — penambahan di atas
-        kuota ditolak server dengan kode TRIAL_USER_LIMIT.
+        Selama masa uji coba, workspace dapat memiliki maksimal 3 pengguna
+        internal.
       </p>
     </div>
   );

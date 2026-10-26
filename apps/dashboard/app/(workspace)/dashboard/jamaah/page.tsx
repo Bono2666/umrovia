@@ -18,6 +18,7 @@ import {
   type Pilgrim,
   type PilgrimDocument,
 } from "@/lib/api";
+import { formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
@@ -203,7 +204,7 @@ export default function JamaahPage() {
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf dengan akses jamaah"
-            description="Peran Anda tidak memiliki permission pilgrims.read."
+            description="Peran Anda belum diberi akses melihat data jamaah. Hubungi Owner travel."
           />
         </div>
       </div>
@@ -214,10 +215,9 @@ export default function JamaahPage() {
     <div className="workspace-page">
       <h1 className="text-2xl font-bold">Jamaah</h1>
       <p className="mt-1 text-sm text-muted">
-        Master data jamaah (MOD-04). NIK &amp; nomor paspor disimpan terenkripsi
-        dan hanya ditampilkan sebagai 4 karakter terakhir (masked, §10.1);
-        identitas sama ditandai sebagai potensi duplikat — tidak digabung
-        otomatis.
+        Data jamaah travel Anda. NIK dan nomor paspor disimpan terenkripsi dan
+        hanya ditampilkan 4 karakter terakhir. Jamaah dengan identitas sama
+        ditandai sebagai kemungkinan duplikat agar dapat Anda periksa.
       </p>
 
       {message ? (
@@ -257,26 +257,26 @@ export default function JamaahPage() {
         ) : (
           <ul className="mt-4 divide-y divide-border/60">
             {rows.map((pilgrim) => (
-              <li key={pilgrim.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-                <div className="min-w-40">
-                  <p className="font-semibold">{pilgrim.name}</p>
-                  <p className="text-xs text-muted">
-                    {pilgrim.code}
-                    {pilgrim.identity_masked ? ` · NIK ${pilgrim.identity_masked}` : ""}
-                    {pilgrim.phone ? ` · ${pilgrim.phone}` : ""}
-                  </p>
+              <li key={pilgrim.id} className="py-4 text-sm">
+                <p className="flex flex-wrap items-center gap-2 font-semibold">
+                  {pilgrim.name}
+                  <StatusBadge tone={pilgrim.status === "ACTIVE" ? "success" : "neutral"}>
+                    {pilgrim.status === "ACTIVE" ? "Aktif" : "Diarsipkan"}
+                  </StatusBadge>
+                  {pilgrim.possible_duplicate_of ? (
+                    <StatusBadge tone="warning">Kemungkinan duplikat</StatusBadge>
+                  ) : null}
+                </p>
+                <p className="text-xs text-muted">
+                  {pilgrim.code}
+                  {pilgrim.identity_masked ? ` · NIK ${formatMasked(pilgrim.identity_masked)}` : ""}
+                  {pilgrim.phone ? ` · ${pilgrim.phone}` : ""}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <Btn variant="tint" size="xs" onClick={() => openDetail(pilgrim)}>Detail</Btn>
+                  {can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="tint" size="xs" disabled={busy} onClick={() => editPilgrim(pilgrim)}>Ubah jamaah</Btn> : null}
+                  {pilgrim.deletable && can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="danger" size="xs" disabled={busy || editing?.id === pilgrim.id} onClick={() => void removePilgrim(pilgrim)}>Hapus</Btn> : null}
                 </div>
-                {pilgrim.possible_duplicate_of ? (
-                  <StatusBadge tone="warning">DUPLIKAT?</StatusBadge>
-                ) : null}
-                <StatusBadge tone={pilgrim.status === "ACTIVE" ? "success" : "neutral"}>
-                  {pilgrim.status === "ACTIVE" ? "AKTIF" : "DIARSIPKAN"}
-                </StatusBadge>
-                <Btn variant="tint" className="ml-auto" onClick={() => openDetail(pilgrim)}>
-                  Detail
-                </Btn>
-                {can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="tint" disabled={busy} onClick={() => editPilgrim(pilgrim)}>Ubah jamaah</Btn> : null}
-                {pilgrim.deletable && can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="danger" disabled={busy || editing?.id === pilgrim.id} onClick={() => void removePilgrim(pilgrim)}>Hapus</Btn> : null}
               </li>
             ))}
           </ul>
@@ -293,11 +293,11 @@ export default function JamaahPage() {
             <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">NIK</dt>
-                <dd>{selected.identity_masked || "—"}</dd>
+                <dd>{selected.identity_masked ? formatMasked(selected.identity_masked) : "—"}</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">Paspor</dt>
-                <dd>{selected.passport_masked || "—"}</dd>
+                <dd>{selected.passport_masked ? formatMasked(selected.passport_masked) : "—"}</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">Lahir</dt>
