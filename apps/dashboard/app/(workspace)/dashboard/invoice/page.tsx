@@ -6,6 +6,7 @@ import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, Loadi
 import { API_BASE, apiFetch, problemMessage, type Booking, type PaymentRules, type TravelInvoice } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 const LABELS: Record<string, string> = { ISSUED: "Terbit", PARTIALLY_PAID: "Dibayar sebagian", PAID: "Lunas", VOIDED: "Dibatalkan" };
 
@@ -59,7 +60,7 @@ export default function InvoicePage() {
   if (!can("invoices.read")) return <EmptyState title="Anda tidak memiliki akses invoice" />;
 
   return <div className="workspace-page">
-    <h1 className="text-2xl font-bold">Invoice</h1>
+    <RevealText as="h1" variant="title" className="text-2xl font-bold">Invoice</RevealText>
     <p className="mt-1 text-sm text-muted">Tagihan dari harga booking yang sudah tersimpan. Pembayaran terverifikasi memperbarui sisa tagihan.</p>
     {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}

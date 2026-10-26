@@ -16,6 +16,7 @@ import {
   type SettingsPayload,
   type UserPayload,
 } from "@/lib/api";
+import { RevealText } from "@/components/marketing/RevealText";
 
 type Section = "branding" | "invoice";
 type Draft = { address: string; dueDays: string; notes: string };
@@ -152,7 +153,7 @@ export default function ProfilPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Profil Travel</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Profil Travel</RevealText>
       <p className="mt-1 text-sm text-muted">
         Informasi travel yang dicetak pada invoice dan kuitansi, serta pengaturan bawaan untuk invoice baru.
       </p>

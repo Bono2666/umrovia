@@ -19,6 +19,7 @@ import {
   type RoleRow,
   type UserPayload,
 } from "@/lib/api";
+import { RevealText } from "@/components/marketing/RevealText";
 
 /**
  * Pengguna & Role (S06, §4.1): daftar membership + undang staf
@@ -163,7 +164,7 @@ export default function PenggunaPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Pengguna & Role</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Pengguna & Role</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus Owner/Admin"
@@ -176,7 +177,7 @@ export default function PenggunaPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Pengguna & Role</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Pengguna & Role</RevealText>
       <p className="mt-1 text-sm text-muted">
         Kelola staf travel dan peran mereka (Owner dapat mengubah role dan
         mencabut akses; audit tercatat).

@@ -16,6 +16,7 @@ import { apiFetch, problemMessage, type TravelPackage, type RoomType } from "@/l
 import { EMPTY_ROOM_PRICES, ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 /**
  * Master Paket (S08, UI-04; MOD-05; Spec §5.2/§8.3): daftar + CRUD draft/
@@ -174,7 +175,7 @@ export default function PaketPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Paket</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Paket</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf dengan akses katalog"
@@ -187,7 +188,7 @@ export default function PaketPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Paket</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Paket</RevealText>
       <p className="mt-1 text-sm text-muted">
         Katalog paket perjalanan beserta harganya. Aktifkan paket sebelum
         menerbitkannya. Perubahan harga hanya berlaku untuk booking baru; booking

@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { UmroviaMark } from "@/components/UmroviaMark";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
+import { WorkspaceReveal } from "@/components/workspace/WorkspaceReveal";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { Btn, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
@@ -428,7 +429,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             canConvert={hasPermission(permissions, "trial.convert")}
             onConverted={loadMe}
           />
-          {children}
+          <WorkspaceReveal>{children}</WorkspaceReveal>
         </main>
       </div>
     </div>

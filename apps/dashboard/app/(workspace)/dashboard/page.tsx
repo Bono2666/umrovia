@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, type BankAccount, type MembershipRow, type RoleRow, type SettingsPayload, type TrialStatus, type SaasWallet } from "@/lib/api";
 import { formatDate, formatIdr, formatRemaining } from "@/lib/format";
+import { RevealText } from "@/components/marketing/RevealText";
 
 type Step = { step: string; label: string; note: string; href: string; done: boolean | null };
 
@@ -71,7 +72,7 @@ export default function DashboardPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Ringkasan</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Ringkasan</RevealText>
       <p className="mt-1 text-sm text-muted">
         Status workspace dan langkah menyiapkan travel Anda{demo ? " (data demo tidak pernah menjadi tagihan)" : ""}.
       </p>

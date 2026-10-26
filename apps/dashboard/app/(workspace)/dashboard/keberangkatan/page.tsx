@@ -21,6 +21,7 @@ import {
   type DepartureStaff,
   type TravelPackage,
 } from "@/lib/api";
+import { RevealText } from "@/components/marketing/RevealText";
 
 /**
  * Keberangkatan & kuota (S08, UI-05; MOD-06; Spec §5.2/§6.5/§8.3): daftar
@@ -257,7 +258,7 @@ export default function KeberangkatanPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Keberangkatan</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Keberangkatan</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf operasional"
@@ -275,7 +276,7 @@ export default function KeberangkatanPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Keberangkatan</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Keberangkatan</RevealText>
       <p className="mt-1 text-sm text-muted">
         Jadwal keberangkatan dan kuota kursi. Kursi tersisa = kapasitas − kursi
         terpakai − kursi diblokir. Alur status: Draf → Pendaftaran dibuka → Siap

@@ -24,6 +24,7 @@ import {
 import { ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 /**
  * Booking end-to-end (S09, UI-07; MOD-07; Spec §5.2/§6.2/§8.3): daftar booking
@@ -265,7 +266,7 @@ export default function BookingPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Booking</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Booking</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf penjualan"
@@ -285,7 +286,7 @@ export default function BookingPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Booking</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Booking</RevealText>
       <p className="mt-1 text-sm text-muted">
         Pendaftaran jamaah ke keberangkatan. Booking dimulai sebagai draf; klik
         “Reservasi kursi” untuk menahan kursi, dan pembatalan melepasnya kembali.

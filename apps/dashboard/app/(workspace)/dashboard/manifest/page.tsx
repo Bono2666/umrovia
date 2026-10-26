@@ -22,6 +22,7 @@ import {
   type ManifestRequirement,
   type UserPayload,
 } from "@/lib/api";
+import { RevealText } from "@/components/marketing/RevealText";
 
 /**
  * Manifest keberangkatan & checklist operasional (S10; Spec §5.2/§7.6/§8.3,
@@ -234,7 +235,7 @@ export default function ManifestPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Manifest & checklist</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Manifest & checklist</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus Operasional/Admin"
@@ -255,7 +256,7 @@ export default function ManifestPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Manifest & checklist</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Manifest & checklist</RevealText>
       <p className="mt-1 text-sm text-muted">
         Daftar jamaah per keberangkatan dan checklist dokumen wajib per paket.
         Manifest hanya memuat peserta booking aktif dengan identitas tersamar.
