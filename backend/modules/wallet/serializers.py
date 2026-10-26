@@ -13,6 +13,7 @@ class StrictSerializer(serializers.Serializer):
 
 class TopupCreateSerializer(StrictSerializer):
     amount_idr = serializers.IntegerField(min_value=1, max_value=10_000_000_000)
+    method = serializers.ChoiceField(choices=["manual", "midtrans"], default="manual")
 
     def validate_amount_idr(self, value):
         if type(self.initial_data["amount_idr"]) is not int:
@@ -25,10 +26,13 @@ class TopupSubmitSerializer(StrictSerializer):
     evidence_ref = serializers.CharField(max_length=512)
 
 
-class TopupSettleSerializer(TopupCreateSerializer):
+class TopupSettleSerializer(StrictSerializer):
+    amount_idr = serializers.IntegerField(min_value=1, max_value=10_000_000_000)
     provider_txn_id = serializers.CharField(max_length=160)
     decision = serializers.ChoiceField(choices=["PAID", "REJECTED"], default="PAID")
     reason = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+
+    validate_amount_idr = TopupCreateSerializer.validate_amount_idr
 
 
 def topup_payload(topup):
@@ -41,6 +45,9 @@ def topup_payload(topup):
         "paid_at": topup.paid_at.isoformat() if topup.paid_at else None,
         "ledger_entry_id": str(topup.ledger_entry_id) if topup.ledger_entry_id else None,
         "reason": topup.reason,
+        "gateway_status": topup.gateway_status, "payment_type": topup.payment_type,
+        # Only an open Snap order can still be paid.
+        "payment_url": topup.payment_url if topup.provider == "midtrans" and topup.status in {"CREATED", "PENDING"} else None,
     }
 
 

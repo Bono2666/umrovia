@@ -6,8 +6,9 @@ from django.utils import timezone
 from modules.audit.services import log_event
 from modules.billing.services import settle_pending_charges
 from modules.tenants.models import Tenant
+from modules.wallet import midtrans
 from modules.wallet.models import WalletTopup
-from modules.wallet.services import platform_tenant_context, reconcile_wallet
+from modules.wallet.services import platform_tenant_context, reconcile_wallet, sync_gateway_topups
 
 
 class Command(BaseCommand):
@@ -25,6 +26,9 @@ class Command(BaseCommand):
         checked = 0
         mismatches = 0
         for tenant in tenants.iterator():
+            # Missed Midtrans webhooks: re-read open orders (network, no locks held).
+            if midtrans.configured():
+                sync_gateway_topups(tenant.pk)
             with platform_tenant_context(tenant.pk):
                 # This retains the wallet lock through the outer transaction,
                 # keeping the same wallet -> top-up order as submission/settlement.
@@ -32,7 +36,8 @@ class Command(BaseCommand):
                 with transaction.atomic():
                     # Submission obtains a top-up row lock too. Never expire
                     # PENDING evidence: funds may already be in transit.
-                    for topup in WalletTopup.objects.select_for_update().filter(status="CREATED", expires_at__lte=timezone.now()):
+                    # Midtrans orders follow the gateway status (sync above), not this timer.
+                    for topup in WalletTopup.objects.select_for_update().filter(provider="manual", status="CREATED", expires_at__lte=timezone.now()):
                         topup.status = "EXPIRED"
                         topup.save(update_fields=["status", "updated_at"])
                         log_event(action="wallet.topup.expired", tenant=tenant, object_type="wallet_topup", object_id=topup.pk)

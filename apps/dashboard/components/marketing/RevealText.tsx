@@ -55,6 +55,8 @@ export function RevealText({
     const screen = window.matchMedia("(min-width: 568px) and (max-aspect-ratio: 13/9), (min-width: 668px) and (min-height: 416px), (min-width: 980px)");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce), (update: slow)");
     let stop: (() => void) | undefined;
+    // Once revealed, a media change (resize/rotation) must not hide the text again.
+    let revealed = false;
     const updateMode = () => {
       stop?.();
       stop = undefined;
@@ -75,15 +77,17 @@ export function RevealText({
       };
       measureLines();
       element.dataset.revealReady = "true";
+      if (revealed) element.dataset.revealVisible = "true";
       const observer = new IntersectionObserver((entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
         element.dataset.revealVisible = "true";
+        revealed = true;
         observer.disconnect();
       }, { rootMargin: "0px 0px -100px 0px", threshold: 0 });
       const resize = new ResizeObserver(measureLines);
       resize.observe(element);
       // Allow the hidden pose to paint before starting an in-view transition.
-      frame = requestAnimationFrame(() => observer.observe(element));
+      if (!revealed) frame = requestAnimationFrame(() => observer.observe(element));
       document.fonts.ready.then(() => {
         if (!disposed) measureLines();
       }).catch(() => {});

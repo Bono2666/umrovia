@@ -151,6 +151,7 @@ export type SaasWallet = {
   version: number; ledger_balance_idr: number; balance_matches_ledger: boolean;
   topup_available: boolean; provider: "manual"; topup_minimum_idr: number | null;
   pending_charge_count: number; pending_charge_idr: number; posted_charge_count: number; tenant_state: string;
+  topup_methods: {manual: boolean; midtrans: boolean};
   last_reconciliation: {at: string; consistent: boolean; variance_idr: number} | null;
 };
 export type SaasRefund = {
@@ -175,6 +176,8 @@ export type WalletTopup = {
   payment_reference: string; evidence_ref: string; provider_txn_id: string;
   expires_at: string; created_at: string; paid_at: string | null;
   ledger_entry_id: string | null; reason: string;
+  /** Midtrans: last gateway status/method and the Snap page while still payable. */
+  gateway_status: string; payment_type: string; payment_url: string | null;
 };
 export type WalletLedger = {
   id: string; sequence: number; kind: string; signed_amount_idr: number;

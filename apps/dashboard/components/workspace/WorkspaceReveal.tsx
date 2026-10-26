@@ -29,6 +29,9 @@ export function WorkspaceReveal({ children }: { children: ReactNode }) {
     const screen = window.matchMedia(SCREEN);
     const reduced = window.matchMedia(REDUCED);
     let stop: (() => void) | undefined;
+    // Per halaman, bukan per restart: perubahan media query (resize, rotasi)
+    // tidak boleh menyembunyikan ulang blok yang sudah tampil.
+    const seen = new WeakSet<Element>();
 
     const finish = (target: HTMLElement) => {
       target.classList.remove("ws-reveal");
@@ -42,7 +45,6 @@ export function WorkspaceReveal({ children }: { children: ReactNode }) {
       stop = undefined;
       if (!screen.matches || reduced.matches) return;
 
-      const seen = new WeakSet<Element>();
       const pending = new Set<HTMLElement>();
       const queue: HTMLElement[] = [];
       let frame = 0;
