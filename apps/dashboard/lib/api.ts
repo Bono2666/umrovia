@@ -16,7 +16,7 @@ export type ProblemDetail = {
 };
 
 export type Membership = {
-  tenant: { id: string; slug: string; display_name: string; state: string };
+  tenant: { id: string; slug: string; display_name: string; state: string; writable_environments?: string[] };
   role: string | null;
   status: string;
   permissions: string[];
@@ -100,6 +100,7 @@ export type TravelPackage = {
  * blocked` (formula MOD-06).
  */
 export type Departure = {
+  has_bookings: boolean;
   id: string;
   environment: string;
   code: string;
@@ -344,6 +345,7 @@ export type SettingsPayload = {
 
 /** Baris GET /bank-accounts (S05 — hanya nomor masked, §5.3). */
 export type BankAccount = {
+  number_editable: boolean;
   id: string;
   bank_name: string;
   account_name: string;

@@ -14,6 +14,8 @@ import {
 import { formatIdr } from "@/lib/format";
 import { apiFetch, problemMessage, type TravelPackage, type RoomType } from "@/lib/api";
 import { EMPTY_ROOM_PRICES, ROOM_LABELS } from "@/lib/rooms";
+import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
+import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
 /**
  * Master Paket (S08, UI-04; MOD-05; Spec §5.2/§8.3): daftar + CRUD draft/
@@ -35,6 +37,9 @@ const STATUS_TONE: Record<string, "neutral" | "success" | "warning"> = {
 };
 
 export default function PaketPage() {
+  const {can, canEditEnvironment, writableEnvironments} = useWorkspacePermissions();
+  const [cancellationPolicy, setCancellationPolicy] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
   const [rows, setRows] = useState<TravelPackage[] | null>(null);
   const [query, setQuery] = useState("");
   const [noAccess, setNoAccess] = useState(false);
@@ -106,9 +111,7 @@ export default function PaketPage() {
     setBusy(true);
     setMessage(null);
     setError(null);
-    const result = await apiFetch<TravelPackage>(editing ? `/packages/${editing.id}` : "/packages", {
-      method: editing ? "PATCH" : "POST",
-      body: JSON.stringify({
+    const values = {
         name: name.trim(),
         kind,
         duration_days: duration,
@@ -117,11 +120,15 @@ export default function PaketPage() {
         description: description.trim(),
         inclusions: inclusions.split("\n").map((line) => line.trim()).filter(Boolean),
         exclusions: exclusions.split("\n").map((line) => line.trim()).filter(Boolean),
-      }),
+        cancellation_policy:cancellationPolicy.trim(), payment_terms:paymentTerms.trim(),
+      };
+    const result = await apiFetch<TravelPackage>(editing ? `/packages/${editing.id}` : "/packages", {
+      method: editing ? "PATCH" : "POST",
+      body:JSON.stringify(editing ? changedFields(values, editing) : values),
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors({ form: problemMessage(result.error) });
+      setFormErrors(apiFormErrors(result.error));
       return;
     }
     setName("");
@@ -132,13 +139,14 @@ export default function PaketPage() {
     setEditing(null);
     setDescription("");
     setInclusions("");
-    setExclusions("");
+    setExclusions(""); setCancellationPolicy(""); setPaymentTerms("");
     setMessage(`Paket ${result.data.code} tersimpan${editing ? "; harga booking yang sudah ada tetap" : " sebagai draf"}.`);
     load(query);
   }
 
   function editPackage(pkg: TravelPackage) {
-    setEditing(pkg);
+    setEditing(pkg); setCancellationPolicy(pkg.cancellation_policy); setPaymentTerms(pkg.payment_terms);
+    focusForm("package-form");
     setName(pkg.name); setKind(pkg.kind); setDurationDays(String(pkg.duration_days));
     setPrice(String(pkg.price_idr)); setDescription(pkg.description);
     setInclusions(pkg.inclusions.join("\n")); setExclusions(pkg.exclusions.join("\n"));
@@ -220,8 +228,8 @@ export default function PaketPage() {
                     {pkg.status}
                   </StatusBadge>
                   {pkg.published ? <StatusBadge tone="success">TERBIT</StatusBadge> : null}
-                  <span className="ml-auto flex flex-wrap gap-1.5">
-                    <Btn variant="tint" size="xs" onClick={() => editPackage(pkg)}>Ubah paket / harga</Btn>
+                  {can("packages.write") && canEditEnvironment(pkg.environment) ? <span className="ml-auto flex flex-wrap gap-1.5">
+                    <Btn variant="tint" size="xs" disabled={busy} onClick={() => editPackage(pkg)}>Ubah paket / harga</Btn>
                     {pkg.status === "DRAFT" ? (
                       <Btn
                         variant="tint"
@@ -272,17 +280,17 @@ export default function PaketPage() {
                         Aktifkan
                       </Btn>
                     ) : null}
-                  </span>
+                  </span> : null}
                 </li>
               ))}
             </ul>
           )}
         </section>
 
-        <section className="card p-6">
+        {can("packages.write") && writableEnvironments.length > 0 ? <section className="card p-6">
           <h2 className="font-semibold">{editing ? `Ubah ${editing.code}` : "Tambah paket"}</h2>
           {/* Workspace controls use compact typography and field spacing. */}
-          <form onSubmit={onAdd} className="mt-6">
+          <form id="package-form" onSubmit={onAdd} className="mt-6 scroll-mt-24"><fieldset className="min-w-0" disabled={busy}>
             <FormField
               label="Nama paket"
               htmlFor="package-name"
@@ -352,6 +360,8 @@ export default function PaketPage() {
               onChange={(event) => setExclusions(event.target.value)}
               placeholder={"Upgrade kamar\nUang saku"}
             />
+            <FormTextarea label="Ketentuan pembayaran" htmlFor="package-payment-terms" value={paymentTerms} onChange={(event) => setPaymentTerms(event.target.value)} />
+            <FormTextarea label="Kebijakan pembatalan" htmlFor="package-cancellation-policy" value={cancellationPolicy} onChange={(event) => setCancellationPolicy(event.target.value)} />
             {formErrors.form ? (
               <p className="error-message" role="alert">
                 {formErrors.form}
@@ -361,10 +371,10 @@ export default function PaketPage() {
               <Btn type="submit" disabled={busy}>
                 {busy ? "Menyimpan…" : editing ? "Simpan perubahan" : "Tambah paket"}
               </Btn>
-              {editing ? <Btn variant="tint" type="button" className="ml-2" onClick={() => { setEditing(null); setName(""); setPrice(""); setRoomPrices(EMPTY_ROOM_PRICES); setKind("umroh"); setDurationDays(""); setDescription(""); setInclusions(""); setExclusions(""); }}>Batal ubah</Btn> : null}
+              {editing ? <Btn variant="tint" type="button" className="ml-2" onClick={() => { setEditing(null); setName(""); setPrice(""); setRoomPrices(EMPTY_ROOM_PRICES); setKind("umroh"); setDurationDays(""); setDescription(""); setInclusions(""); setExclusions(""); setCancellationPolicy(""); setPaymentTerms(""); setFormErrors({}); }}>Batal ubah</Btn> : null}
             </div>
-          </form>
-        </section>
+          </fieldset></form>
+        </section> : null}
       </div>
     </div>
   );

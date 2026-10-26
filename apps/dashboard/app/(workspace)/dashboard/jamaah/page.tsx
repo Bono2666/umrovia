@@ -6,6 +6,7 @@ import {
   EmptyState,
   ErrorState,
   FormField,
+  FormCheckbox,
   FormSelect,
   FormTextarea,
   LoadingState,
@@ -17,6 +18,8 @@ import {
   type Pilgrim,
   type PilgrimDocument,
 } from "@/lib/api";
+import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
+import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
 const EMPTY_PROFILE = {
   nationality: "ID", marital_status: "", address: "",
@@ -46,6 +49,11 @@ const PROFILE_FIELDS = [
  * tampil status tanpa akses (server menolak semua operasi).
  */
 export default function JamaahPage() {
+  const {can, canEditEnvironment, writableEnvironments} = useWorkspacePermissions();
+  const [editing, setEditing] = useState<Pilgrim | null>(null);
+  const [clearIdentity, setClearIdentity] = useState(false);
+  const [clearPassport, setClearPassport] = useState(false);
+  const [status, setStatus] = useState("ACTIVE");
   const [rows, setRows] = useState<Pilgrim[] | null>(null);
   const [selected, setSelected] = useState<Pilgrim | null>(null);
   const [documents, setDocuments] = useState<PilgrimDocument[]>([]);
@@ -105,9 +113,9 @@ export default function JamaahPage() {
     event.preventDefault();
     const errors: Record<string, string | null> = {
       name: name.trim() ? null : "Nama sesuai dokumen wajib diisi.",
-      birth_date: birthDate ? null : "Tanggal lahir wajib diisi.",
+      birth_date: birthDate || editing ? null : "Tanggal lahir wajib diisi.",
       identity_number:
-        !identityNumber.trim() || identityNumber.replace(/\D/g, "").length === 16
+        clearIdentity || !identityNumber.trim() || identityNumber.replace(/\D/g, "").length === 16
           ? null
           : "NIK harus 16 digit.",
     };
@@ -116,27 +124,44 @@ export default function JamaahPage() {
 
     setBusy(true);
     setMessage(null);
-    const result = await apiFetch<Pilgrim>("/pilgrims", {
-      method: "POST",
-      body: JSON.stringify({
+    const values = {
         ...profile,
         passport_issued_at: profile.passport_issued_at || null,
         passport_expires_at: profile.passport_expires_at || null,
         name: name.trim(),
         gender,
-        birth_date: birthDate,
+        birth_date: birthDate || null,
         birth_place: birthPlace.trim(),
         phone: phone.trim(),
         email: email.trim(),
-        identity_number: identityNumber.replace(/\D/g, ""),
-        passport_number: passportNumber.trim(),
+        status,
+      };
+    const payload = editing ? changedFields(values, editing) : values;
+    const result = await apiFetch<Pilgrim>(editing ? `/pilgrims/${editing.id}` : "/pilgrims", {
+      method: editing ? "PATCH" : "POST",
+      body: JSON.stringify({...payload,
+        ...(!editing || clearIdentity || identityNumber.trim() ? {identity_number: clearIdentity ? "" : identityNumber.replace(/\D/g, "")} : {}),
+        ...(!editing || clearPassport || passportNumber.trim() ? {passport_number: clearPassport ? "" : passportNumber.trim()} : {}),
       }),
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors({ form: problemMessage(result.error) });
+      setFormErrors(apiFormErrors(result.error));
       return;
     }
+    if (editing) setSelected(result.data);
+    resetForm();
+    const created = result.data;
+    setMessage(
+      created.possible_duplicate_of
+        ? `Jamaah ${created.code} tersimpan — identitas serupa terdeteksi dan ditandai sebagai potensi duplikat.`
+        : `Jamaah ${created.code} tersimpan.`,
+    );
+    load(query);
+  }
+
+  function resetForm() {
+    setEditing(null); setClearIdentity(false); setClearPassport(false); setStatus("ACTIVE"); setFormErrors({});
     setName("");
     setGender("");
     setBirthDate("");
@@ -146,13 +171,19 @@ export default function JamaahPage() {
     setIdentityNumber("");
     setPassportNumber("");
     setProfile(EMPTY_PROFILE);
-    const created = result.data;
-    setMessage(
-      created.possible_duplicate_of
-        ? `Jamaah ${created.code} tersimpan — identitas serupa terdeteksi dan ditandai sebagai potensi duplikat.`
-        : `Jamaah ${created.code} tersimpan (NIK/paspor disimpan terenkripsi, tampil masked).`,
-    );
-    load(query);
+  }
+
+  async function editPilgrim(pilgrim: Pilgrim) {
+    setBusy(true); setError(null);
+    const result = await apiFetch<Pilgrim>(`/pilgrims/${pilgrim.id}`);
+    setBusy(false);
+    if (!result.ok) {setError(problemMessage(result.error)); return;}
+    const p = result.data;
+    resetForm(); setEditing(p); setSelected(p);
+    setName(p.name); setGender(p.gender); setBirthDate(p.birth_date ?? ""); setBirthPlace(p.birth_place);
+    setPhone(p.phone); setEmail(p.email); setStatus(p.status);
+    setProfile(Object.fromEntries(Object.keys(EMPTY_PROFILE).map((key) => [key, p[key as keyof Pilgrim] ?? ""])) as typeof EMPTY_PROFILE);
+    setMessage(null); focusForm("pilgrim-form");
   }
 
   if (noAccess) {
@@ -234,6 +265,7 @@ export default function JamaahPage() {
                 <Btn variant="tint" className="ml-auto" onClick={() => openDetail(pilgrim)}>
                   Detail
                 </Btn>
+                {can("pilgrims.write") && canEditEnvironment(pilgrim.environment) ? <Btn variant="tint" disabled={busy} onClick={() => editPilgrim(pilgrim)}>Ubah jamaah</Btn> : null}
               </li>
             ))}
           </ul>
@@ -320,10 +352,10 @@ export default function JamaahPage() {
         ) : null}
       </section>
 
-      <section className="card p-6">
-        <h2 className="font-semibold">Tambah jamaah</h2>
+      {can("pilgrims.write") && writableEnvironments.length > 0 ? <section className="card p-6">
+        <h2 className="font-semibold">{editing ? `Ubah jamaah ${editing.code}` : "Tambah jamaah"}</h2>
         {/* Workspace controls use compact typography and field spacing. */}
-        <form onSubmit={onAdd} className="mt-6">
+        <form id="pilgrim-form" onSubmit={onAdd} className="mt-6 scroll-mt-24"><fieldset className="min-w-0" disabled={busy}>
           <FormField
             label="Nama sesuai dokumen"
             htmlFor="pilgrim-name"
@@ -350,7 +382,7 @@ export default function JamaahPage() {
             error={formErrors.birth_date}
             value={birthDate}
             onChange={(event) => setBirthDate(event.target.value)}
-            required
+            required={!editing}
           />
           <FormField
             label="Tempat lahir"
@@ -379,21 +411,26 @@ export default function JamaahPage() {
           <FormField
             label="NIK"
             htmlFor="pilgrim-identity"
-            hint="16 digit — disimpan terenkripsi (write-only, tampil masked)."
+            hint={editing ? `Tersimpan: ${editing.identity_masked || "belum ada"}. Kosongkan untuk mempertahankan nomor.` : "16 digit — disimpan terenkripsi."}
             error={formErrors.identity_number}
             value={identityNumber}
             onChange={(event) => setIdentityNumber(event.target.value)}
             inputMode="numeric"
+            disabled={clearIdentity}
             placeholder="3175092102900001"
           />
+          {editing?.identity_masked ? <FormCheckbox id="clear-pilgrim-identity" label="Hapus NIK tersimpan" checked={clearIdentity} onChange={setClearIdentity} /> : null}
           <FormField
             label="Nomor paspor"
             htmlFor="pilgrim-passport"
-            hint="Disimpan terenkripsi (write-only, tampil masked)."
+            hint={editing ? `Tersimpan: ${editing.passport_masked || "belum ada"}. Kosongkan untuk mempertahankan nomor.` : "Disimpan terenkripsi."}
             value={passportNumber}
+            disabled={clearPassport}
             onChange={(event) => setPassportNumber(event.target.value)}
             placeholder="C1234567"
           />
+          {editing?.passport_masked ? <FormCheckbox id="clear-pilgrim-passport" label="Hapus nomor paspor tersimpan" checked={clearPassport} onChange={setClearPassport} /> : null}
+          {editing ? <FormSelect label="Status jamaah" htmlFor="pilgrim-status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="ACTIVE">Aktif</option><option value="ARCHIVED">Diarsipkan</option></FormSelect> : null}
           <details className="my-6 border-t border-border pt-4">
             <summary className="cursor-pointer text-sm font-semibold">
               Data tambahan, kontak darurat &amp; paspor
@@ -405,6 +442,7 @@ export default function JamaahPage() {
                   label={label}
                   htmlFor={`pilgrim-${key}`}
                   type={key.endsWith("_at") ? "date" : "text"}
+                  error={formErrors[key]}
                   value={profile[key]}
                   onChange={(event) => setProfile((prev) => ({ ...prev, [key]: event.target.value }))}
                 />
@@ -431,11 +469,12 @@ export default function JamaahPage() {
           ) : null}
           <div className="form-submit">
             <Btn type="submit" disabled={busy}>
-              {busy ? "Menyimpan…" : "Tambah jamaah"}
+              {busy ? "Menyimpan…" : editing ? "Simpan perubahan" : "Tambah jamaah"}
             </Btn>
+            {editing ? <Btn type="button" variant="tint" className="ml-2" onClick={resetForm}>Batal ubah</Btn> : null}
           </div>
-        </form>
-      </section>
+        </fieldset></form>
+      </section> : null}
       </div>
     </div>
   );

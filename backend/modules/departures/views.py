@@ -9,6 +9,7 @@ terpakai+terblokir ditolak 400.
 """
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -16,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.booking.models import Booking
 from modules.departures.models import Departure, generate_departure_code
 from modules.departures.serializers import (
     DepartureTransitionSerializer,
@@ -28,9 +30,10 @@ from modules.tenants.models import MembershipStatus, TenantMembership
 from modules.tenants.rbac import require_permission
 
 
-def _get_departure(departure_id) -> Departure:
+def _get_departure(departure_id, *, for_update=False) -> Departure:
     try:
-        return Departure.objects.get(pk=departure_id)
+        queryset = Departure.objects.select_for_update() if for_update else Departure.objects.all()
+        return queryset.get(pk=departure_id)
     except (Departure.DoesNotExist, ValueError, ValidationError):
         raise NotFound("Keberangkatan tidak ditemukan.") from None
 
@@ -60,7 +63,7 @@ class DepartureListCreateView(APIView):
         return [IsAuthenticated(), require_permission("departures.read")()]
 
     def get(self, request):
-        qs = Departure.objects.all()
+        qs = Departure.objects.annotate(has_bookings=Exists(Booking.objects.filter(departure_id=OuterRef("pk"))))
         env = request.query_params.get("environment", "").strip()
         if env:
             from modules.tenants.models import Environment
@@ -139,13 +142,21 @@ class DepartureDetailView(APIView):
     def get(self, request, departure_id):
         return Response(departure_payload(_get_departure(departure_id)))
 
+    @transaction.atomic
     def patch(self, request, departure_id):
-        dep = _get_departure(departure_id)
+        dep = _get_departure(departure_id, for_update=True)
         assert_environment_writable(request.tenant, dep.environment)
         serializer = DepartureWriteSerializer(dep, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        critical = {"package", "start_at", "end_at", "seat_capacity", "seats_blocked", "registration_deadline"}
+        if dep.status in {"DEPARTED", "COMPLETED", "CANCELED"}:
+            for field in critical & serializer.validated_data.keys():
+                if serializer.validated_data[field] != getattr(dep, field):
+                    raise ValidationError({field: "Jadwal, paket dan kuota keberangkatan ini sudah dikunci."})
         if "package" in serializer.validated_data:
             package = serializer.validated_data["package"]
+            if package.pk != dep.package_id and Booking.objects.filter(departure=dep).exists():
+                raise ValidationError({"package": "Paket tidak dapat diganti setelah terdapat booking. Buat keberangkatan baru untuk paket berbeda."})
             if package.environment != dep.environment:
                 raise ValidationError(
                     {"package": f"Paket harus berasal dari environment '{dep.environment}'."}
@@ -154,7 +165,8 @@ class DepartureDetailView(APIView):
         for field, value in serializer.validated_data.items():
             setattr(dep, field, value)
         try:
-            dep.save()
+            with transaction.atomic():
+                dep.save()
         except IntegrityError:
             # CHECK ck_departure_seats_within_capacity (BR-002) — pengaman DB
             raise ValidationError(

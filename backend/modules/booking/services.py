@@ -404,13 +404,13 @@ def update_draft_booking(
     departure_changed = departure_id is not None and departure_id != booking.departure_id
     if departure_id is not None and departure_changed:
         try:
-            departure = Departure.objects.get(pk=departure_id)
+            departure = Departure.objects.select_for_update().get(pk=departure_id)
         except (Departure.DoesNotExist, ValueError, ValidationError):
             raise ValidationError({"departure": "Keberangkatan tidak ditemukan."}) from None
         _guard_departure_bookable(departure, environment=environment)
         booking.departure = departure
     else:
-        departure = Departure.objects.get(pk=booking.departure_id)
+        departure = Departure.objects.select_for_update().get(pk=booking.departure_id)
     departure.package = TravelPackage.objects.select_for_update().prefetch_related("room_prices").get(pk=departure.package_id)
 
     participants_changed = False

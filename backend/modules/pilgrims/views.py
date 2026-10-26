@@ -33,9 +33,10 @@ from modules.tenants.models import Environment
 from modules.tenants.rbac import require_permission
 
 
-def _get_pilgrim(pilgrim_id) -> Pilgrim:
+def _get_pilgrim(pilgrim_id, *, for_update=False) -> Pilgrim:
     try:
-        return Pilgrim.objects.get(pk=pilgrim_id)
+        queryset = Pilgrim.objects.select_for_update() if for_update else Pilgrim.objects.all()
+        return queryset.get(pk=pilgrim_id)
     except (Pilgrim.DoesNotExist, ValueError, ValidationError):
         raise NotFound("Jamaah tidak ditemukan.") from None
 
@@ -159,8 +160,9 @@ class PilgrimDetailView(APIView):
     def get(self, request, pilgrim_id):
         return Response(pilgrim_payload(_get_pilgrim(pilgrim_id)))
 
+    @transaction.atomic
     def patch(self, request, pilgrim_id):
-        pilgrim = _get_pilgrim(pilgrim_id)
+        pilgrim = _get_pilgrim(pilgrim_id, for_update=True)
         assert_environment_writable(request.tenant, pilgrim.environment)
         serializer = PilgrimWriteSerializer(pilgrim, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)

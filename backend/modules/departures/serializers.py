@@ -6,7 +6,10 @@ from modules.tenants.models import MembershipStatus, TenantMembership
 
 
 def departure_payload(dep: Departure) -> dict:
+    from modules.booking.models import Booking
+
     return {
+        "has_bookings": dep.has_bookings if hasattr(dep, "has_bookings") else Booking.objects.filter(departure=dep).exists(),
         "id": str(dep.id),
         "environment": dep.environment,
         "code": dep.code,

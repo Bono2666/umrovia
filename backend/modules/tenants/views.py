@@ -6,8 +6,9 @@ context request — id asing → 404, tanpa kebocoran lintas-tenant.
 """
 import re
 
+from django.db import transaction
 from rest_framework import serializers, status
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ from modules.audit.services import log_event
 from modules.tenants import services
 from modules.tenants.exceptions import TenantAccessDenied
 from modules.tenants.models import MembershipStatus, Role, TenantMembership, TenantSettings
-from modules.tenants.rbac import permission_list, require_permission
+from modules.tenants.rbac import has_permission, permission_list, require_permission
 
 # Batas ukuran JSON settings (mencegah payload raksasa) — bytes ter-serialize.
 _MAX_SECTION_BYTES = 16_384
@@ -109,7 +110,14 @@ class UpdateRoleSerializer(RoleNameMixin, serializers.Serializer):
     permissions = serializers.ListField(child=serializers.CharField(max_length=64), required=False)
 
     def validate_permissions(self, value):
-        return _validate_permissions(value)
+        return _validate_permissions(value) if value else []
+
+
+def _assert_grant_scope(request, grants, previous=()):
+    actor_grants = permission_list(request.membership.role)
+    for grant in set(grants) - set(previous):
+        if not has_permission(actor_grants, grant):
+            raise PermissionDenied("Anda hanya dapat memberikan izin yang tercakup dalam hak akses Anda.")
 
 
 def _tenant_payload(membership: TenantMembership) -> dict:
@@ -336,6 +344,7 @@ class ListCreateRolesView(APIView):
         serializer = CreateRoleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         name = serializer.validated_data["name"]
+        _assert_grant_scope(request, serializer.validated_data.get("permissions", []))
         if Role.objects.filter(tenant=request.tenant, name=name).exists():
             raise serializers.ValidationError({"name": f"Role '{name}' sudah ada di workspace ini."})
         role = Role.objects.create(
@@ -366,13 +375,16 @@ class RoleDetailView(APIView):
             raise NotFound("Role tidak ditemukan di workspace ini.")
         return role
 
+    @transaction.atomic
     def patch(self, request, role_id):
         role = self._get(request.tenant, role_id)
-        if role.is_system:
+        role = Role.objects.select_for_update().get(pk=role.pk)
+        if role.is_system or role.name == "Owner":
             raise ValidationError({"role": "Role sistem tidak bisa diubah."})
         serializer = UpdateRoleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         before = {"name": role.name, "permissions": permission_list(role)}
+        _assert_grant_scope(request, serializer.validated_data.get("permissions", []), previous=before["permissions"])
         new_name = serializer.validated_data.get("name")
         if new_name and Role.objects.filter(tenant=request.tenant, name=new_name).exclude(pk=role.pk).exists():
             raise serializers.ValidationError({"name": f"Role '{new_name}' sudah ada di workspace ini."})

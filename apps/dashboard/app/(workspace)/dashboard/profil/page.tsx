@@ -42,6 +42,7 @@ const SECTIONS: { key: SectionKey; label: string; hint: string }[] = [
  */
 export default function ProfilPage() {
   const [values, setValues] = useState<Record<SectionKey, string> | null>(null);
+  const [savedValues, setSavedValues] = useState<Record<SectionKey, string> | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const [messages, setMessages] = useState<Record<string, string | null>>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
@@ -62,11 +63,12 @@ export default function ProfilPage() {
     });
     apiFetch<SettingsPayload>("/tenant/settings").then((result) => {
       if (result.ok) {
-        setValues({
+        const saved = {
           branding_json: JSON.stringify(result.data.branding_json, null, 2),
           invoice_config_json: JSON.stringify(result.data.invoice_config_json, null, 2),
           rules_json: JSON.stringify(result.data.rules_json, null, 2),
-        });
+        };
+        setValues(saved); setSavedValues(saved);
       } else if (result.error.status === 403) {
         setReadOnly(true);
         setValues({ branding_json: "{}", invoice_config_json: "{}", rules_json: "{}" });
@@ -114,6 +116,9 @@ export default function ProfilPage() {
       setMessages((prev) => ({ ...prev, [key]: problemMessage(result.error) }));
       return;
     }
+    const saved = JSON.stringify(result.data[key], null, 2);
+    setValues((prev) => prev ? {...prev,[key]:saved} : prev);
+    setSavedValues((prev) => prev ? {...prev,[key]:saved} : prev);
     setMessages((prev) => ({ ...prev, [key]: "Tersimpan." }));
   }
 
@@ -157,19 +162,23 @@ export default function ProfilPage() {
                   setMessages((prev) => ({ ...prev, [section.key]: null }));
                 }}
                 onBlur={() => values && validate(section.key, values[section.key])}
-                readOnly={readOnly}
+                readOnly={readOnly || busyKey === section.key}
                 spellCheck={false}
               />
             </div>
             <div className="mt-3 flex items-center gap-3">
               {readOnly ? null : (
                 <Btn
-                  disabled={busyKey === section.key}
+                  disabled={busyKey === section.key || values?.[section.key] === savedValues?.[section.key]}
                   onClick={() => onSave(section.key)}
                 >
                   {busyKey === section.key ? "Menyimpan…" : "Simpan"}
                 </Btn>
               )}
+              {!readOnly && values?.[section.key] !== savedValues?.[section.key] ? <Btn variant="tint" disabled={busyKey === section.key} onClick={() => {
+                setValues((prev) => prev && savedValues ? {...prev,[section.key]:savedValues[section.key]} : prev);
+                setFieldErrors((prev) => ({...prev,[section.key]:null})); setMessages((prev) => ({...prev,[section.key]:null}));
+              }}>Batal ubah</Btn> : null}
               {messages[section.key] ? (
                 <span
                   className={`text-xs ${

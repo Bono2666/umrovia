@@ -188,8 +188,10 @@ def record_payment(*, invoice_id, actor, data):
     if data["received_at"] > timezone.now():
         raise ValidationError({"received_at": "Tanggal penerimaan tidak boleh di masa depan."})
     account = data.get("bank_account")
-    if account is not None and not account.active:
-        raise ValidationError({"bank_account": "Rekening tidak aktif."})
+    if account is not None:
+        account = TravelBankAccount.objects.select_for_update().filter(pk=account.pk).first()
+        if account is None or not account.active:
+            raise ValidationError({"bank_account": "Rekening tidak aktif."})
     if data["method"] == "TRANSFER" and account is None:
         raise ValidationError({"bank_account": "Pilih rekening tujuan transfer."})
     allocations = data["allocations"]

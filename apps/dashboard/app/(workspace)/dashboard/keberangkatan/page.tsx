@@ -7,10 +7,13 @@ import {
   ErrorState,
   FormField,
   FormSelect,
+  FormTextarea,
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
 import { formatDate } from "@/lib/format";
+import { changedFields, focusForm, formErrors as apiFormErrors, localDateTime } from "@/lib/forms";
+import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import {
   apiFetch,
   problemMessage,
@@ -54,6 +57,10 @@ const NEXT_ACTIONS: Record<string, { target: string; label: string }[]> = {
 };
 
 export default function KeberangkatanPage() {
+  const {can, canEditEnvironment, writableEnvironments} = useWorkspacePermissions();
+  const [editing, setEditing] = useState<Departure | null>(null);
+  const [notes, setNotes] = useState("");
+  const lockedTravel = !!editing && ["DEPARTED", "COMPLETED", "CANCELED"].includes(editing.status);
   const [rows, setRows] = useState<Departure[] | null>(null);
   const [packages, setPackages] = useState<TravelPackage[]>([]);
   const [staff, setStaff] = useState<DepartureStaff[]>([]);
@@ -188,12 +195,10 @@ export default function KeberangkatanPage() {
     setBusy(true);
     setMessage(null);
     setError(null);
-    const result = await apiFetch<Departure>("/departures", {
-      method: "POST",
-      body: JSON.stringify({
+    const values = {
         package: packageId,
-        start_at: startAt,
-        end_at: endAt || null,
+        start_at: new Date(startAt).toISOString(),
+        end_at: endAt ? new Date(endAt).toISOString() : null,
         city_of_origin: cityOfOrigin.trim(),
         route: route.trim(),
         meeting_point: meetingPoint.trim(),
@@ -201,27 +206,42 @@ export default function KeberangkatanPage() {
         seats_blocked: blocked,
         registration_deadline: deadline || null,
         lead_staff: leadStaff || null,
-      }),
+        notes: notes.trim(),
+      };
+    const original = editing ? {...editing, package: editing.package_id,
+      start_at: new Date(localDateTime(editing.start_at)).toISOString(),
+      end_at: editing.end_at ? new Date(localDateTime(editing.end_at)).toISOString() : null} : {};
+    const result = await apiFetch<Departure>(editing ? `/departures/${editing.id}` : "/departures", {
+      method: editing ? "PATCH" : "POST",
+      body: JSON.stringify(editing ? changedFields(values, original) : values),
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors({ form: problemMessage(result.error) });
+      setFormErrors(apiFormErrors(result.error));
       return;
     }
-    setPackageId("");
-    setStartAt("");
-    setEndAt("");
-    setCityOfOrigin("");
-    setRoute("");
-    setMeetingPoint("");
-    setSeatCapacity("");
-    setSeatsBlocked("");
-    setDeadline("");
-    setLeadStaff("");
-    setMessage(
-      `Keberangkatan ${result.data.code} dibuat — ${result.data.available_seats} kursi tersedia.`,
-    );
-    load(query);
+    setMessage(`Keberangkatan ${result.data.code} ${editing ? "diperbarui" : "dibuat"} — ${result.data.available_seats} kursi tersedia.`);
+    resetForm(); load(query);
+  }
+
+  function resetForm() {
+    setEditing(null); setPackageId(""); setStartAt(""); setEndAt(""); setCityOfOrigin("");
+    setRoute(""); setMeetingPoint(""); setSeatCapacity(""); setSeatsBlocked("");
+    setDeadline(""); setLeadStaff(""); setNotes(""); setFormErrors({});
+  }
+
+  async function editDeparture(row: Departure) {
+    setBusy(true); setError(null);
+    const result = await apiFetch<Departure>(`/departures/${row.id}`);
+    setBusy(false);
+    if (!result.ok) {setError(problemMessage(result.error)); return;}
+    const dep = result.data;
+    resetForm(); setEditing(dep); setPackageId(dep.package_id);
+    setStartAt(localDateTime(dep.start_at)); setEndAt(localDateTime(dep.end_at));
+    setCityOfOrigin(dep.city_of_origin); setRoute(dep.route); setMeetingPoint(dep.meeting_point);
+    setSeatCapacity(String(dep.seat_capacity)); setSeatsBlocked(String(dep.seats_blocked));
+    setDeadline(dep.registration_deadline ?? ""); setLeadStaff(dep.lead_staff ?? ""); setNotes(dep.notes);
+    setMessage(null); focusForm("departure-form");
   }
 
   if (noAccess) {
@@ -327,7 +347,8 @@ export default function KeberangkatanPage() {
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {(NEXT_ACTIONS[dep.status] ?? []).map((action) => (
+                    {can("departures.write") && canEditEnvironment(dep.environment) ? <Btn size="xs" variant="tint" disabled={busy} onClick={() => editDeparture(dep)}>Ubah keberangkatan</Btn> : null}
+                    {(can("departures.manage") && canEditEnvironment(dep.environment) ? NEXT_ACTIONS[dep.status] ?? [] : []).map((action) => (
                       <Btn
                         key={action.target}
                         variant="tint"
@@ -338,7 +359,7 @@ export default function KeberangkatanPage() {
                         {action.label}
                       </Btn>
                     ))}
-                    {dep.status === "OPEN" ? (
+                    {can("departures.manage") && canEditEnvironment(dep.environment) && dep.status === "OPEN" ? (
                       <Btn
                         variant="tint"
                         size="xs"
@@ -348,7 +369,7 @@ export default function KeberangkatanPage() {
                         Siapkan dengan pengecualian
                       </Btn>
                     ) : null}
-                    {["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
+                    {can("departures.manage") && canEditEnvironment(dep.environment) && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
                       <Btn
                         variant="danger"
                         size="xs"
@@ -358,7 +379,7 @@ export default function KeberangkatanPage() {
                         Batalkan
                       </Btn>
                     ) : null}
-                    {["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
+                    {can("departures.write") && canEditEnvironment(dep.environment) && ["DRAFT", "OPEN", "READY"].includes(dep.status) ? (
                       <Btn
                         variant="tint"
                         size="xs"
@@ -375,18 +396,22 @@ export default function KeberangkatanPage() {
           )}
         </section>
 
-        <section className="card p-6">
-          <h2 className="font-semibold">Tambah keberangkatan</h2>
+        {can("departures.write") && writableEnvironments.length > 0 ? <section className="card p-6">
+          <h2 className="font-semibold">{editing ? `Ubah keberangkatan ${editing.code}` : "Tambah keberangkatan"}</h2>
+          {lockedTravel ? <p className="mt-2 text-sm text-muted">Jadwal, paket dan kuota sudah dikunci. Informasi operasional dan catatan masih dapat dikoreksi.</p> : null}
           {/* Workspace controls use compact typography and field spacing. */}
-          <form onSubmit={onAdd} className="mt-6">
+          <form id="departure-form" onSubmit={onAdd} className="mt-6 scroll-mt-24"><fieldset className="min-w-0" disabled={busy}>
             <FormSelect
               label="Paket"
               htmlFor="departure-package"
+              disabled={lockedTravel || !!editing?.has_bookings}
+              hint={editing?.has_bookings ? "Paket terkunci karena keberangkatan sudah memiliki booking." : undefined}
               error={formErrors.package}
               value={packageId}
               onChange={(event) => setPackageId(event.target.value)}
             >
               <option value="">— pilih paket —</option>
+              {editing && !packages.some((pkg) => pkg.id === editing.package_id) ? <option value={editing.package_id}>{editing.package_name}</option> : null}
               {packages.map((pkg) => (
                 <option key={pkg.id} value={pkg.id}>
                   {pkg.code} — {pkg.name}
@@ -405,11 +430,13 @@ export default function KeberangkatanPage() {
               onChange={(event) => setLeadStaff(event.target.value)}
             >
               <option value="">— belum ditentukan —</option>
+              {editing?.lead_staff && !staff.some((member) => member.id === editing.lead_staff) ? <option value={editing.lead_staff}>{editing.lead_staff_name} (staf tidak aktif)</option> : null}
               {staff.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
             </FormSelect>
             <FormField
               label="Keberangkatan"
               htmlFor="departure-start"
+              disabled={lockedTravel}
               type="datetime-local"
               error={formErrors.start_at}
               value={startAt}
@@ -419,6 +446,7 @@ export default function KeberangkatanPage() {
             <FormField
               label="Kepulangan"
               htmlFor="departure-end"
+              disabled={lockedTravel}
               type="datetime-local"
               error={formErrors.end_at}
               value={endAt}
@@ -450,6 +478,7 @@ export default function KeberangkatanPage() {
             <FormField
               label="Kapasitas kursi"
               htmlFor="departure-capacity"
+              disabled={lockedTravel}
               error={formErrors.seat_capacity}
               value={seatCapacity}
               onChange={(event) => setSeatCapacity(event.target.value)}
@@ -459,6 +488,7 @@ export default function KeberangkatanPage() {
             <FormField
               label="Kuota blokir"
               htmlFor="departure-blocked"
+              disabled={lockedTravel}
               hint="Kursi ditahan untuk sponsor/agensi — tidak dijual ke publik."
               error={formErrors.seats_blocked}
               value={seatsBlocked}
@@ -469,10 +499,12 @@ export default function KeberangkatanPage() {
             <FormField
               label="Batas pendaftaran"
               htmlFor="departure-deadline"
+              disabled={lockedTravel}
               type="date"
               value={deadline}
               onChange={(event) => setDeadline(event.target.value)}
             />
+            <FormTextarea label="Catatan keberangkatan" htmlFor="departure-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
             {formErrors.form ? (
               <p className="error-message" role="alert">
                 {formErrors.form}
@@ -480,11 +512,12 @@ export default function KeberangkatanPage() {
             ) : null}
             <div className="form-submit">
               <Btn type="submit" disabled={busy}>
-                {busy ? "Menyimpan…" : "Tambah keberangkatan"}
+                {busy ? "Menyimpan…" : editing ? "Simpan perubahan" : "Tambah keberangkatan"}
               </Btn>
+              {editing ? <Btn type="button" variant="tint" className="ml-2" onClick={resetForm}>Batal ubah</Btn> : null}
             </div>
-          </form>
-        </section>
+          </fieldset></form>
+        </section> : null}
       </div>
     </div>
   );
