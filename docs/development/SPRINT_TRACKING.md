@@ -460,6 +460,31 @@ setelah dicabut atau kedaluwarsa ditolak oleh test otomatis.
 **Batas tahap:** antimalware scanning, notifikasi portal/email berbasis event
 (S16), presign S3 saat object storage produksi dipilih.
 
+## Sprint S15 — Operasional keberangkatan, manifest & ekspor PDF (F07)
+
+**Status:** DONE (26 Oktober 2026), branch `sprint/s15-departure-operations`.
+UAT: [S15_OPERATIONAL_UAT.md](S15_OPERATIONAL_UAT.md). Bukti:
+[verifikasi S15](SPRINT_S15_VERIFICATION.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S15-01 | Status pembayaran per jamaah di manifest (tagihan/terbayar/sisa, kamar, DP) + filter pembayaran & booking | DONE | `payment_by_participant` (2 query), OPS05 |
+| S15-02 | Ringkasan kesiapan keberangkatan atas seluruh roster (dokumen, DP, lunas, konfirmasi, kursi, piutang, checklist) | DONE | `readiness`, OPS06 |
+| S15-03 | Ekspor manifest PDF (A4 lanskap) dan XLSX (aman formula) di samping CSV, filter sama dengan tampilan | DONE | `?file=csv\|xlsx\|pdf`, OPS04 |
+| S15-04 | PDF versi terbit dari snapshot beku + verifikasi checksum (versi, waktu, penerbit) | DONE | `manifest/versions/{n}/pdf` |
+| S15-05 | Dokumen cetak MOD-12: formulir pendaftaran, label koper, amplop DL; data pribadi lengkap berizin + audit | DONE | `print/{kind}`, OPS03/OPS07 |
+| S15-06 | Watermark DEMO dan prefiks `DEMO-` pada seluruh PDF demo | DONE | TR05 |
+| S15-07 | UI Manifest: kartu kesiapan, filter pembayaran, PDF/Excel/CSV, cetak dokumen, unduh PDF versi; tautan "Manifest & cetak" di Keberangkatan | DONE | Playwright |
+| S15-08 | Dokumen UAT operasional + test otomatis, regresi, lint/TypeScript | DONE | 384/384 backend |
+
+**Exit gate S15 (Operational UAT):** sembilan skenario UAT operasional
+(OPS01–OPS07, UAT-14, TR05) dipetakan ke test otomatis yang lulus dan langkah
+uji manual pengguna.
+
+**Batas tahap:** rooming list, visa, tiket, itinerary (P1, MOD-14); antrean
+ekspor asinkron `POST /exports` dan notifikasi perubahan jadwal (S16);
+laporan operasional siap pakai (S17).
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -477,7 +502,8 @@ setelah dicabut atau kedaluwarsa ditolak oleh test otomatis.
 | S12 | 12 | Prepaid wallet, top-up manual dan immutable ledger | DONE |
 | S13 | 13 | Billing event flow, saldo kurang, refund (M4) | DONE |
 | S14 | 14 | Portal jamaah, autentikasi, profil & unggah dokumen | DONE |
-| S15–S19 | 15–19 | mengikuti Roadmap §3 | TODO |
+| S15 | 15 | Operasional keberangkatan, manifest & ekspor PDF | DONE |
+| S16–S19 | 16–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 

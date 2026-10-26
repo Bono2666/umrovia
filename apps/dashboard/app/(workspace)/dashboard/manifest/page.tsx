@@ -11,9 +11,9 @@ import {
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
-import { formatDate, formatMasked } from "@/lib/format";
+import { formatDate, formatIdr, formatMasked } from "@/lib/format";
 import {
-  API_BASE,
+  downloadFromApi,
   apiFetch,
   hasPermission,
   problemMessage,
@@ -21,6 +21,7 @@ import {
   type ManifestEnvelope,
   type ManifestRequirement,
   type UserPayload,
+  type ManifestReadiness,
 } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
 
@@ -81,6 +82,35 @@ const DOC_STATUS_LABEL: Record<string, string> = {
   REJECTED: "ditolak",
 };
 
+const PAYMENT_LABEL: Record<string, string> = { paid: "Lunas", partial: "Sebagian", unpaid: "Belum bayar" };
+
+/** Ringkasan kesiapan keberangkatan (S15, OPS-06): seluruh jamaah aktif, bukan hasil filter. */
+function ReadinessCard({ readiness }: { readiness: ManifestReadiness }) {
+  const total = readiness.participants;
+  const metric = (label: string, value: number, tone?: string) => (
+    <div className="card p-4">
+      <p className="text-xs text-muted">{label}</p>
+      <p className={`mt-1 text-xl font-bold ${tone ?? ""}`}>{value}<span className="text-sm font-normal text-muted"> / {total}</span></p>
+    </div>
+  );
+  return (
+    <section className="mt-6" aria-label="Kesiapan keberangkatan">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {metric("Dokumen wajib lengkap", readiness.docs_complete, readiness.docs_complete === total && total ? "text-success" : "")}
+        {metric("DP diterima", readiness.dp_received)}
+        {metric("Lunas", readiness.fully_paid, readiness.fully_paid === total && total ? "text-success" : "")}
+        {metric("Terkonfirmasi", readiness.confirmed)}
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Kursi {readiness.seats_taken} terpakai dari {readiness.seat_capacity} · sisa {readiness.available_seats}
+        {readiness.outstanding_idr > 0 ? ` · piutang jamaah ${formatIdr(readiness.outstanding_idr)}` : " · tidak ada piutang"}
+        {readiness.pending_charge ? ` · ${readiness.pending_charge} menunggu saldo SaaS Wallet` : ""}
+        {readiness.checklist_ready ? " · checklist siap berangkat terpenuhi" : ` · ${readiness.gap_count} kekurangan dokumen wajib`}
+      </p>
+    </section>
+  );
+}
+
 function docSummary(row: ManifestEnvelope["rows"][number]): string {
   if (row.docs_complete) return "Lengkap";
   const parts = row.docs_missing.map((kind) => {
@@ -99,6 +129,8 @@ export default function ManifestPage() {
   const [envelope, setEnvelope] = useState<ManifestEnvelope | null>(null);
   const [query, setQuery] = useState("");
   const [docFilter, setDocFilter] = useState("");
+  const [payFilter, setPayFilter] = useState("");
+  const [fullFormPii, setFullFormPii] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -110,11 +142,12 @@ export default function ManifestPage() {
   const [reqMandatory, setReqMandatory] = useState(true);
   const [reqBusy, setReqBusy] = useState(false);
 
-  const load = useCallback((depId: string, q: string, documentFilter: string) => {
+  const load = useCallback((depId: string, q: string, documentFilter: string, paymentFilter = "") => {
     if (!depId) return; // pilih “— pilih keberangkatan —”: biarkan state (dibersihkan di handler)
     const params = new URLSearchParams({ checklist_gaps: "1" });
     if (q.trim()) params.set("q", q.trim());
     if (documentFilter) params.set("document", documentFilter);
+    if (paymentFilter) params.set("payment", paymentFilter);
     apiFetch<ManifestEnvelope>(`/departures/${depId}/manifest?${params.toString()}`).then(
       (result) => {
         if (result.ok) {
@@ -144,7 +177,10 @@ export default function ManifestPage() {
     apiFetch<{ results: Departure[] }>("/departures").then((result) => {
       if (result.ok) {
         setDepartures(result.data.results);
-        setDepartureId((prev) => prev || result.data.results[0]?.id || "");
+        // ?departure= dari halaman Keberangkatan memilih keberangkatan tersebut.
+        const wanted = new URLSearchParams(window.location.search).get("departure");
+        const preferred = result.data.results.find((dep) => dep.id === wanted)?.id;
+        setDepartureId((prev) => prev || preferred || result.data.results[0]?.id || "");
       } else if (result.error.status === 403) {
         setNoAccess(true);
       }
@@ -152,8 +188,8 @@ export default function ManifestPage() {
   }, []);
 
   useEffect(() => {
-    load(departureId, query, docFilter);
-  }, [departureId, query, docFilter, load]);
+    load(departureId, query, docFilter, payFilter);
+  }, [departureId, query, docFilter, payFilter, load]);
 
   async function publish() {
     if (!departureId) return;
@@ -173,22 +209,25 @@ export default function ManifestPage() {
       `Versi ${result.data.version.version_no} dipublikasikan — checksum ` +
         `${result.data.version.checksum.slice(0, 12)}… (snapshot tersimpan, tidak dapat diedit).`,
     );
-    load(departureId, query, docFilter);
+    load(departureId, query, docFilter, payFilter);
   }
 
-  function downloadCsv() {
+  function downloadExport(file: "csv" | "xlsx" | "pdf") {
     if (!departureId) return;
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ file });
     if (query.trim()) params.set("q", query.trim());
     if (docFilter) params.set("document", docFilter);
+    if (payFilter) params.set("payment", payFilter);
     if (includePii) params.set("pii", "1");
-    // unduh via anchor sintetis: server merespons Content-Disposition attachment
-    const anchor = document.createElement("a");
-    anchor.href = `${API_BASE}/api/v1/departures/${departureId}/manifest/export?${params.toString()}`;
-    anchor.rel = "noopener";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    // Server merespons Content-Disposition attachment; filter sama dengan tampilan.
+    downloadFromApi(`/api/v1/departures/${departureId}/manifest/export?${params.toString()}`);
+  }
+
+  function printDocument(kind: "registration-forms" | "labels" | "envelopes") {
+    if (!departureId) return;
+    const params = new URLSearchParams();
+    if (kind === "registration-forms" && fullFormPii) params.set("pii", "1");
+    downloadFromApi(`/api/v1/departures/${departureId}/print/${kind}${params.size ? `?${params}` : ""}`);
   }
 
   async function addRequirement(event: React.FormEvent) {
@@ -215,7 +254,7 @@ export default function ManifestPage() {
       `Syarat dokumen ${KIND_LABEL[reqKind] ?? reqKind} ditambahkan untuk paket ` +
         `${envelope.departure.package_code}.`,
     );
-    load(departureId, query, docFilter);
+    load(departureId, query, docFilter, payFilter);
   }
 
   async function removeRequirement(req: ManifestRequirement) {
@@ -229,7 +268,7 @@ export default function ManifestPage() {
       return;
     }
     setMessage("Syarat dokumen dihapus.");
-    load(departureId, query, docFilter);
+    load(departureId, query, docFilter, payFilter);
   }
 
   if (noAccess) {
@@ -279,7 +318,7 @@ export default function ManifestPage() {
       ) : null}
 
       <section className="card mt-6 p-6">
-        <div className="manifest-filters grid gap-x-3 gap-y-8 md:grid-cols-3">
+        <div className="manifest-filters grid gap-x-3 gap-y-8 md:grid-cols-2 xl:grid-cols-4">
           <FormSelect
             label="Keberangkatan"
             htmlFor="manifest-departure"
@@ -314,6 +353,17 @@ export default function ManifestPage() {
             <option value="complete">Lengkap semua</option>
             <option value="incomplete">Belum lengkap</option>
           </FormSelect>
+          <FormSelect
+            label="Pembayaran"
+            htmlFor="manifest-pay-filter"
+            value={payFilter}
+            onChange={(event) => setPayFilter(event.target.value)}
+          >
+            <option value="">Semua</option>
+            <option value="paid">Lunas</option>
+            <option value="partial">Sebagian</option>
+            <option value="unpaid">Belum bayar</option>
+          </FormSelect>
         </div>
         {departures.length === 0 && permissions !== null ? (
           <p className="form-control__hint">
@@ -321,6 +371,8 @@ export default function ManifestPage() {
           </p>
         ) : null}
       </section>
+
+      {envelope?.readiness ? <ReadinessCard readiness={envelope.readiness} /> : null}
 
       {gaps.length > 0 ? (
         <div className="mt-4 border border-warning/30 bg-warning/10 p-3 text-sm">
@@ -363,14 +415,14 @@ export default function ManifestPage() {
                   {canExportPii ? (
                     <FormCheckbox
                       id="manifest-pii"
-                      label="Sertakan PII"
+                      label="Sertakan data pribadi"
                       checked={includePii}
                       onChange={setIncludePii}
                     />
                   ) : null}
-                  <Btn variant="solid" size="xs" onClick={downloadCsv}>
-                    Unduh CSV
-                  </Btn>
+                  <Btn variant="solid" size="xs" onClick={() => downloadExport("pdf")}>PDF</Btn>
+                  <Btn variant="tint" size="xs" onClick={() => downloadExport("xlsx")}>Excel</Btn>
+                  <Btn variant="tint" size="xs" onClick={() => downloadExport("csv")}>CSV</Btn>
                 </>
               ) : null}
             </div>
@@ -422,6 +474,13 @@ export default function ManifestPage() {
                   </div>
                   <p className="mt-1 text-xs text-muted">
                     NIK {row.identity_masked ? formatMasked(row.identity_masked) : "—"} · Paspor {row.passport_masked ? formatMasked(row.passport_masked) : "—"}
+                  </p>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <StatusBadge tone={row.payment_status === "paid" ? "success" : row.payment_status === "partial" ? "warning" : "neutral"}>{PAYMENT_LABEL[row.payment_status]}</StatusBadge>
+                    <span className="text-muted">
+                      Terbayar {formatIdr(row.paid_idr)} dari {formatIdr(row.amount_idr)}
+                      {row.balance_idr > 0 ? ` · sisa ${formatIdr(row.balance_idr)}` : ""}
+                    </span>
                   </p>
                 </li>
               ))}
@@ -517,6 +576,23 @@ export default function ManifestPage() {
             ) : null}
           </section>
 
+          {canExport && departureId ? (
+            <section className="card p-6">
+              <h2 className="font-semibold">Cetak dokumen</h2>
+              <p className="mt-1 text-xs text-muted">Untuk seluruh jamaah aktif keberangkatan ini. Dokumen demo diberi watermark.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Btn size="xs" variant="tint" onClick={() => printDocument("registration-forms")}>Formulir pendaftaran</Btn>
+                <Btn size="xs" variant="tint" onClick={() => printDocument("labels")}>Label koper</Btn>
+                <Btn size="xs" variant="tint" onClick={() => printDocument("envelopes")}>Amplop</Btn>
+              </div>
+              {canExportPii ? (
+                <div className="mt-3">
+                  <FormCheckbox id="form-pii" label="Tampilkan NIK & paspor lengkap pada formulir" checked={fullFormPii} onChange={setFullFormPii} />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           <section className="card p-6">
             <h2 className="font-semibold">Versi manifest</h2>
             {envelope && envelope.versions.length > 0 ? (
@@ -530,8 +606,9 @@ export default function ManifestPage() {
                         {version.published_by_name ?? "sistem"}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted">
-                      checksum {version.checksum.slice(0, 16)}…
+                    <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-muted">
+                      <span className="truncate">checksum {version.checksum.slice(0, 16)}…</span>
+                      {canExport ? <Btn size="xs" variant="link" onClick={() => downloadFromApi(`/api/v1/departures/${departureId}/manifest/versions/${version.version_no}/pdf`)}>Unduh PDF</Btn> : null}
                     </p>
                   </li>
                 ))}

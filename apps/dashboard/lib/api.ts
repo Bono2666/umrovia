@@ -308,6 +308,13 @@ export type ManifestRow = {
   docs_required: string[];
   docs_missing: string[];
   docs_complete: boolean;
+  /** S15: kamar, DP diterima dan status pembayaran milik peserta ini. */
+  room_type: string;
+  dp_received: boolean;
+  amount_idr: number;
+  paid_idr: number;
+  balance_idr: number;
+  payment_status: "paid" | "partial" | "unpaid";
   /** Hanya terisi pada respons ekspor ber-PII. */
   identity_number?: string;
   passport_number?: string;
@@ -334,6 +341,8 @@ export type ManifestEnvelope = {
   rows: ManifestRow[];
   row_count: number;
   versions: ManifestVersion[];
+  /** Ringkasan kesiapan (S15, OPS-06) atas seluruh roster, bukan hasil filter. */
+  readiness?: ManifestReadiness;
   requirements: ManifestRequirement[];
   /** Hanya ada bila `?checklist_gaps=1` — kekurangan gerbang READY. */
   checklist_gaps?: string[];
@@ -533,4 +542,11 @@ export type PortalInviteInfo = {
 export type PilgrimPortalStatus = {
   accesses: {id: string; email: string; status: string; created_at: string}[];
   pending_invite: {id: string; email: string; expires_at: string} | null;
+};
+
+export type ManifestReadiness = {
+  participants: number; docs_complete: number; dp_received: number; fully_paid: number;
+  confirmed: number; pending_charge: number; outstanding_idr: number;
+  seat_capacity: number; seats_taken: number; available_seats: number;
+  checklist_ready: boolean; gap_count: number;
 };

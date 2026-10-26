@@ -26,6 +26,16 @@ urlpatterns = [
         name="manifest-export",
     ),
     path(
+        "departures/<uuid:departure_id>/manifest/versions/<int:version_no>/pdf",
+        views.ManifestVersionPdfView.as_view(),
+        name="manifest-version-pdf",
+    ),
+    path(
+        "departures/<uuid:departure_id>/print/<str:kind>",
+        views.DeparturePrintView.as_view(),
+        name="departure-print",
+    ),
+    path(
         "document-requirements",
         views.DocumentRequirementListCreateView.as_view(),
         name="document-requirement-list",
