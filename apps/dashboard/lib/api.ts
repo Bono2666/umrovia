@@ -144,7 +144,24 @@ export type SaasWallet = {
   estimated_participant_capacity: number; pending_participant_count: number;
   version: number; ledger_balance_idr: number; balance_matches_ledger: boolean;
   topup_available: boolean; provider: "manual"; topup_minimum_idr: number | null;
+  pending_charge_count: number; pending_charge_idr: number; posted_charge_count: number; tenant_state: string;
   last_reconciliation: {at: string; consistent: boolean; variance_idr: number} | null;
+};
+export type SaasRefund = {
+  id: string; charge_id: string; amount_idr: number; status: "REQUESTED" | "APPROVED" | "REJECTED";
+  reason: string; decision_reason: string; created_at: string; decided_at: string | null; ledger_entry_id: string | null;
+};
+export type SaasCharge = {
+  id: string; status: "PENDING" | "POSTED" | "VOID" | "REFUNDED"; saas_charge_status: string; pending_reason: string;
+  unit_price_idr: number; price_version: string; booking_id: string; booking_code: string;
+  booking_participant_id: string; booking_passenger_id: string; participant_status: string; pilgrim_name: string;
+  eligible_at: string; charged_at: string | null; attempts: number; ledger_entry_id: string | null; void_reason: string;
+  refund: SaasRefund | null; refundable: boolean;
+};
+export type ChargePreview = {
+  environment: string; charges_applicable: boolean; price_version?: string; unit_fee_idr?: number; total_fee_idr?: number;
+  participants: {booking_participant_id: string; pilgrim_name: string; allocation_idr: number; already_charged: boolean; will_attempt_charge: boolean; unit_fee_idr: number}[];
+  wallet_balance_idr?: number; pending_queue_idr?: number; balance_after_idr?: number; sufficient?: boolean;
 };
 export type WalletTopup = {
   id: string; number: string; amount_idr: number; status: string; provider: string;
@@ -166,7 +183,7 @@ export type TravelPayment = {
   simulated: boolean; reason: string; verified_at: string | null; verified_by_name: string | null;
   receipt: {id: string; receipt_no: string; status: string; checksum: string; issued_at: string} | null;
   allocations: {booking_participant_id: string; pilgrim_name: string; amount_idr: number}[];
-  participants: {id: string; status: string; saas_charge_state: string; dp_eligible_at: string | null}[];
+  participants: {id: string; status: string; saas_charge_state: string; dp_eligible_at: string | null; saas_charge_status: string | null; unit_fee_idr: number | null}[];
 };
 
 /** Peserta booking (S09, §6.2 + PRD MOD-07 saverules). */
