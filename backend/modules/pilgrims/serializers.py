@@ -21,7 +21,12 @@ def pilgrim_payload(pilgrim: Pilgrim, *, include_restricted: bool = True) -> dic
     `special_needs` (catatan kebutuhan khusus, akses terbatas MOD-04) hanya
     ikut bila diminta (detail), tidak di daftar.
     """
+    if hasattr(pilgrim, "in_booking"):
+        used = pilgrim.in_booking or pilgrim.has_documents
+    else:
+        used = pilgrim.booking_participations.exists() or pilgrim.documents.exists()
     data = {
+        "deletable": not used,  # jamaah terpakai diarsipkan, tidak dihapus
         "id": str(pilgrim.id),
         "code": pilgrim.code,
         "environment": pilgrim.environment,

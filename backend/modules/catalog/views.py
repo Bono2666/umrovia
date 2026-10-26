@@ -5,6 +5,7 @@ production; demo READ_ONLY ditolak — §2.2, pola S07). Audit tiap create/
 update; `published` = tombol publish/unpublish (guard: hanya dari ACTIVE).
 """
 from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -16,6 +17,7 @@ from rest_framework.views import APIView
 from modules.audit.services import log_event
 from modules.catalog.models import PackageRoomPrice, TravelPackage, generate_package_code
 from modules.catalog.serializers import PackageWriteSerializer, package_payload
+from modules.departures.models import Departure
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import require_permission
 
@@ -46,7 +48,7 @@ class PackageListCreateView(APIView):
 
     @extend_schema(operation_id="packages_list", responses=OpenApiTypes.OBJECT)
     def get(self, request):
-        qs = TravelPackage.objects.all()
+        qs = TravelPackage.objects.annotate(has_departures=Exists(Departure.objects.filter(package_id=OuterRef("pk"))))
         env = request.query_params.get("environment", "").strip()
         if env:
             from modules.tenants.models import Environment
@@ -99,10 +101,13 @@ class PackageListCreateView(APIView):
 
 
 class PackageDetailView(APIView):
+    """GET/PATCH/DELETE paket. Hapus hanya sebelum dipakai keberangkatan;
+    setelahnya gunakan status ARCHIVED agar referensi perjalanan tetap utuh."""
+
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method == "PATCH":
+        if self.request.method in {"PATCH", "DELETE"}:
             return [IsAuthenticated(), require_permission("packages.write")()]
         return [IsAuthenticated(), require_permission("packages.read")()]
 
@@ -139,3 +144,16 @@ class PackageDetailView(APIView):
             changes=changes,
         )
         return Response(package_payload(pkg))
+
+    @extend_schema(responses={204: None})
+    @transaction.atomic
+    def delete(self, request, package_id):
+        pkg = TravelPackage.objects.select_for_update().filter(pk=package_id).first()
+        if pkg is None:
+            raise NotFound("Paket tidak ditemukan.")
+        assert_environment_writable(request.tenant, pkg.environment)
+        if pkg.departures.exists():
+            raise ValidationError({"package": "Paket sudah dipakai keberangkatan dan tidak dapat dihapus. Ubah status menjadi Diarsipkan."})
+        log_event(action="packages.deleted", request=request, object_type="package", object_id=pkg.pk, changes={"code": pkg.code, "name": pkg.name})
+        pkg.delete()
+        return Response(status=204)

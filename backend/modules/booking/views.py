@@ -26,7 +26,7 @@ from modules.booking.serializers import (
     BookingUpdateSerializer,
     booking_payload,
 )
-from modules.booking.services import create_booking, transition_booking, update_draft_booking
+from modules.booking.services import create_booking, delete_draft_booking, transition_booking, update_draft_booking
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import require_permission
 
@@ -120,7 +120,7 @@ class BookingDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method == "PATCH":
+        if self.request.method in {"PATCH", "DELETE"}:
             return [IsAuthenticated(), require_permission("bookings.create")()]
         return [IsAuthenticated(), require_permission("bookings.read")()]
 
@@ -160,6 +160,17 @@ class BookingDetailView(APIView):
         )
         booking = _get_booking(booking.pk)
         return Response(booking_payload(booking))
+
+    @extend_schema(responses={204: None}, description="Hapus booking DRAF (belum menahan kursi, belum ada invoice). Kuota trial yang terpakai tidak dikembalikan (TR03).")
+    def delete(self, request, booking_id):
+        booking = _get_booking(booking_id)
+        assert_environment_writable(request.tenant, booking.environment)
+        try:
+            code = delete_draft_booking(booking_id=booking.pk)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages) from exc
+        log_event(action="bookings.deleted", request=request, object_type="booking", object_id=booking.pk, changes={"code": code})
+        return Response(status=204)
 
 
 class BookingTransitionView(APIView):

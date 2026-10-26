@@ -20,13 +20,15 @@ from modules.travel_finance.models import TravelBankAccount, mask_account_number
 
 
 def _payload(account: TravelBankAccount) -> dict:
+    used = account.has_payments if hasattr(account, "has_payments") else TravelPayment.objects.filter(bank_account=account).exists()
     return {
         "id": str(account.id),
         "bank_name": account.bank_name,
         "account_name": account.account_name,
         "account_masked": account.account_masked,
         "active": account.active,
-        "number_editable": not (account.has_payments if hasattr(account, "has_payments") else TravelPayment.objects.filter(bank_account=account).exists()),
+        "number_editable": not used,
+        "deletable": not used,  # rekening terpakai dinonaktifkan, tidak dihapus
     }
 
 
@@ -128,3 +130,14 @@ class BankAccountDetailView(APIView):
             changes={"updated_fields": sorted(request.data.keys())},
         )
         return Response({"bank_account": _payload(account)}, status=status.HTTP_200_OK)
+
+    @transaction.atomic
+    def delete(self, request, bank_account_id):
+        account = TravelBankAccount.objects.select_for_update().filter(pk=bank_account_id).first()
+        if account is None:
+            raise NotFound("Rekening tidak ditemukan di workspace ini.")
+        if TravelPayment.objects.filter(bank_account=account).exists():
+            raise ValidationError({"bank_account": "Rekening telah dipakai pada pembayaran. Nonaktifkan rekening agar riwayat tetap utuh."})
+        log_event(action="bank_accounts.deleted", request=request, object_type="travel_bank_account", object_id=account.id, changes={"bank_name": account.bank_name, "account_masked": account.account_masked})
+        account.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
