@@ -1,7 +1,8 @@
-"""Transaksi S11. Urutan lock: booking → payment/invoice → peserta → tenant/sequence.
+"""Transaksi S11. Urutan lock: [wallet →] booking → payment/invoice → peserta → charge → tenant/sequence.
 
 Verifikasi dana tidak bergantung pada keberhasilan debit SaaS. Produksi
-menunggu charge S12/S13; demo dapat dikonfirmasi tanpa ledger produksi.
+mencoba charge S13 dalam transaksi yang sama (wallet dikunci lebih dulu);
+demo dapat dikonfirmasi tanpa ledger produksi.
 """
 import hashlib
 import json
@@ -13,6 +14,7 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
 from modules.audit.services import log_event
+from modules.billing.services import charge_verified_booking, lock_wallet, void_pending_for_booking
 from modules.booking.models import Booking, BookingParticipant
 from modules.payments.dates import tenant_today
 from modules.payments.models import (
@@ -298,6 +300,8 @@ def _receipt(payment, actor):
 @transaction.atomic
 def verify_payment(*, payment_id, actor, note=""):
     initial = TravelPayment.objects.get(pk=payment_id)
+    if initial.environment == "production":
+        lock_wallet(initial.tenant)  # wallet sebelum booking: sejalan dengan retry top-up
     booking = Booking.objects.select_for_update().get(pk=initial.booking_id)
     payment = TravelPayment.objects.select_for_update().get(pk=payment_id)
     assert_booking_payable(booking)
@@ -323,6 +327,8 @@ def verify_payment(*, payment_id, actor, note=""):
     payment.save(update_fields=["status", "verified_at", "verified_by", "verification_note", "eligibility_policy_json", "updated_at"])
     _refresh_invoice(invoice)
     eligible = _refresh_eligibility(invoice)
+    if payment.environment == "production":
+        charge_verified_booking(booking=booking, payment=payment, actor=actor)
     _receipt(payment, actor)
     PaymentEvent.objects.get_or_create(
         tenant=payment.tenant, environment=payment.environment, payment=payment, kind="payment.verified",
@@ -367,6 +373,8 @@ def reverse_payment(*, payment_id, actor, reason):
     invoice = TravelInvoice.objects.select_for_update().get(pk=payment.invoice_id)
     _refresh_invoice(invoice)
     _refresh_eligibility(invoice, reversal=True)
+    if payment.environment == "production":
+        void_pending_for_booking(booking, f"DP direversal: {reason.strip()}")
     if booking.status in {"CANCELED", "EXPIRED"}:
         cancel_booking_invoice(booking, booking.cancel_reason or "Booking tidak aktif")
     receipt = TravelReceipt.objects.get(payment=payment)
@@ -382,7 +390,7 @@ def cancel_booking_invoice(booking, reason):
     if invoice is None:
         return
     if invoice.payments.filter(status="VERIFIED").exists():
-        return  # refund/credit membutuhkan review terpisah S13; histori tidak dihapus.
+        return  # refund dana jamaah terpisah dari refund SaaS (S13); histori tidak dihapus.
     invoice.status, invoice.void_reason = "VOIDED", reason
     invoice.save(update_fields=["status", "void_reason", "updated_at"])
 

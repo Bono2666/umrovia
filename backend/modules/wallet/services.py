@@ -1,7 +1,7 @@
 """All balance mutations lock the wallet first and append one source-unique entry.
 
-S12 provides an internal debit primitive. DP event consumption/retry is S13;
-there is deliberately no tenant HTTP endpoint accepting an arbitrary debit.
+Debits only come from S13 SaaS charges (`modules.billing`); there is
+deliberately no tenant HTTP endpoint accepting an arbitrary debit.
 """
 import hashlib
 import json
@@ -11,7 +11,7 @@ from datetime import timedelta
 from uuid import UUID
 
 from django.conf import settings
-from django.db import IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
@@ -31,7 +31,7 @@ from modules.wallet.models import (
 )
 
 logger = logging.getLogger(__name__)
-UNIT_PRICE_IDR = 50_000  # approved standard; pricing/event snapshots arrive in S13
+UNIT_PRICE_IDR = 50_000  # display estimate; charges snapshot SaaSPriceVersion
 
 
 class Conflict(APIException):
@@ -224,24 +224,24 @@ def settle_topup(*, tenant_id, topup_id, actor, amount_idr, provider_txn_id, dec
         except IntegrityError:
             raise Conflict("Referensi settlement bank sudah digunakan atau ledger tidak konsisten.") from None
         log_event(action=f"wallet.topup.{decision.lower()}", tenant=wallet.tenant, actor=actor, object_type="wallet_topup", object_id=topup.pk, changes={"amount_idr": amount_idr, "reason": reason})
+        if decision == "PAID":
+            from modules.billing.services import settle_pending_charges
+
+            # Spec §9.3: a settled top-up retries pending charges FIFO under the
+            # same wallet lock. A retry failure never undoes the bank credit.
+            try:
+                with transaction.atomic():
+                    settle_pending_charges(wallet)
+            except DatabaseError:
+                logger.exception("pending_charge_retry_failed", extra={"wallet_id": str(wallet.pk)})
         return topup
 
 
-@transaction.atomic
-def atomic_debit(*, reference_id, amount_idr, description="Biaya SaaS", actor=None):
-    """Internal S13 building block; reference must be the eventual charge UUID.
-
-    Returns None on insufficient funds. No ledger write, no overdraft.
-    Participant eligibility is the future S13 caller's responsibility.
-    """
+def debit_locked(wallet, *, reference_id, amount_idr, description, actor=None):
+    """Caller holds the wallet lock. None on insufficient funds; never overdraws."""
     positive_amount(amount_idr)
-    try:
-        reference_id = UUID(str(reference_id))
-    except ValueError:
-        raise ValidationError({"reference_id": "UUID charge diperlukan."}) from None
     if not isinstance(description, str) or not 1 <= len(description) <= 240:
         raise ValidationError({"description": "Deskripsi wajib, maksimal 240 karakter."})
-    wallet = locked_wallet()
     previous = WalletLedger.objects.filter(wallet=wallet, kind="DEBIT", reference_type="saas_charge", reference_id=reference_id).first()
     if previous:
         if previous.signed_amount_idr != -amount_idr or previous.description != description:
@@ -253,6 +253,28 @@ def atomic_debit(*, reference_id, amount_idr, description="Biaya SaaS", actor=No
     entry = _append(wallet, amount=-amount_idr, kind="DEBIT", reference_type="saas_charge", reference_id=reference_id, description=description, actor=actor)
     log_event(action="wallet.debited", tenant=wallet.tenant, actor=actor, object_type="wallet_ledger", object_id=entry.pk, changes={"amount_idr": amount_idr, "reference_id": str(reference_id)})
     return entry
+
+
+def refund_credit_locked(wallet, *, adjustment, actor):
+    """Compensating credit for an approved SaaS adjustment; caller holds the wallet lock."""
+    assert_active(wallet)
+    entry = _append(wallet, amount=adjustment.amount_idr, kind="REFUND", reference_type="saas_adjustment", reference_id=adjustment.pk, description=f"Refund SaaS {adjustment.charge_id}", actor=actor)
+    log_event(action="wallet.refund_credited", tenant=wallet.tenant, actor=actor, object_type="wallet_ledger", object_id=entry.pk, changes={"amount_idr": adjustment.amount_idr, "adjustment_id": str(adjustment.pk)})
+    return entry
+
+
+@transaction.atomic
+def atomic_debit(*, reference_id, amount_idr, description="Biaya SaaS", actor=None):
+    """Locking wrapper around `debit_locked`; reference must be a charge UUID.
+
+    A debit without a matching SaaSCharge is reported by reconciliation.
+    """
+    positive_amount(amount_idr)
+    try:
+        reference_id = UUID(str(reference_id))
+    except ValueError:
+        raise ValidationError({"reference_id": "UUID charge diperlukan."}) from None
+    return debit_locked(locked_wallet(), reference_id=reference_id, amount_idr=amount_idr, description=description, actor=actor)
 
 
 @transaction.atomic
@@ -275,16 +297,34 @@ def reconcile_wallet():
     paid = WalletTopup.objects.filter(wallet=wallet, status="PAID").select_related("ledger_entry")
     topups_ok = all(t.ledger_entry.wallet_id == wallet.pk and t.ledger_entry.tenant_id == wallet.tenant_id and t.ledger_entry.kind == "TOPUP" and t.ledger_entry.reference_id == t.pk and t.ledger_entry.signed_amount_idr == t.amount_idr for t in paid)
     topups_ok &= WalletLedger.objects.filter(wallet=wallet, kind="TOPUP").count() == paid.count()
-    consistent = bool(variance == 0 and chain_ok and topups_ok and wallet.version == count and balance >= 0)
+    charges = charge_checks(wallet)
+    consistent = bool(variance == 0 and chain_ok and topups_ok and charges["charges_ok"] and charges["refunds_ok"] and wallet.version == count and balance >= 0)
     result = WalletReconciliation.objects.create(
         tenant=wallet.tenant, wallet=wallet, cached_balance_idr=wallet.balance_cached_idr,
         ledger_balance_idr=balance, variance_idr=variance, ledger_count=count, consistent=consistent,
-        details_json={"chain_ok": bool(chain_ok), "topups_ok": bool(topups_ok), "wallet_version": wallet.version},
+        details_json={"chain_ok": bool(chain_ok), "topups_ok": bool(topups_ok), "wallet_version": wallet.version, **charges},
     )
     if not consistent:
         logger.error("wallet_reconciliation_mismatch", extra={"wallet_id": str(wallet.pk), "variance_idr": variance})
-        log_event(action="wallet.reconciliation.mismatch", tenant=wallet.tenant, object_type="wallet", object_id=wallet.pk, changes={"variance_idr": variance, "chain_ok": bool(chain_ok), "topups_ok": bool(topups_ok)})
+        log_event(action="wallet.reconciliation.mismatch", tenant=wallet.tenant, object_type="wallet", object_id=wallet.pk, changes={"variance_idr": variance, "chain_ok": bool(chain_ok), "topups_ok": bool(topups_ok), **charges})
     return result
+
+
+def charge_checks(wallet):
+    """Every DEBIT belongs to one posted charge and every REFUND to one approved credit."""
+    from modules.billing.models import SaaSAdjustment, SaaSCharge
+
+    posted = SaaSCharge.objects.filter(wallet=wallet, status__in=["POSTED", "REFUNDED"]).select_related("ledger_entry")
+    charges_ok = all(c.ledger_entry.wallet_id == wallet.pk and c.ledger_entry.kind == "DEBIT" and c.ledger_entry.reference_id == c.pk and c.ledger_entry.signed_amount_idr == -c.unit_price_idr for c in posted)
+    orphan_debits = WalletLedger.objects.filter(wallet=wallet, kind="DEBIT").count() - posted.count()
+    approved = SaaSAdjustment.objects.filter(status="APPROVED", charge__wallet=wallet).select_related("ledger_entry", "charge")
+    refunds_ok = all(a.ledger_entry.wallet_id == wallet.pk and a.ledger_entry.kind == "REFUND" and a.ledger_entry.reference_id == a.pk and a.ledger_entry.signed_amount_idr == a.amount_idr == a.charge.unit_price_idr and a.charge.status == "REFUNDED" for a in approved)
+    orphan_refunds = WalletLedger.objects.filter(wallet=wallet, kind="REFUND").count() - approved.count()
+    return {
+        "charges_ok": bool(charges_ok and orphan_debits == 0), "orphan_debits": orphan_debits,
+        "refunds_ok": bool(refunds_ok and orphan_refunds == 0), "orphan_refunds": orphan_refunds,
+        "pending_charges": SaaSCharge.objects.filter(status="PENDING").count(),
+    }
 
 
 def ledger_total(wallet):

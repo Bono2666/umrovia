@@ -87,5 +87,16 @@ def payment_payload(payment):
         "verified_by_name": (payment.verified_by.full_name or payment.verified_by.email) if payment.verified_by_id else None,
         "receipt": receipt_payload(receipt) if receipt else None,
         "allocations": [{"booking_participant_id": str(a.participant_id), "pilgrim_name": a.participant.pilgrim.name, "amount_idr": a.amount_idr} for a in payment.allocations.select_related("participant__pilgrim")],
-        "participants": [{"id": str(p.pk), "status": p.participant_status, "saas_charge_state": p.saas_charge_state, "dp_eligible_at": p.dp_eligible_at.isoformat() if p.dp_eligible_at else None} for p in payment.booking.participants.all()],
+        "participants": [participant_charge_payload(p) for p in payment.booking.participants.prefetch_related("saas_charges")],
+    }
+
+
+def participant_charge_payload(participant):
+    from modules.billing.services import charge_status
+
+    charge = next((c for c in participant.saas_charges.all() if c.status != "VOID"), None)
+    return {
+        "id": str(participant.pk), "status": participant.participant_status, "saas_charge_state": participant.saas_charge_state,
+        "dp_eligible_at": participant.dp_eligible_at.isoformat() if participant.dp_eligible_at else None,
+        "saas_charge_status": charge_status(charge), "unit_fee_idr": charge.unit_price_idr if charge else None,
     }

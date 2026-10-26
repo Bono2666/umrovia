@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.billing.services import charge_preview, lock_wallet
 from modules.booking.models import Booking
 from modules.booking.serializers import booking_payload
 from modules.payments import services
@@ -176,11 +177,13 @@ class PaymentActionView(APIView):
         grant = "payments.create" if self.action == "submit" else "payments.reverse" if self.action == "reverse" else "payments.verify"
         return [IsAuthenticated(), require_permission(grant)()]
 
-    @extend_schema(request=PaymentActionSerializer, responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)], description="Payment state transition. Verification persists DP and issues one receipt; production participants remain pending SaaS charge. Reversal requires a different approver and a reason.")
+    @extend_schema(request=PaymentActionSerializer, responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)], description="Payment state transition. Verification persists DP, issues one receipt and attempts one SaaS charge per eligible production participant; insufficient wallet still returns 200 with saas_charge_status PENDING_INSUFFICIENT_FUNDS. Reversal requires a different approver and a reason and never refunds a posted charge.")
     @transaction.atomic
     def post(self, request, payment_id):
         # Cakupan Sales hanya pembayarannya sendiri, Finance/Owner read_all.
         initial = _get(_payments(request), pk=payment_id)
+        if self.action == "verify" and initial.environment == "production":
+            lock_wallet(request.tenant)  # urutan lock S13: wallet sebelum booking
         booking = _get(Booking.objects.select_for_update(), pk=initial.booking_id)
         payment = _get(TravelPayment.objects.select_for_update(), pk=payment_id)
         assert_environment_writable(request.tenant, payment.environment)
@@ -210,6 +213,16 @@ class PaymentActionView(APIView):
             return payment_payload(result)
 
         return Response(services.idempotent_operation(request=request, action=self.action, booking=booking, target=payment.pk, factory=execute))
+
+
+class PaymentChargePreviewView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("payments.verify")]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT, description="SaaS charge preview before DP verification: eligible participants, effective fee, already-charged flags. Wallet balance only for roles with wallet.read.")
+    def get(self, request, payment_id):
+        payment = _get(_payments(request), pk=payment_id)
+        show_wallet = has_permission(permission_list(request.membership.role), "wallet.read")
+        return Response(charge_preview(payment, show_wallet=show_wallet))
 
 
 class PaymentOptionsView(APIView):

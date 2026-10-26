@@ -60,7 +60,9 @@ def test_concurrent_debits_never_overdraw_or_duplicate(wallet_setup, same_refere
     assert sum(result is None for result in results) == (0 if same_reference else 3)
     with platform_tenant_context(s["tenant"].pk):
         reconciliation = reconcile_wallet()
-        assert reconciliation.consistent
+        # Raw debits have no SaaSCharge (S13 flags them); balance chain stays exact.
+        assert reconciliation.variance_idr == 0 and reconciliation.details_json["chain_ok"]
+        assert reconciliation.details_json["orphan_debits"] == (1 if same_reference else 2)
         assert reconciliation.ledger_balance_idr == (50_000 if same_reference else 0)
 
 

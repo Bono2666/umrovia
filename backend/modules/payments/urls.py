@@ -13,6 +13,7 @@ urlpatterns = [
     path("payments/options", views.PaymentOptionsView.as_view(), name="payment-options"),
     path("payments/settings", views.PaymentSettingsView.as_view(), name="payment-settings"),
     path("payments/<uuid:payment_id>", views.PaymentDetailView.as_view(), name="payment-detail"),
+    path("payments/<uuid:payment_id>/charge-preview", views.PaymentChargePreviewView.as_view(), name="payment-charge-preview"),
     path("receipts/<uuid:receipt_id>/pdf", views.ReceiptPdfView.as_view(), name="receipt-pdf"),
     *[path(f"payments/<uuid:payment_id>/{action}", views.PaymentActionView.as_view(action=action), name=f"payment-{action}") for action in ["submit", "verify", "reject", "reverse"]],
 ]

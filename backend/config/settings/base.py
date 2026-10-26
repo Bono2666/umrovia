@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "modules.manifest",
     "modules.payments",
     "modules.wallet",
+    "modules.billing",
     "modules.audit",
     "modules.documents",
 ]
