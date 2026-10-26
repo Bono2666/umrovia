@@ -8,7 +8,7 @@ import json
 import logging
 from contextlib import contextmanager
 from datetime import timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.db import DatabaseError, IntegrityError, connection, transaction
@@ -20,8 +20,10 @@ from modules.audit.services import log_event
 from modules.tenants.context import clear_current_tenant, get_current_tenant, set_current_tenant
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.models import Tenant
+from modules.wallet import midtrans
 from modules.wallet.models import (
     MAX_BALANCE,
+    GatewayOrder,
     Wallet,
     WalletEvent,
     WalletLedger,
@@ -37,6 +39,11 @@ UNIT_PRICE_IDR = 50_000  # display estimate; charges snapshot SaaSPriceVersion
 class Conflict(APIException):
     status_code = 409
     default_code = "wallet_conflict"
+
+
+class GatewayUnavailable(APIException):
+    status_code = 502
+    default_code = "payment_gateway_unavailable"
 
 
 def production_tenant(*, writable=True):
@@ -98,18 +105,29 @@ def _append(wallet, *, amount, kind, reference_type, reference_id, description, 
     return entry
 
 
+def _existing_operation(key, digest):
+    existing = WalletOperation.objects.filter(key=key).select_related("topup").first()
+    if existing and existing.request_hash != digest:
+        raise Conflict("Idempotency-Key telah dipakai untuk nominal atau metode lain.")
+    return existing.topup if existing else None
+
+
 @transaction.atomic
-def create_topup(*, actor, amount_idr, key):
+def create_topup(*, actor, amount_idr, key, method="manual"):
     positive_amount(amount_idr)
     if not isinstance(key, str) or not 1 <= len(key.strip()) <= 128:
         raise ValidationError({"Idempotency-Key": "Header wajib diisi, maksimal 128 karakter."})
+    if method not in {"manual", "midtrans"}:
+        raise ValidationError({"method": "Pilih manual atau midtrans."})
+    # Manual keeps the S12 fingerprint so earlier keys remain replayable.
+    fingerprint = {"amount_idr": amount_idr} if method == "manual" else {"amount_idr": amount_idr, "method": method}
+    digest = hashlib.sha256(json.dumps(fingerprint, sort_keys=True).encode()).hexdigest()
+    if method == "midtrans":
+        return _create_gateway_topup(actor=actor, amount_idr=amount_idr, key=key, digest=digest)
     wallet = locked_wallet()
-    digest = hashlib.sha256(json.dumps({"amount_idr": amount_idr}, sort_keys=True).encode()).hexdigest()
-    existing = WalletOperation.objects.filter(key=key).select_related("topup").first()
+    existing = _existing_operation(key, digest)
     if existing:
-        if existing.request_hash != digest:
-            raise Conflict("Idempotency-Key telah dipakai untuk nominal lain.")
-        return existing.topup
+        return existing
     assert_active(wallet)
     instructions = manual_instructions()
     if not instructions:
@@ -124,6 +142,40 @@ def create_topup(*, actor, amount_idr, key):
     return topup
 
 
+def _create_gateway_topup(*, actor, amount_idr, key, digest):
+    tenant = production_tenant()
+    if not midtrans.configured():
+        raise ValidationError({"method": "Pembayaran online belum dikonfigurasi. Gunakan transfer manual atau hubungi dukungan."})
+    existing = _existing_operation(key, digest)
+    if existing:
+        return existing
+    current = Wallet.objects.filter(tenant=tenant, currency="IDR").first()
+    if current:
+        assert_active(current)
+    topup_id = uuid4()
+    finish = f"{settings.TENANT_APP_URL.rstrip('/')}/dashboard/wallet?topup={topup_id}"
+    # Network call before any row lock (ADR-0008/0010). A concurrent identical
+    # request may win below; its own Snap order then simply stays unpaid.
+    try:
+        snap = midtrans.create_snap(topup_id=topup_id, amount_idr=amount_idr, customer_name=actor.full_name, customer_email=actor.email, finish_url=finish)
+    except midtrans.GatewayError as exc:
+        raise GatewayUnavailable(str(exc)) from None
+    wallet = locked_wallet()
+    existing = _existing_operation(key, digest)
+    if existing:
+        return existing
+    assert_active(wallet)
+    topup = WalletTopup.objects.create(
+        id=topup_id, tenant=wallet.tenant, wallet=wallet, amount_idr=amount_idr, provider="midtrans",
+        requested_by=actor, expires_at=timezone.now() + timedelta(hours=24),
+        instructions_json={"method": "midtrans"}, payment_url=snap["redirect_url"],
+    )
+    GatewayOrder.objects.create(order_id=midtrans.order_id(topup_id), tenant=wallet.tenant, topup_id=topup_id)
+    WalletOperation.objects.create(tenant=wallet.tenant, key=key, request_hash=digest, topup=topup)
+    log_event(action="wallet.topup.created", tenant=wallet.tenant, actor=actor, object_type="wallet_topup", object_id=topup.pk, changes={"amount_idr": amount_idr, "provider": "midtrans"})
+    return topup
+
+
 def _topup(wallet, topup_id):
     topup = WalletTopup.objects.select_for_update().filter(pk=topup_id, wallet=wallet).first()
     if topup is None:
@@ -135,6 +187,8 @@ def _topup(wallet, topup_id):
 def submit_topup(*, topup_id, actor, payment_reference, evidence_ref):
     wallet = locked_wallet()
     topup = _topup(wallet, topup_id)
+    if topup.provider != "manual":
+        raise Conflict("Top-up Midtrans dikonfirmasi otomatis setelah pembayaran; tidak perlu bukti transfer.")
     if topup.status == "PENDING":
         if (topup.payment_reference, topup.evidence_ref) != (payment_reference, evidence_ref):
             raise Conflict("Top-up sudah diajukan dengan bukti/referensi lain.")
@@ -182,6 +236,27 @@ def platform_tenant_context(tenant_id):
                     cursor.execute("SELECT set_config('app.tenant_id', %s, TRUE)", [previous])
 
 
+def _mark_paid(wallet, topup, *, provider_txn_id, actor):
+    """Credit + PAID + outbox in one savepoint; caller holds wallet → top-up locks."""
+    topup.ledger_entry = _append(wallet, amount=topup.amount_idr, kind="TOPUP", reference_type="wallet_topup", reference_id=topup.pk, description=f"Top-up {topup.pk}", actor=actor)
+    topup.paid_at = timezone.now()
+    topup.status, topup.provider_txn_id, topup.settled_by = "PAID", provider_txn_id, actor
+    topup.save(update_fields=["status", "provider_txn_id", "settled_by", "ledger_entry", "paid_at", "updated_at"])
+    WalletEvent.objects.create(tenant=wallet.tenant, topup=topup, payload_json={"wallet_id": str(wallet.pk), "topup_id": str(topup.pk), "amount_idr": topup.amount_idr, "provider": topup.provider})
+
+
+def _retry_pending_charges(wallet):
+    from modules.billing.services import settle_pending_charges
+
+    # Spec §9.3: a settled top-up retries pending charges FIFO under the
+    # same wallet lock. A retry failure never undoes the credit.
+    try:
+        with transaction.atomic():
+            settle_pending_charges(wallet)
+    except DatabaseError:
+        logger.exception("pending_charge_retry_failed", extra={"wallet_id": str(wallet.pk)})
+
+
 @transaction.atomic
 def settle_topup(*, tenant_id, topup_id, actor, amount_idr, provider_txn_id, decision="PAID", reason=""):
     assert_platform_billing(actor)
@@ -193,6 +268,8 @@ def settle_topup(*, tenant_id, topup_id, actor, amount_idr, provider_txn_id, dec
     with platform_tenant_context(tenant_id):
         wallet = locked_wallet()
         topup = _topup(wallet, topup_id)
+        if topup.provider != "manual":
+            raise Conflict("Top-up Midtrans diselesaikan otomatis oleh gateway, bukan settlement manual.")
         if topup.requested_by_id == actor.pk:
             raise PermissionDenied("Petugas settlement harus berbeda dari pemohon top-up.")
         if topup.amount_idr != amount_idr:
@@ -211,30 +288,132 @@ def settle_topup(*, tenant_id, topup_id, actor, amount_idr, provider_txn_id, dec
         try:
             with transaction.atomic():
                 if decision == "PAID":
-                    entry = _append(wallet, amount=topup.amount_idr, kind="TOPUP", reference_type="wallet_topup", reference_id=topup.pk, description=f"Top-up {topup.pk}", actor=actor)
-                    topup.ledger_entry = entry
-                    topup.paid_at = timezone.now()
-                topup.status = decision
-                topup.provider_txn_id = provider_txn_id
-                topup.settled_by = actor
-                topup.reason = reason
-                topup.save(update_fields=["status", "provider_txn_id", "settled_by", "reason", "ledger_entry", "paid_at", "updated_at"])
-                if decision == "PAID":
-                    WalletEvent.objects.create(tenant=wallet.tenant, topup=topup, payload_json={"wallet_id": str(wallet.pk), "topup_id": str(topup.pk), "amount_idr": topup.amount_idr})
+                    _mark_paid(wallet, topup, provider_txn_id=provider_txn_id, actor=actor)
+                else:
+                    topup.status, topup.provider_txn_id, topup.settled_by, topup.reason = decision, provider_txn_id, actor, reason
+                    topup.save(update_fields=["status", "provider_txn_id", "settled_by", "reason", "updated_at"])
         except IntegrityError:
             raise Conflict("Referensi settlement bank sudah digunakan atau ledger tidak konsisten.") from None
         log_event(action=f"wallet.topup.{decision.lower()}", tenant=wallet.tenant, actor=actor, object_type="wallet_topup", object_id=topup.pk, changes={"amount_idr": amount_idr, "reason": reason})
         if decision == "PAID":
-            from modules.billing.services import settle_pending_charges
+            _retry_pending_charges(wallet)
+        return topup
 
-            # Spec §9.3: a settled top-up retries pending charges FIFO under the
-            # same wallet lock. A retry failure never undoes the bank credit.
+
+TERMINAL_TOPUP = {"PAID", "EXPIRED", "REJECTED"}
+
+
+def _gateway_alert(wallet, topup, action, **changes):
+    logger.error(action.replace(".", "_"), extra={"topup_id": str(topup.pk), **{k: str(v) for k, v in changes.items()}})
+    log_event(action=action, tenant=wallet.tenant, object_type="wallet_topup", object_id=topup.pk, changes=changes)
+
+
+def apply_gateway_status(*, topup_id, status):
+    """Apply the authoritative Midtrans status (None = no transaction yet).
+
+    Caller is in the top-up's tenant context and makes no network call while
+    this runs. Idempotent: replays of the same status change nothing.
+    """
+    initial = WalletTopup.objects.filter(pk=topup_id, provider="midtrans").first()
+    if initial is None:
+        raise NotFound("Top-up Midtrans tidak ditemukan.")
+    wallet = Wallet.objects.select_for_update().get(pk=initial.wallet_id)
+    topup = _topup(wallet, topup_id)
+    if status is None:
+        # Snap orders unpaid long after their window are closed locally.
+        if topup.status == "CREATED" and timezone.now() >= topup.expires_at + timedelta(hours=1):
+            topup.status = "EXPIRED"
+            topup.save(update_fields=["status", "updated_at"])
+            log_event(action="wallet.topup.expired", tenant=wallet.tenant, object_type="wallet_topup", object_id=topup.pk)
+        return topup
+    result = midtrans.outcome(status)
+    transaction_status = str(status.get("transaction_status", ""))[:32]
+    if topup.status in TERMINAL_TOPUP:
+        if result == "PAID" and topup.status != "PAID":
+            _gateway_alert(wallet, topup, "wallet.topup.gateway_conflict", local_status=topup.status, gateway_status=transaction_status)
+        elif result == "REFUNDED" and topup.status == "PAID":
+            # Platform policy: no automatic debit; billing reviews the reversal.
+            _gateway_alert(wallet, topup, "wallet.topup.gateway_refunded", gateway_status=transaction_status)
+        return topup
+    fields = ["gateway_status", "payment_type", "updated_at"]
+    topup.gateway_status, topup.payment_type = transaction_status, str(status.get("payment_type", ""))[:32]
+    if result in {"PENDING", "PAID", "FAILED"} and topup.status == "CREATED":
+        topup.status = "PENDING"
+        fields.append("status")
+    topup.save(update_fields=fields)
+    if result == "FAILED":
+        topup.status, topup.reason = "REJECTED", f"Pembayaran Midtrans {transaction_status or 'gagal'}."
+        topup.save(update_fields=["status", "reason", "updated_at"])
+        log_event(action="wallet.topup.rejected", tenant=wallet.tenant, object_type="wallet_topup", object_id=topup.pk, changes={"gateway_status": transaction_status})
+    elif result == "PAID":
+        amount = midtrans.gross_idr(status.get("gross_amount"))
+        if amount != topup.amount_idr:
+            _gateway_alert(wallet, topup, "wallet.topup.gateway_amount_mismatch", expected=topup.amount_idr, received=status.get("gross_amount"))
+        elif wallet.status != "ACTIVE" or not status.get("transaction_id"):
+            _gateway_alert(wallet, topup, "wallet.topup.gateway_review", wallet_status=wallet.status)
+        else:
             try:
                 with transaction.atomic():
-                    settle_pending_charges(wallet)
-            except DatabaseError:
-                logger.exception("pending_charge_retry_failed", extra={"wallet_id": str(wallet.pk)})
+                    _mark_paid(wallet, topup, provider_txn_id=str(status["transaction_id"])[:160], actor=None)
+            except IntegrityError:
+                _gateway_alert(wallet, topup, "wallet.topup.gateway_duplicate_transaction", transaction_id=status["transaction_id"])
+                return topup
+            log_event(action="wallet.topup.paid", tenant=wallet.tenant, object_type="wallet_topup", object_id=topup.pk, changes={"amount_idr": topup.amount_idr, "provider": "midtrans", "payment_type": topup.payment_type})
+            _retry_pending_charges(wallet)
+    return topup
+
+
+def _fetch(order):
+    try:
+        return midtrans.fetch_status(order)
+    except midtrans.GatewayError as exc:
+        raise GatewayUnavailable(str(exc)) from None
+
+
+def handle_gateway_notification(payload):
+    """Webhook: signature first, then the status API as source of truth."""
+    if not isinstance(payload, dict) or not midtrans.valid_signature(payload):
+        raise PermissionDenied("Tanda tangan notifikasi tidak valid.")
+    mapping = GatewayOrder.objects.filter(order_id=payload["order_id"]).first()
+    if mapping is None:
+        # E.g. the dashboard's test notification; acknowledge so it stops retrying.
+        logger.info("midtrans_unknown_order")
+        return None
+    status = _fetch(mapping.order_id)
+    with platform_tenant_context(mapping.tenant_id):
+        return apply_gateway_status(topup_id=mapping.topup_id, status=status).status
+
+
+@transaction.atomic
+def refresh_gateway_topup(*, topup_id):
+    """Tenant-triggered status check (also covers webhooks that cannot reach local dev)."""
+    production_tenant(writable=False)
+    topup = WalletTopup.objects.filter(pk=topup_id).first()
+    if topup is None:
+        raise NotFound("Top-up tidak ditemukan.")
+    if topup.provider != "midtrans":
+        raise ValidationError({"topup": "Hanya top-up Midtrans yang diperiksa ke gateway."})
+    if topup.status in TERMINAL_TOPUP:
         return topup
+    status = _fetch(midtrans.order_id(topup.pk))
+    return apply_gateway_status(topup_id=topup.pk, status=status)
+
+
+def sync_gateway_topups(tenant_id, *, older_than=timedelta(minutes=15), limit=100):
+    """Command helper: re-check open Midtrans top-ups; one transaction each."""
+    with platform_tenant_context(tenant_id):
+        ids = list(WalletTopup.objects.filter(provider="midtrans", status__in=["CREATED", "PENDING"], created_at__lte=timezone.now() - older_than).order_by("created_at").values_list("pk", flat=True)[:limit])
+    synced = 0
+    for topup_id in ids:
+        try:
+            status = midtrans.fetch_status(midtrans.order_id(topup_id))  # no locks held
+        except midtrans.GatewayError:
+            logger.warning("midtrans_sync_skipped", extra={"topup_id": str(topup_id)})
+            continue
+        with platform_tenant_context(tenant_id):
+            apply_gateway_status(topup_id=topup_id, status=status)
+        synced += 1
+    return synced
 
 
 def debit_locked(wallet, *, reference_id, amount_idr, description, actor=None):

@@ -193,6 +193,10 @@ CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", "bonoworxx@gmail.com")
 WALLET_MANUAL_BANK_NAME = env("WALLET_MANUAL_BANK_NAME", "")
 WALLET_MANUAL_ACCOUNT_NAME = env("WALLET_MANUAL_ACCOUNT_NAME", "")
 WALLET_MANUAL_ACCOUNT_NUMBER = env("WALLET_MANUAL_ACCOUNT_NUMBER", "")
+# Midtrans Snap (platform merchant) for SaaS wallet top-ups. Empty server key
+# disables online top-up; sandbox unless MIDTRANS_IS_PRODUCTION=True.
+MIDTRANS_SERVER_KEY = env("MIDTRANS_SERVER_KEY", "")
+MIDTRANS_IS_PRODUCTION = env_bool("MIDTRANS_IS_PRODUCTION", "False")
 
 # --- Enkripsi PII jamaah (Spec §5.2 identity_encrypted, §10.1) ---------------
 # Key Fernet (urlsafe base64 32 byte). Production WAJIB eksplisit (production.py);

@@ -10,6 +10,8 @@ urlpatterns = [
     path("wallet/topups", views.TopupListView.as_view(), name="topups"),
     path("wallet/topups/<uuid:topup_id>", views.TopupDetailView.as_view(), name="topup-detail"),
     path("wallet/topups/<uuid:topup_id>/submit", views.TopupSubmitView.as_view(), name="topup-submit"),
+    path("wallet/topups/<uuid:topup_id>/refresh", views.TopupRefreshView.as_view(), name="topup-refresh"),
+    path("payments/midtrans/notification", views.MidtransNotificationView.as_view(), name="midtrans-notification"),
     path("platform/tenants/<uuid:tenant_id>/wallet/topups", views.PlatformTopupListView.as_view(), name="platform-topups"),
     path("platform/tenants/<uuid:tenant_id>/wallet/topups/<uuid:topup_id>/settle", views.PlatformTopupSettleView.as_view(), name="platform-settle"),
 ]

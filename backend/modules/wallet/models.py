@@ -61,7 +61,7 @@ class WalletLedger(ImmutableRecord):
 class WalletTopup(TenantScopedModel, BaseAppModel):
     wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name="topups")
     amount_idr = models.PositiveBigIntegerField()
-    provider = models.CharField(max_length=24, default="manual", editable=False)
+    provider = models.CharField(max_length=24, default="manual", choices=[("manual", "Transfer manual"), ("midtrans", "Midtrans")])
     status = models.CharField(max_length=16, default="CREATED", choices=[(s, s) for s in ["CREATED", "PENDING", "PAID", "EXPIRED", "REJECTED"]])
     instructions_json = models.JSONField(default=dict)
     payment_reference = models.CharField(max_length=120, blank=True)
@@ -73,27 +73,51 @@ class WalletTopup(TenantScopedModel, BaseAppModel):
     paid_at = models.DateTimeField(null=True)
     reason = models.TextField(blank=True)
     ledger_entry = models.OneToOneField(WalletLedger, on_delete=models.PROTECT, null=True)
+    # Midtrans Snap: redirect URL for the payer and the last authoritative status.
+    payment_url = models.URLField(max_length=255, blank=True)
+    gateway_status = models.CharField(max_length=32, blank=True)
+    payment_type = models.CharField(max_length=32, blank=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
         permissions = [("settle_topup", "Verify platform settlement of SaaS wallet top-ups")]
         constraints = [
             models.CheckConstraint(condition=models.Q(amount_idr__gt=0, amount_idr__lte=10_000_000_000), name="ck_wallet_topup_amount"),
-            models.CheckConstraint(condition=models.Q(provider="manual"), name="ck_wallet_topup_provider"),
+            models.CheckConstraint(condition=models.Q(provider__in=["manual", "midtrans"]), name="ck_wallet_topup_provider"),
             models.UniqueConstraint(fields=["provider", "provider_txn_id"], condition=~models.Q(provider_txn_id=""), name="uq_wallet_topup_provider_txn"),
-            models.CheckConstraint(condition=(models.Q(status="PAID", ledger_entry__isnull=False, paid_at__isnull=False, settled_by__isnull=False) | models.Q(status__in=["CREATED", "PENDING", "EXPIRED", "REJECTED"], ledger_entry__isnull=True, paid_at__isnull=True)), name="ck_wallet_topup_settlement"),
+            # Manual settlement needs a platform officer; Midtrans PAID is verified by the gateway.
+            models.CheckConstraint(condition=(models.Q(status="PAID", ledger_entry__isnull=False, paid_at__isnull=False) & (models.Q(settled_by__isnull=False) | models.Q(provider="midtrans")) | models.Q(status__in=["CREATED", "PENDING", "EXPIRED", "REJECTED"], ledger_entry__isnull=True, paid_at__isnull=True)), name="ck_wallet_topup_settlement"),
             models.CheckConstraint(condition=~models.Q(settled_by=models.F("requested_by")), name="ck_wallet_topup_separation"),
         ]
 
     def save(self, *args, **kwargs):
         if not self._state.adding:
-            allowed = {"status", "payment_reference", "evidence_ref", "provider_txn_id", "settled_by", "paid_at", "reason", "ledger_entry", "updated_at"}
+            allowed = {"status", "payment_reference", "evidence_ref", "provider_txn_id", "settled_by", "paid_at", "reason", "ledger_entry", "payment_url", "gateway_status", "payment_type", "updated_at"}
             if not kwargs.get("update_fields") or not set(kwargs["update_fields"]) <= allowed:
                 raise ValidationError("Nominal dan instruksi top-up tidak dapat diubah.")
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Riwayat top-up tidak dapat dihapus.")
+
+
+class GatewayOrder(BaseAppModel):
+    """Platform lookup: gateway order → tenant/top-up. Webhooks arrive without
+    a session, and wallet tables are RLS-scoped, so the tenant is resolved here
+    first. No pilgrim or payer data; append-only."""
+
+    provider = models.CharField(max_length=24, default="midtrans")
+    order_id = models.CharField(max_length=50, unique=True)
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.PROTECT, related_name="gateway_orders")
+    topup_id = models.UUIDField(unique=True)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Pemetaan order gateway bersifat append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Pemetaan order gateway tidak dapat dihapus.")
 
 
 class WalletOperation(ImmutableRecord):

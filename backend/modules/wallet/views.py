@@ -10,7 +10,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,7 +20,7 @@ from modules.billing.services import current_price
 from modules.booking.models import BookingParticipant
 from modules.tenants.environment import resolve_active_environment
 from modules.tenants.rbac import require_permission
-from modules.wallet import services
+from modules.wallet import midtrans, services
 from modules.wallet.models import Wallet, WalletLedger, WalletTopup
 from modules.wallet.serializers import (
     TopupCreateSerializer,
@@ -96,6 +96,8 @@ class WalletView(APIView):
         credits = services.ledger_total(wallet) if wallet else 0
         reconciliation = wallet.reconciliations.order_by("-created_at").first() if wallet else None
         rate = current_price().unit_price_idr
+        topup_open = not demo and request.tenant.state in {"ACTIVE", "RESTRICTED"} and (wallet is None or wallet.status == "ACTIVE")
+        methods = {"manual": topup_open and services.manual_instructions() is not None, "midtrans": topup_open and midtrans.configured()}
         pending = SaaSCharge.objects.filter(status="PENDING").aggregate(count=Count("id"), total=Sum("unit_price_idr")) if not demo else {"count": 0, "total": 0}
         return Response({
             "id": str(wallet.pk) if wallet else None, "currency": "IDR", "environment": "demo" if demo else "production",
@@ -107,7 +109,8 @@ class WalletView(APIView):
             "tenant_state": request.tenant.state,
             "version": wallet.version if wallet else 0, "ledger_balance_idr": credits,
             "balance_matches_ledger": balance == credits,
-            "topup_available": not demo and request.tenant.state in {"ACTIVE", "RESTRICTED"} and (wallet is None or wallet.status == "ACTIVE") and services.manual_instructions() is not None,
+            "topup_available": topup_open and any(methods.values()),
+            "topup_methods": methods,
             "provider": "manual", "topup_minimum_idr": None,
             "last_reconciliation": {"at": reconciliation.created_at.isoformat(), "consistent": reconciliation.consistent, "variance_idr": reconciliation.variance_idr} if reconciliation else None,
         })
@@ -188,6 +191,27 @@ class TopupSubmitView(APIView):
         serializer.is_valid(raise_exception=True)
         topup = services.submit_topup(topup_id=topup_id, actor=request.user, **serializer.validated_data)
         return Response(topup_payload(topup))
+
+
+class TopupRefreshView(APIView):
+    permission_classes = [IsAuthenticated, wallet_permission("wallet.read")]
+
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT, description="Re-read a Midtrans top-up from the Midtrans status API and apply it (idempotent). Useful when webhooks cannot reach this server.")
+    def post(self, request, topup_id):
+        return Response(topup_payload(services.refresh_gateway_topup(topup_id=topup_id)))
+
+
+class MidtransNotificationView(APIView):
+    """Public Midtrans HTTP notification. No session/CSRF; trust comes from the
+    SHA-512 signature plus a status API re-read. Non-2xx makes Midtrans retry."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT, auth=[])
+    def post(self, request):
+        result = services.handle_gateway_notification(request.data)
+        return Response({"received": True, "status": result})
 
 
 class PlatformTopupSettleView(APIView):
