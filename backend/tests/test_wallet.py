@@ -206,7 +206,10 @@ def test_atomic_debit_dedup_and_insufficient_balance(wallet_setup):
         assert atomic_debit(reference_id=uuid4(), amount_idr=50_000)
         assert atomic_debit(reference_id=uuid4(), amount_idr=1) is None
         result = reconcile_wallet()
-        assert result.consistent and result.ledger_balance_idr == 0 and result.ledger_count == 3
+        # S13: balance/chain stay exact, but a debit without a SaaSCharge is flagged.
+        assert result.ledger_balance_idr == 0 and result.ledger_count == 3 and result.variance_idr == 0
+        assert result.details_json["chain_ok"] and result.details_json["orphan_debits"] == 2
+        assert not result.consistent
     assert balance(s)["balance_idr"] == 0
 
 
@@ -379,10 +382,12 @@ def test_topup_stays_separate_from_travel_dp_and_s13_confirmation(wallet_setup, 
     ok(settle(s, topup(s)))
     same_payment = ok(s["client"].get(f"/api/v1/payments/{payment['id']}"))
     assert same_payment["receipt"] == verified["receipt"]
-    assert same_payment["participants"] == verified["participants"]  # S13 owns automatic settlement
+    # S13: the settled top-up retries the pending charge once (PAY04); DP stays travel money.
+    charged = [p for p in same_payment["participants"] if p["saas_charge_state"] == "charged"]
+    assert len(charged) == 1 and charged[0]["status"] == "CONFIRMED" and charged[0]["saas_charge_status"] == "POSTED"
     invoice = ok(s["client"].get(f"/api/v1/invoices/{travel['invoice']['id']}"))
     assert invoice["paid_idr"] == 1
-    assert balance(s)["balance_idr"] == 100_000
+    assert balance(s)["balance_idr"] == 50_000
 
 
 def test_demo_read_never_exposes_production_ledger(wallet_setup):

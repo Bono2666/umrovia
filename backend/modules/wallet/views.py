@@ -3,6 +3,7 @@ import io
 from datetime import UTC, datetime, time, timedelta
 
 from django.db import transaction
+from django.db.models import Count, Sum
 from django.http import HttpResponse
 from django.utils.dateparse import parse_date
 from drf_spectacular.types import OpenApiTypes
@@ -14,6 +15,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.billing.models import SaaSCharge
+from modules.billing.services import current_price
 from modules.booking.models import BookingParticipant
 from modules.tenants.environment import resolve_active_environment
 from modules.tenants.rbac import require_permission
@@ -28,7 +31,7 @@ from modules.wallet.serializers import (
 )
 
 IDEMPOTENCY = OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)
-LEDGER_PARAMS = [OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE), OpenApiParameter("kind", str, enum=["TOPUP", "DEBIT"]), OpenApiParameter("page", int)]
+LEDGER_PARAMS = [OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE), OpenApiParameter("kind", str, enum=["TOPUP", "DEBIT", "REFUND"]), OpenApiParameter("page", int)]
 
 
 class WalletPagination(PageNumberPagination):
@@ -74,7 +77,7 @@ def _ledger(request):
         raise ValidationError({"to": "Tanggal akhir harus sama atau setelah tanggal awal."})
     kind = request.query_params.get("kind")
     if kind:
-        if kind not in {"TOPUP", "DEBIT"}:
+        if kind not in {"TOPUP", "DEBIT", "REFUND"}:
             raise ValidationError({"kind": "Jenis mutasi tidak dikenal."})
         qs = qs.filter(kind=kind)
     return qs
@@ -92,11 +95,16 @@ class WalletView(APIView):
         balance = wallet.balance_cached_idr if wallet else 0
         credits = services.ledger_total(wallet) if wallet else 0
         reconciliation = wallet.reconciliations.order_by("-created_at").first() if wallet else None
+        rate = current_price().unit_price_idr
+        pending = SaaSCharge.objects.filter(status="PENDING").aggregate(count=Count("id"), total=Sum("unit_price_idr")) if not demo else {"count": 0, "total": 0}
         return Response({
             "id": str(wallet.pk) if wallet else None, "currency": "IDR", "environment": "demo" if demo else "production",
             "status": wallet.status if wallet else "UNFUNDED", "balance_idr": balance,
-            "standard_rate_idr": services.UNIT_PRICE_IDR, "estimated_participant_capacity": balance // services.UNIT_PRICE_IDR,
+            "standard_rate_idr": rate, "estimated_participant_capacity": balance // rate,
             "pending_participant_count": 0 if demo else BookingParticipant.objects.filter(environment="production", saas_charge_state="pending_charge").count(),
+            "pending_charge_count": pending["count"], "pending_charge_idr": pending["total"] or 0,
+            "posted_charge_count": 0 if demo else SaaSCharge.objects.filter(status="POSTED").count(),
+            "tenant_state": request.tenant.state,
             "version": wallet.version if wallet else 0, "ledger_balance_idr": credits,
             "balance_matches_ledger": balance == credits,
             "topup_available": not demo and request.tenant.state in {"ACTIVE", "RESTRICTED"} and (wallet is None or wallet.status == "ACTIVE") and services.manual_instructions() is not None,

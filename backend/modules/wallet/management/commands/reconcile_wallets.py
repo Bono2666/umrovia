@@ -1,9 +1,10 @@
-"""Daily reconciliation and safe expiry; scheduling belongs to S16."""
+"""Daily reconciliation, safe expiry and pending-charge retry; scheduling belongs to S16."""
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
 from modules.audit.services import log_event
+from modules.billing.services import settle_pending_charges
 from modules.tenants.models import Tenant
 from modules.wallet.models import WalletTopup
 from modules.wallet.services import platform_tenant_context, reconcile_wallet
@@ -38,6 +39,10 @@ class Command(BaseCommand):
                 if result:
                     checked += 1
                     mismatches += not result.consistent
+                    if result.consistent:
+                        # Spec §11 pending_charge_retry after reconciliation; a
+                        # mismatched wallet is reviewed before any new debit.
+                        settle_pending_charges(result.wallet)
         self.stdout.write(f"wallets={checked} mismatches={mismatches}")
         if mismatches:
             raise CommandError("Rekonsiliasi menemukan mismatch; tinjau tanpa mengedit ledger.")

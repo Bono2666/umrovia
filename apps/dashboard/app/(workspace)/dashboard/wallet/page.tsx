@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
-import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
+import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasCharge, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
 const LABELS: Record<string, string> = {CREATED: "Menunggu transfer", PENDING: "Menunggu verifikasi platform", PAID: "Saldo telah masuk", EXPIRED: "Kedaluwarsa", REJECTED: "Ditolak"};
+const KIND: Record<string, string> = {TOPUP: "Top-up", DEBIT: "Biaya SaaS", REFUND: "Refund SaaS"};
+const CHARGE: Record<string, string> = {POSTED: "Tercharge", PENDING_INSUFFICIENT_FUNDS: "Menunggu saldo", PENDING_WALLET_UNAVAILABLE: "Wallet tidak tersedia", VOID: "Dibatalkan", REFUNDED: "Direfund"};
+const PARTICIPANT: Record<string, string> = {AWAITING_DP: "Menunggu DP", DP_VERIFIED_PENDING_CHARGE: "DP terverifikasi", CONFIRMED: "Terkonfirmasi", READY: "Siap", DEPARTED: "Berangkat", COMPLETED: "Selesai", CANCELED: "Batal", REVIEW_REQUIRED: "Perlu review"};
+const REFUND: Record<string, string> = {REQUESTED: "Refund diajukan", APPROVED: "Refund disetujui", REJECTED: "Refund ditolak"};
 const dateTime = (value: string) => new Date(value).toLocaleString("id-ID", {dateStyle:"long", timeStyle:"short"});
 
 export default function WalletPage() {
@@ -15,6 +19,9 @@ export default function WalletPage() {
   const [wallet, setWallet] = useState<SaasWallet | null>(null);
   const [ledger, setLedger] = useState<Paginated<WalletLedger> | null>(null);
   const [topups, setTopups] = useState<Paginated<WalletTopup> | null>(null);
+  const [charges, setCharges] = useState<Paginated<SaasCharge> | null>(null);
+  const [chargePage, setChargePage] = useState(1);
+  const [chargeStatus, setChargeStatus] = useState("");
   const [ledgerPage, setLedgerPage] = useState(1);
   const [topupPage, setTopupPage] = useState(1);
   const [filters, setFilters] = useState({from:"", to:"", kind:""});
@@ -36,9 +43,11 @@ export default function WalletPage() {
       apiFetch<SaasWallet>("/wallet"),
       apiFetch<Paginated<WalletLedger>>(`/wallet/ledger?page=${ledgerPage}&${query}`),
       apiFetch<Paginated<WalletTopup>>(`/wallet/topups?page=${topupPage}`),
+      apiFetch<Paginated<SaasCharge>>(`/wallet/charges?page=${chargePage}${chargeStatus ? `&status=${chargeStatus}` : ""}`),
     ]).then((results) => {
     if (sequence !== loadSequence.current) return;
-    const [balance, transactions, requests] = results;
+    const [balance, transactions, requests, saasCharges] = results;
+    if (saasCharges.ok) setCharges(saasCharges.data);
     if (balance.ok) setWallet(balance.data);
     if (transactions.ok) setLedger(transactions.data);
     if (requests.ok) {
@@ -47,7 +56,7 @@ export default function WalletPage() {
     }
     for (const result of results) if (!result.ok) setError(problemMessage(result.error));
     });
-  }, [ledgerPage, topupPage, query]);
+  }, [ledgerPage, topupPage, chargePage, chargeStatus, query]);
   useEffect(() => {if (!loading && canRead) void load();}, [loading, canRead, load]);
 
   async function create(event: React.FormEvent) {
@@ -74,6 +83,27 @@ export default function WalletPage() {
     setSelected(result.data); setMessage("Bukti diajukan. Menunggu verifikasi dana oleh platform."); void load();
   }
 
+  async function retryCharges() {
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch<{posted: number; pending: number; voided: number}>("/wallet/charges/retry", {method:"POST"});
+    setBusy(false);
+    if (!result.ok) {setError(problemMessage(result.error)); return;}
+    const {posted, pending} = result.data;
+    setMessage(posted ? `${posted} charge berhasil diproses dari saldo.${pending ? ` ${pending} masih menunggu saldo.` : ""}` : pending ? `Saldo belum cukup; ${pending} charge masih menunggu top-up.` : "Tidak ada charge tertunda.");
+    void load();
+  }
+
+  async function requestRefund(charge: SaasCharge) {
+    const reason = window.prompt(`Alasan permintaan refund biaya SaaS ${formatIdr(charge.unit_price_idr)} untuk ${charge.pilgrim_name} (wajib, minimal 5 karakter). Saldo bertambah setelah disetujui platform:`);
+    if (reason === null) return;
+    if (reason.trim().length < 5) {setError("Alasan refund minimal 5 karakter."); return;}
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/wallet/charges/${charge.id}/refund-request`, {method:"POST", body:JSON.stringify({reason:reason.trim()})});
+    setBusy(false);
+    if (!result.ok) {setError(problemMessage(result.error)); return;}
+    setMessage("Permintaan refund diajukan untuk ditinjau platform. Saldo belum berubah."); void load();
+  }
+
   function pick(topup: WalletTopup) {setSelected(topup); setReference(topup.payment_reference); setEvidence(topup.evidence_ref);}
 
   if (loading) return <LoadingState />;
@@ -86,12 +116,14 @@ export default function WalletPage() {
     {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
     {!wallet ? (error ? null : <div className="mt-6"><LoadingState /></div>) : <>
       {wallet.environment === "demo" ? <p className="mt-4 border border-border p-4 text-sm text-muted">Mode demo tidak memakai saldo atau transaksi wallet nyata. Top-up tersedia setelah travel beralih ke produksi.</p> : null}
+      {wallet.tenant_state === "RESTRICTED" ? <p className="mt-4 border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">Ada {wallet.pending_charge_count} biaya layanan tertunda. DP dan layanan jamaah tetap berjalan; konfirmasi peserta baru menunggu saldo mencukupi.</p> : null}
       {wallet.status === "FROZEN" ? <p className="mt-4 text-sm text-danger" role="alert">Wallet dibekukan. Hubungi dukungan untuk peninjauan.</p> : null}
       {!wallet.balance_matches_ledger || wallet.last_reconciliation?.consistent === false ? <p className="mt-4 border border-danger/30 p-4 text-sm text-danger" role="alert">Saldo memerlukan peninjauan rekonsiliasi. Hubungi dukungan platform.</p> : null}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <section className="card p-5"><p className="text-sm text-muted">Saldo tersedia</p><p className="mt-2 text-2xl font-semibold">{formatIdr(wallet.balance_idr)}</p></section>
         <section className="card p-5"><p className="text-sm text-muted">Perkiraan kapasitas saldo</p><p className="mt-2 text-2xl font-semibold">{wallet.estimated_participant_capacity} jamaah</p><p className="mt-1 text-xs text-muted">Tarif standar {formatIdr(wallet.standard_rate_idr)} per booking-jamaah</p></section>
-        <section className="card p-5"><p className="text-sm text-muted">DP menunggu charge</p><p className="mt-2 text-2xl font-semibold">{wallet.pending_participant_count} jamaah</p><p className="mt-1 text-xs text-muted">Pembayaran DP tetap sah dan kuitansi tetap tersedia.</p></section>
+        <section className="card p-5"><p className="text-sm text-muted">Charge menunggu saldo</p><p className="mt-2 text-2xl font-semibold">{wallet.pending_charge_count} jamaah</p><p className="mt-1 text-xs text-muted">{wallet.pending_charge_count ? `Butuh ${formatIdr(wallet.pending_charge_idr)}. ` : ""}Pembayaran DP tetap sah dan kuitansi tetap tersedia.</p>
+          {wallet.pending_charge_count && can("wallet.topup") ? <Btn className="mt-3" size="xs" variant="tint" disabled={busy || wallet.balance_idr <= 0} onClick={() => void retryCharges()}>Proses dengan saldo saat ini</Btn> : null}</section>
       </div>
       <div className="workspace-columns mt-6">
         <section className="card min-w-0 p-6"><h2 className="font-semibold">Riwayat top-up</h2>
@@ -117,15 +149,30 @@ export default function WalletPage() {
           </section> : null}
         </div>
       </div>
+      <section className="card mt-6 p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Biaya SaaS per jamaah</h2>
+          <FormSelect label="Status" htmlFor="charge-status" value={chargeStatus} onChange={(event) => {setChargePage(1); setChargeStatus(event.target.value);}}><option value="">Semua</option><option value="POSTED">Tercharge</option><option value="PENDING">Menunggu saldo</option><option value="REFUNDED">Direfund</option><option value="VOID">Dibatalkan</option></FormSelect></div>
+        <p className="mt-1 text-sm text-muted">Satu biaya {formatIdr(wallet.standard_rate_idr)} per booking-jamaah setelah DP terverifikasi. Pembatalan tidak mengembalikan biaya otomatis; refund diajukan untuk ditinjau platform.</p>
+        {charges === null ? <LoadingState /> : charges.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada biaya layanan" /></div> : <>
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm"><thead><tr className="border-b border-border text-muted"><th className="py-3 pr-4">Jamaah</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Eligible</th><th className="py-3 text-right">Biaya</th></tr></thead><tbody>{charges.results.map((row) => <tr key={row.id} className="border-b border-border align-top">
+            <td className="py-3 pr-4"><span className="font-medium">{row.pilgrim_name}</span><p className="mt-1 text-xs text-muted">{row.booking_code} · {PARTICIPANT[row.participant_status] ?? row.participant_status}</p></td>
+            <td className="py-3 pr-4"><StatusBadge tone={row.status === "POSTED" ? "success" : row.status === "PENDING" ? "warning" : "neutral"}>{CHARGE[row.saas_charge_status] ?? row.saas_charge_status}</StatusBadge>
+              {row.refund ? <p className="mt-1 text-xs text-muted">{REFUND[row.refund.status]}{row.refund.decision_reason ? ` · ${row.refund.decision_reason}` : ""}</p> : null}
+              {row.void_reason ? <p className="mt-1 text-xs text-muted">{row.void_reason}</p> : null}
+              {row.refundable && can("wallet.refund_request") ? <div className="mt-1"><Btn size="xs" variant="link" disabled={busy} onClick={() => void requestRefund(row)}>Ajukan refund</Btn></div> : null}</td>
+            <td className="py-3 pr-4">{formatDate(row.eligible_at)}{row.charged_at ? <p className="mt-1 text-xs text-muted">Dipotong {formatDate(row.charged_at)}</p> : null}</td>
+            <td className="py-3 text-right">{formatIdr(row.unit_price_idr)}</td></tr>)}</tbody></table></div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><Btn size="xs" variant="solid" disabled={!charges.previous} onClick={() => setChargePage((value) => value - 1)}>Sebelumnya</Btn><span>Halaman {chargePage}</span><Btn size="xs" variant="solid" disabled={!charges.next} onClick={() => setChargePage((value) => value + 1)}>Berikutnya</Btn></div>
+        </>}
+      </section>
       <section className="card mt-6 p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Mutasi wallet</h2>{can("wallet.export") ? <a className="text-sm text-primary underline" href={`${API_BASE}/api/v1/wallet/ledger/export?${query}`}>Unduh CSV</a> : null}</div>
         <form className="wallet-filters mt-6 grid items-end gap-4 sm:grid-cols-4" onSubmit={(event) => {event.preventDefault(); setLedgerPage(1); setFilters(draftFilters);}}>
           <FormField label="Dari tanggal (UTC)" htmlFor="ledger-from" type="date" value={draftFilters.from} onChange={(event) => setDraftFilters({...draftFilters,from:event.target.value})} />
           <FormField label="Sampai tanggal (UTC)" htmlFor="ledger-to" type="date" value={draftFilters.to} onChange={(event) => setDraftFilters({...draftFilters,to:event.target.value})} />
-          <FormSelect label="Jenis mutasi" htmlFor="ledger-kind" value={draftFilters.kind} onChange={(event) => setDraftFilters({...draftFilters,kind:event.target.value})}><option value="">Semua</option><option value="TOPUP">Top-up</option><option value="DEBIT">Biaya SaaS</option></FormSelect>
+          <FormSelect label="Jenis mutasi" htmlFor="ledger-kind" value={draftFilters.kind} onChange={(event) => setDraftFilters({...draftFilters,kind:event.target.value})}><option value="">Semua</option><option value="TOPUP">Top-up</option><option value="DEBIT">Biaya SaaS</option><option value="REFUND">Refund SaaS</option></FormSelect>
           <Btn type="submit">Terapkan</Btn>
         </form>
         {ledger === null ? <LoadingState /> : ledger.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada mutasi pada periode ini" /></div> : <>
-          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-border text-muted"><th className="py-3 pr-4">Tanggal</th><th className="py-3 pr-4">Keterangan</th><th className="py-3 pr-4 text-right">Mutasi</th><th className="py-3 text-right">Saldo setelah</th></tr></thead><tbody>{ledger.results.map((row) => <tr key={row.id} className="border-b border-border"><td className="py-3 pr-4">{formatDate(row.created_at)}</td><td className="py-3 pr-4"><span>{row.kind === "TOPUP" ? "Top-up" : "Biaya SaaS"}</span><p className="mt-1 max-w-72 break-all text-xs text-muted">{row.reference_id}</p></td><td className={`py-3 pr-4 text-right font-medium ${row.signed_amount_idr > 0 ? "text-success" : "text-foreground"}`}>{row.signed_amount_idr > 0 ? "+" : "−"}{formatIdr(Math.abs(row.signed_amount_idr))}</td><td className="py-3 text-right">{formatIdr(row.balance_after_idr)}</td></tr>)}</tbody></table></div>
+          <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b border-border text-muted"><th className="py-3 pr-4">Tanggal</th><th className="py-3 pr-4">Keterangan</th><th className="py-3 pr-4 text-right">Mutasi</th><th className="py-3 text-right">Saldo setelah</th></tr></thead><tbody>{ledger.results.map((row) => <tr key={row.id} className="border-b border-border"><td className="py-3 pr-4">{formatDate(row.created_at)}</td><td className="py-3 pr-4"><span>{KIND[row.kind] ?? row.kind}</span><p className="mt-1 max-w-72 break-all text-xs text-muted">{row.reference_id}</p></td><td className={`py-3 pr-4 text-right font-medium ${row.signed_amount_idr > 0 ? "text-success" : "text-foreground"}`}>{row.signed_amount_idr > 0 ? "+" : "−"}{formatIdr(Math.abs(row.signed_amount_idr))}</td><td className="py-3 text-right">{formatIdr(row.balance_after_idr)}</td></tr>)}</tbody></table></div>
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><Btn size="xs" variant="solid" disabled={!ledger.previous} onClick={() => setLedgerPage((value) => value - 1)}>Sebelumnya</Btn><span>Halaman {ledgerPage}</span><Btn size="xs" variant="solid" disabled={!ledger.next} onClick={() => setLedgerPage((value) => value + 1)}>Berikutnya</Btn></div>
         </>}
         {wallet.last_reconciliation ? <p className="mt-4 text-xs text-muted">Rekonsiliasi terakhir {formatDate(wallet.last_reconciliation.at)} · {wallet.last_reconciliation.consistent ? "Sesuai" : "Perlu ditinjau"}</p> : null}

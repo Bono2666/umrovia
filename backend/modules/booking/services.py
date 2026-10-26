@@ -594,7 +594,11 @@ def transition_booking(
         fields += ["cancel_reason", "canceled_by"]
     booking.save(update_fields=fields)
     if target in (BookingStatus.CANCELED, BookingStatus.EXPIRED):
+        from modules.billing.services import void_pending_for_booking
         from modules.payments.services import cancel_booking_invoice
 
         cancel_booking_invoice(booking, reason or "Booking kedaluwarsa")
+        if booking.environment == "production":
+            # Charge POSTED tidak direfund otomatis (PAY09); hanya PENDING di-VOID.
+            void_pending_for_booking(booking, reason or "Booking kedaluwarsa")
     return booking

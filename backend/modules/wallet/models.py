@@ -39,7 +39,7 @@ class ImmutableRecord(TenantScopedModel, BaseAppModel):
 class WalletLedger(ImmutableRecord):
     wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT, related_name="ledger")
     sequence = models.PositiveBigIntegerField()
-    kind = models.CharField(max_length=16, choices=[("TOPUP", "Top-up"), ("DEBIT", "Debit SaaS")])
+    kind = models.CharField(max_length=16, choices=[("TOPUP", "Top-up"), ("DEBIT", "Debit SaaS"), ("REFUND", "Refund SaaS")])
     signed_amount_idr = models.BigIntegerField()
     balance_after_idr = models.PositiveBigIntegerField()
     reference_type = models.CharField(max_length=32)
@@ -52,7 +52,7 @@ class WalletLedger(ImmutableRecord):
         constraints = [
             models.UniqueConstraint(fields=["wallet", "sequence"], name="uq_wallet_ledger_sequence"),
             models.UniqueConstraint(fields=["wallet", "kind", "reference_type", "reference_id"], name="uq_wallet_ledger_source"),
-            models.CheckConstraint(condition=(models.Q(kind="TOPUP", signed_amount_idr__gt=0, reference_type="wallet_topup") | models.Q(kind="DEBIT", signed_amount_idr__lt=0, reference_type="saas_charge")), name="ck_wallet_ledger_sign"),
+            models.CheckConstraint(condition=(models.Q(kind="TOPUP", signed_amount_idr__gt=0, reference_type="wallet_topup") | models.Q(kind="DEBIT", signed_amount_idr__lt=0, reference_type="saas_charge") | models.Q(kind="REFUND", signed_amount_idr__gt=0, reference_type="saas_adjustment")), name="ck_wallet_ledger_sign"),
             models.CheckConstraint(condition=models.Q(balance_after_idr__lte=MAX_BALANCE), name="ck_wallet_ledger_max"),
             models.CheckConstraint(condition=models.Q(sequence__gt=0), name="ck_wallet_sequence_positive"),
         ]

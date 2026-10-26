@@ -404,7 +404,35 @@ scope actor. Panduan dan bukti: [Koreksi data](DATA_CORRECTIONS.md).
 Verifikasi: **303/303 test backend**, 52 targeted, lint/TypeScript/Ruff,
 browser API nyata ketujuh form + readonly/dark/mobile, build Docker,
 runtime/API healthy dan smoke browser build produksi lulus. Tidak ada migrasi
-database baru. Database QA sudah dibersihkan. Status S13 tetap TODO.
+database baru. Database QA sudah dibersihkan.
+
+## Sprint S13 — Billing event flow, saldo kurang & refund (F06 → M4)
+
+**Status:** DONE — implementasi, pengujian, migrasi dan browser API nyata
+terverifikasi (26 Oktober 2026). Branch `sprint/s13-billing-charges`.
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S13-01 | Charge `initial` per booking-jamaah, tarif snapshot `SaaSPriceVersion` STD-2026 Rp50.000, partial unique `uq_saas_charge_once` | DONE | `billing/models.py`, `billing/0001`; PAY06/PAY07 |
+| S13-02 | Verifikasi DP produksi → charge + DEBIT ledger + peserta CONFIRMED + outbox dalam satu transaksi; urutan lock wallet → booking | DONE | `charge_verified_booking`, PAY01, PAY02 (10 verifikasi serentak = 1 charge) |
+| S13-03 | Saldo kurang: DP VERIFIED + kuitansi, charge PENDING beralasan, `saas_charge_status` di respons 200, tenant RESTRICTED, alert dedupe | DONE | PAY03, test wallet frozen |
+| S13-04 | Retry FIFO ketat setelah top-up PAID, refund disetujui, tombol tenant, `retry_pending_charges` dan `reconcile_wallets` | DONE | PAY04, FIFO, PAY10 (5 charge dana 2 = 2 POSTED/3 PENDING), race top-up vs verifikasi tanpa deadlock |
+| S13-05 | Reversal DP/pembatalan booking mem-VOID charge PENDING; POSTED tidak direfund otomatis; epoch charge baru | DONE | PAY08, PAY09, test reversal |
+| S13-06 | Refund: permintaan Owner (peserta batal) → keputusan platform `billing.approve_adjustment` → satu kredit REFUND | DONE | SEC03 (replay + 5 persetujuan serentak = 1 kredit), pemisahan peran |
+| S13-07 | Guard DB: terms immutable, transisi valid, POSTED↔DEBIT, REFUNDED↔APPROVED↔REFUND, parent produksi/verified; RLS 3 tabel | DONE | SQL mutation tests, probe RLS non-superuser |
+| S13-08 | Rekonsiliasi: DEBIT ↔ charge, REFUND ↔ adjustment, orphan terdeteksi, jumlah pending | DONE | `charge_checks`, test S12 diperbarui untuk invariant baru |
+| S13-09 | API: `/wallet/charges`, retry, refund-request, charge-preview, antrean/keputusan refund platform; ledger `REFUND` | DONE | OpenAPI, test izin/IDOR/demo |
+| S13-10 | UI Wallet (charge per jamaah, banner RESTRICTED, proses ulang, refund) dan pratinjau biaya saat verifikasi DP | DONE | Playwright API nyata pada DB terpisah, dark/mobile |
+| S13-11 | Regresi, migrasi clean/rollback/reapply, lint/TypeScript, dokumentasi | DONE | [verifikasi S13](SPRINT_S13_VERIFICATION.md), [ADR-0009](../adr/0009-saas-charge-pending-refund.md) |
+
+**Exit gate S13 (Exactly-once charge + ledger consistency) dan M4:** DP
+terverifikasi menghasilkan tepat satu debit per booking-jamaah dalam
+konkurensi nyata; saldo kurang menghasilkan pending charge tanpa menggagalkan
+DP; rekonsiliasi konsisten setelah charge, retry dan refund. M4 tercapai.
+
+**Batas tahap:** waiver charge, tarif bertingkat dan chargeback gateway
+menunggu keputusan bisnis; platform console UI refund → S18 (API tersedia);
+pengiriman notifikasi outbox billing dan penjadwalan command → S16.
 
 ## Sprint berikutnya
 
@@ -421,7 +449,8 @@ database baru. Database QA sudah dibersihkan. Status S13 tetap TODO.
 | S10 | 10 | Manifest base & checklist operasional (ekspor manifest dasar) | DONE |
 | S11 | 11 | Invoice/kuitansi, verifikasi DP dan varian harga kamar | DONE |
 | S12 | 12 | Prepaid wallet, top-up manual dan immutable ledger | DONE |
-| S13–S19 | 13–19 | mengikuti Roadmap §3 | TODO |
+| S13 | 13 | Billing event flow, saldo kurang, refund (M4) | DONE |
+| S14–S19 | 14–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
