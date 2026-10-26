@@ -6,10 +6,13 @@ import {
   EmptyState,
   ErrorState,
   FormField,
+  FormCheckbox,
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type BankAccount } from "@/lib/api";
+import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
+import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
 /**
  * Kas & Bank (S06, §5.3): daftar rekening bank resmi travel (nomor hanya
@@ -18,6 +21,9 @@ import { apiFetch, problemMessage, type BankAccount } from "@/lib/api";
  * → tampil status tanpa akses (server menolak semua operasi).
  */
 export default function RekeningPage() {
+  const {can} = useWorkspacePermissions();
+  const [editing, setEditing] = useState<BankAccount | null>(null);
+  const [active, setActive] = useState(true);
   const [rows, setRows] = useState<BankAccount[] | null>(null);
   const [noAccess, setNoAccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,35 +53,42 @@ export default function RekeningPage() {
       bank_name: bankName.trim() ? null : "Nama bank wajib diisi.",
       account_name: accountName.trim() ? null : "Nama pemilik wajib diisi.",
       account_number:
-        accountNumber.replace(/\D/g, "").length >= 8
+        (editing && !accountNumber.trim()) || /^\d{8,32}$/.test(accountNumber.trim())
           ? null
-          : "Nomor rekening minimal 8 digit.",
+          : "Nomor rekening harus 8–32 digit.",
     };
     setFormErrors(errors);
     if (Object.values(errors).some(Boolean)) return;
 
     setBusy(true);
     setMessage(null);
-    const result = await apiFetch<{ bank_account: BankAccount }>("/bank-accounts", {
-      method: "POST",
-      body: JSON.stringify({
-        bank_name: bankName.trim(),
-        account_name: accountName.trim(),
-        account_number: accountNumber.replace(/\D/g, ""),
-      }),
+    const values = {bank_name:bankName.trim(), account_name:accountName.trim(), active};
+    const payload = {...(editing ? changedFields(values, editing) : {bank_name:values.bank_name, account_name:values.account_name}),
+      ...(!editing || accountNumber.trim() ? {account_number:accountNumber.trim()} : {})};
+    if (editing && Object.keys(payload).length === 0) {setBusy(false); setMessage("Tidak ada perubahan pada rekening."); return;}
+    const result = await apiFetch<{ bank_account: BankAccount }>(editing ? `/bank-accounts/${editing.id}` : "/bank-accounts", {
+      method: editing ? "PATCH" : "POST",
+      body: JSON.stringify(payload),
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors({ form: problemMessage(result.error) });
+      setFormErrors(apiFormErrors(result.error));
       return;
     }
-    setBankName("");
-    setAccountName("");
-    setAccountNumber("");
+    resetForm();
     setMessage(
       `Rekening tersimpan (tersimpan sebagai nomor masked ${result.data.bank_account.account_masked}).`,
     );
     load();
+  }
+
+  function resetForm() {
+    setEditing(null); setBankName(""); setAccountName(""); setAccountNumber(""); setActive(true); setFormErrors({});
+  }
+
+  function editAccount(account: BankAccount) {
+    resetForm(); setEditing(account); setBankName(account.bank_name); setAccountName(account.account_name); setActive(account.active);
+    setMessage(null); setError(null); focusForm("bank-form");
   }
 
   async function onToggle(account: BankAccount) {
@@ -100,7 +113,7 @@ export default function RekeningPage() {
         <h1 className="text-2xl font-bold">Kas &amp; Bank</h1>
         <div className="mt-6">
           <EmptyState
-            title="Halaman ini khusus Owner/Admin/Finance"
+            title="Halaman ini khusus staf dengan akses rekening"
             description="Peran Anda tidak memiliki akses rekening bank (bank_accounts.read)."
           />
         </div>
@@ -156,19 +169,20 @@ export default function RekeningPage() {
                 <StatusBadge tone={account.active ? "success" : "neutral"}>
                   {account.active ? "AKTIF" : "NONAKTIF"}
                 </StatusBadge>
-                <Btn variant="tint" className="ml-auto" onClick={() => onToggle(account)}>
+                {can("bank_accounts.write") ? <><Btn variant="tint" className="ml-auto" disabled={busy} onClick={() => editAccount(account)}>Ubah rekening</Btn>
+                <Btn variant="tint" disabled={busy} onClick={() => onToggle(account)}>
                   {account.active ? "Nonaktifkan" : "Aktifkan"}
-                </Btn>
+                </Btn></> : null}
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      <section className="card p-6">
-        <h2 className="font-semibold">Tambah rekening</h2>
+      {can("bank_accounts.write") ? <section className="card p-6">
+        <h2 className="font-semibold">{editing ? `Ubah rekening ${editing.bank_name}` : "Tambah rekening"}</h2>
         {/* Workspace controls use compact typography and field spacing. */}
-        <form onSubmit={onAdd} className="mt-6">
+        <form id="bank-form" onSubmit={onAdd} className="mt-6 scroll-mt-24"><fieldset className="min-w-0" disabled={busy}>
           <FormField
             label="Nama bank"
             htmlFor="bank-name"
@@ -190,14 +204,16 @@ export default function RekeningPage() {
           <FormField
             label="Nomor rekening"
             htmlFor="account-number"
-            hint="Hanya 4 digit terakhir yang disimpan (write-only)."
+            disabled={!!editing && !editing.number_editable}
+            hint={editing ? editing.number_editable ? `Tersimpan: ${editing.account_masked}. Kosongkan untuk mempertahankan nomor.` : `Tersimpan: ${editing.account_masked}. Sudah digunakan pada pembayaran; tambahkan rekening baru bila nomor berubah.` : "Hanya 4 digit terakhir yang disimpan."}
             error={formErrors.account_number}
             value={accountNumber}
             onChange={(event) => setAccountNumber(event.target.value)}
             inputMode="numeric"
-            placeholder="1234567890"
-            required
+            placeholder={editing ? "Isi hanya jika nomor perlu dikoreksi" : "1234567890"}
+            required={!editing}
           />
+          {editing ? <FormCheckbox id="bank-active" label="Rekening aktif" checked={active} onChange={setActive} /> : null}
           {formErrors.form ? (
             <p className="error-message" role="alert">
               {formErrors.form}
@@ -205,11 +221,12 @@ export default function RekeningPage() {
           ) : null}
           <div className="form-submit">
             <Btn type="submit" disabled={busy}>
-              {busy ? "Menyimpan…" : "Tambah rekening"}
+              {busy ? "Menyimpan…" : editing ? "Simpan perubahan" : "Tambah rekening"}
             </Btn>
+            {editing ? <Btn type="button" variant="tint" className="ml-2" onClick={resetForm}>Batal ubah</Btn> : null}
           </div>
-        </form>
-      </section>
+        </fieldset></form>
+      </section> : null}
       </div>
     </div>
   );

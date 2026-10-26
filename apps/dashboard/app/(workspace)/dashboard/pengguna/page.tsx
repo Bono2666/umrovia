@@ -7,6 +7,7 @@ import {
   ErrorState,
   FormField,
   FormSelect,
+  FormTextarea,
   LoadingState,
   StatusBadge,
 } from "@/components/workspace/ui";
@@ -37,6 +38,12 @@ export default function PenggunaPage() {
   const [inviteRoleId, setInviteRoleId] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingMember, setEditingMember] = useState<string | null>(null);
+  const [roleDraft, setRoleDraft] = useState("");
+  const [roleBusy, setRoleBusy] = useState(false);
+  const [editingRole, setEditingRole] = useState<RoleRow | null>(null);
+  const [roleName, setRoleName] = useState("");
+  const [rolePermissions, setRolePermissions] = useState("");
 
   const load = useCallback(() => {
     // Permission workspace aktif (mirror resolusi di WorkspaceShell).
@@ -102,15 +109,17 @@ export default function PenggunaPage() {
 
   async function onChangeRole(row: MembershipRow, roleId: string) {
     if (!roleId || roleId === row.role_id) return;
-    setMessage(null);
+    setMessage(null); setError(null); setRoleBusy(true);
     const result = await apiFetch(`/memberships/${row.id}`, {
       method: "PATCH",
       body: JSON.stringify({ role_id: roleId }),
     });
+    setRoleBusy(false);
     if (!result.ok) {
       setError(problemMessage(result.error));
       return;
     }
+    setEditingMember(null);
     setMessage(`Peran ${row.user.email} diubah.`);
     load();
   }
@@ -192,12 +201,13 @@ export default function PenggunaPage() {
                     <td className="py-2 pr-4">{row.user.email}</td>
                     <td className="py-2 pr-4">{row.user.full_name || "-"}</td>
                     <td className="py-2 pr-4">
-                      {canManage && roles.length > 0 ? (
-                        <FormSelect
+                      {editingMember === row.id ? (
+                        <div><FormSelect
                           htmlFor={`role-${row.id}`}
                           className="w-full min-w-24 pb-1 text-sm"
-                          value={row.role_id ?? ""}
-                          onChange={(event) => onChangeRole(row, event.target.value)}
+                          value={roleDraft}
+                          disabled={roleBusy}
+                          onChange={(event) => setRoleDraft(event.target.value)}
                           aria-label={`Ubah peran ${row.user.email}`}
                         >
                           {roles.map((role) => (
@@ -205,7 +215,7 @@ export default function PenggunaPage() {
                               {role.name}
                             </option>
                           ))}
-                        </FormSelect>
+                        </FormSelect><div className="mt-2 flex flex-wrap gap-2"><Btn size="xs" disabled={roleBusy || !roleDraft || roleDraft === row.role_id} onClick={() => onChangeRole(row, roleDraft)}>Simpan perubahan</Btn><Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => setEditingMember(null)}>Batal ubah</Btn></div></div>
                       ) : (
                         row.role ?? "-"
                       )}
@@ -216,6 +226,7 @@ export default function PenggunaPage() {
                       </StatusBadge>
                     </td>
                     <td className="py-2">
+                      {canManage && roles.length > 0 && row.status !== "REVOKED" && editingMember !== row.id ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setEditingMember(row.id); setRoleDraft(row.role_id ?? ""); setError(null);}}>Ubah peran</Btn> : null}
                       {canManage && row.status !== "REVOKED" ? (
                         <Btn variant="danger" onClick={() => onRevoke(row)}>
                           Cabut akses
@@ -277,11 +288,19 @@ export default function PenggunaPage() {
       {canReadRoles && roles.length > 0 ? (
         <section className="card p-6">
           <h2 className="font-semibold">Peran</h2>
+          {editingRole ? <form className="mt-6" onSubmit={async (event) => {
+            event.preventDefault(); setRoleBusy(true); setError(null);
+            const result = await apiFetch(`/roles/${editingRole.id}`, {method:"PATCH", body:JSON.stringify({name:roleName.trim(), permissions:rolePermissions.split(/[\n,]/).map((item) => item.trim()).filter(Boolean)})});
+            setRoleBusy(false);
+            if (!result.ok) {setError(problemMessage(result.error)); return;}
+            setEditingRole(null); setMessage("Definisi peran tersimpan."); load();
+          }}><fieldset className="min-w-0" disabled={roleBusy}><FormField label="Nama peran" htmlFor="role-name" value={roleName} onChange={(event) => setRoleName(event.target.value)} required maxLength={64} /><FormTextarea label="Izin peran" htmlFor="role-permissions" value={rolePermissions} onChange={(event) => setRolePermissions(event.target.value)} hint="Satu izin per baris. Perubahan berlaku untuk semua anggota yang memakai peran ini." /><div className="flex flex-wrap gap-2"><Btn type="submit">Simpan perubahan</Btn><Btn type="button" variant="tint" onClick={() => setEditingRole(null)}>Batal ubah</Btn></div></fieldset></form> : null}
           <ul className="mt-3 space-y-3">
             {roles.map((role) => (
               <li key={role.id}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{role.name}</span>
+                  {perms && hasPermission(perms, "roles.write") && !role.is_system && role.name !== "Owner" ? <Btn variant="link" size="xs" disabled={roleBusy} onClick={() => {setEditingRole(role); setRoleName(role.name); setRolePermissions(role.permissions.join("\n")); setError(null);}}>Ubah definisi peran</Btn> : null}
                   {role.is_system ? (
                     <StatusBadge>SISTEM</StatusBadge>
                   ) : null}

@@ -21,6 +21,8 @@ import {
   type RoomType,
 } from "@/lib/api";
 import { ROOM_LABELS } from "@/lib/rooms";
+import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
+import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 
 /**
  * Booking end-to-end (S09, UI-07; MOD-07; Spec §5.2/§6.2/§8.3): daftar booking
@@ -90,6 +92,8 @@ function formatIdr(value: number): string {
 }
 
 export default function BookingPage() {
+  const {can, canEditEnvironment, writableEnvironments} = useWorkspacePermissions();
+  const [editing, setEditing] = useState<Booking | null>(null);
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [departures, setDepartures] = useState<Departure[]>([]);
   const [query, setQuery] = useState("");
@@ -104,7 +108,7 @@ export default function BookingPage() {
   const [notes, setNotes] = useState("");
   const [pilgrimQuery, setPilgrimQuery] = useState("");
   const [pilgrimResults, setPilgrimResults] = useState<Pilgrim[]>([]);
-  const [picked, setPicked] = useState<Pilgrim[]>([]);
+  const [picked, setPicked] = useState<Pick<Pilgrim, "id" | "name" | "code">[]>([]);
   const [roomTypes, setRoomTypes] = useState<Record<string, RoomType>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
@@ -133,9 +137,11 @@ export default function BookingPage() {
   useEffect(() => {
     const q = pilgrimQuery.trim();
     if (!q) return;
+    let cancelled = false;
     apiFetch<{ results: Pilgrim[] }>(`/pilgrims?q=${encodeURIComponent(q)}`).then((result) => {
-      if (result.ok) setPilgrimResults(result.data.results);
+      if (!cancelled && result.ok) setPilgrimResults(result.data.results);
     });
+    return () => {cancelled = true;};
   }, [pilgrimQuery]);
 
   async function transition(booking: Booking, target: string, reason?: string) {
@@ -191,30 +197,53 @@ export default function BookingPage() {
     setBusy(true);
     setMessage(null);
     setError(null);
-    const result = await apiFetch<Booking>("/bookings", {
-      method: "POST",
-      body: JSON.stringify({
+    const values = {
         departure: departureId,
         participants: picked.map((p) => p.id),
         room_types: Object.fromEntries(picked.filter((p) => roomTypes[p.id]).map((p) => [p.id, roomTypes[p.id]])),
         notes: notes.trim(),
-      }),
+      };
+    const original = editing ? {departure:editing.departure_id, notes:editing.notes,
+      participants:editing.participants.map((p) => p.pilgrim_id),
+      room_types:Object.fromEntries(editing.participants.filter((p) => p.pricing_snapshot.room_type).map((p) => [p.pilgrim_id, p.pricing_snapshot.room_type]))} : {};
+    const result = await apiFetch<Booking>(editing ? `/bookings/${editing.id}` : "/bookings", {
+      method: editing ? "PATCH" : "POST",
+      body: JSON.stringify(editing ? changedFields(values, original) : values),
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors({ form: problemMessage(result.error) });
+      setFormErrors(apiFormErrors(result.error));
       return;
     }
-    setDepartureId("");
-    setNotes("");
-    setPicked([]);
-    setRoomTypes({});
-    setPilgrimQuery("");
-    setMessage(
-      `Booking ${result.data.code} dibuat (draf) untuk ${result.data.participant_count} peserta — ` +
-        "klik “Reservasi kursi” untuk menahan kursi secara atomik.",
-    );
-    load(query);
+    setMessage(editing ? `Booking ${result.data.code} diperbarui.` : `Booking ${result.data.code} dibuat (draf) untuk ${result.data.participant_count} peserta. Reservasi kursi setelah data sesuai.`);
+    resetForm(); load(query);
+  }
+
+  function resetForm() {
+    setEditing(null); setDepartureId(""); setNotes(""); setPicked([]); setRoomTypes({});
+    setPilgrimQuery(""); setPilgrimResults([]); setFormErrors({});
+  }
+
+  async function editBooking(row: Booking) {
+    setBusy(true); setError(null);
+    const result = await apiFetch<Booking>(`/bookings/${row.id}`);
+    if (!result.ok) {setBusy(false); setError(problemMessage(result.error)); return;}
+    const booking = result.data;
+    if (booking.status !== "DRAFT") {setBusy(false); setError("Hanya booking draf yang dapat dikoreksi. Perbarui daftar untuk melihat status terbaru."); load(query); return;}
+    resetForm(); setEditing(booking); setDepartureId(booking.departure_id); setNotes(booking.notes);
+    setPicked(booking.participants.map((p) => ({id:p.pilgrim_id, name:p.pilgrim_name, code:p.pilgrim_code})));
+    setRoomTypes(Object.fromEntries(booking.participants.filter((p) => p.pricing_snapshot.room_type).map((p) => [p.pilgrim_id, p.pricing_snapshot.room_type as RoomType])));
+    if (!departures.some((dep) => dep.id === booking.departure_id)) {
+      const departure = await apiFetch<Departure>(`/departures/${booking.departure_id}`);
+      if (departure.ok) setDepartures((previous) => [...previous.filter((d) => d.id !== departure.data.id), departure.data]);
+    }
+    setBusy(false); setMessage(null); focusForm("booking-form");
+  }
+
+  function existingPrice(pilgrimId: string, room: string) {
+    const participant = editing?.participants.find((p) => p.pilgrim_id === pilgrimId);
+    return editing?.departure_id === departureId && participant?.pricing_snapshot.room_type === room
+      ? Number(participant.pricing_snapshot.unit_price_idr) : undefined;
   }
 
   if (noAccess) {
@@ -236,7 +265,7 @@ export default function BookingPage() {
   const searchable = pilgrimResults.filter((p) => !picked.some((s) => s.id === p.id)).slice(0, 8);
   const selectedDeparture = departures.find((dep) => dep.id === departureId);
   const roomChoices = selectedDeparture?.room_prices ?? [];
-  const estimatedTotal = picked.reduce((total, person) => total + (roomChoices.find((room) => room.room_type === roomTypes[person.id])?.price_idr ?? selectedDeparture?.package_price_idr ?? 0), 0);
+  const estimatedTotal = picked.reduce((total, person) => total + (existingPrice(person.id, roomTypes[person.id] ?? "") ?? roomChoices.find((room) => room.room_type === roomTypes[person.id])?.price_idr ?? selectedDeparture?.package_price_idr ?? 0), 0);
 
   return (
     <div className="workspace-page">
@@ -335,7 +364,8 @@ export default function BookingPage() {
                     </p>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {(NEXT_ACTIONS[booking.status] ?? []).map((action) => (
+                    {booking.status === "DRAFT" && can("bookings.create") && canEditEnvironment(booking.environment) ? <Btn variant="tint" size="xs" disabled={busy} onClick={() => editBooking(booking)}>Ubah booking</Btn> : null}
+                    {(can("bookings.create") && canEditEnvironment(booking.environment) ? NEXT_ACTIONS[booking.status] ?? [] : []).map((action) => (
                       <Btn
                         key={action.target}
                         variant="tint"
@@ -346,7 +376,7 @@ export default function BookingPage() {
                         {action.label}
                       </Btn>
                     ))}
-                    {CANCELABLE.includes(booking.status) ? (
+                    {can("bookings.create") && canEditEnvironment(booking.environment) && CANCELABLE.includes(booking.status) ? (
                       <Btn
                         variant="danger"
                         size="xs"
@@ -356,7 +386,7 @@ export default function BookingPage() {
                         Batalkan
                       </Btn>
                     ) : null}
-                    {EXPIRABLE.includes(booking.status) ? (
+                    {can("bookings.create") && canEditEnvironment(booking.environment) && EXPIRABLE.includes(booking.status) ? (
                       <Btn
                         variant="tint"
                         size="xs"
@@ -373,9 +403,10 @@ export default function BookingPage() {
           )}
         </section>
 
-        <section className="card p-6">
-          <h2 className="font-semibold">Tambah booking</h2>
-          <form onSubmit={onCreate} className="mt-6">
+        {can("bookings.create") && writableEnvironments.length > 0 ? <section className="card p-6">
+          <h2 className="font-semibold">{editing ? `Ubah booking ${editing.code}` : "Tambah booking"}</h2>
+          <p className="mt-2 text-sm text-muted">Peserta, kamar dan keberangkatan dapat dikoreksi selama draf. Harga peserta yang tetap dipertahankan; perubahan kamar atau keberangkatan memakai tarif saat ini.</p>
+          <form id="booking-form" onSubmit={onCreate} className="mt-6 scroll-mt-24"><fieldset className="min-w-0" disabled={busy}>
             <FormSelect
               label="Keberangkatan"
               htmlFor="booking-departure"
@@ -460,10 +491,11 @@ export default function BookingPage() {
 
             {picked.length > 0 ? (
               <div className="my-6 border-t border-border pt-6">
-                {roomChoices.length > 0 ? picked.map((person) => (
-                  <FormSelect key={person.id} label={`Kamar ${person.name}`} htmlFor={`room-${person.id}`} value={roomTypes[person.id] ?? ""} required onChange={(event) => setRoomTypes((prev) => ({...prev, [person.id]: event.target.value as RoomType}))}>
-                    <option value="">— pilih kamar —</option>
-                    {roomChoices.map((room) => <option key={room.room_type} value={room.room_type}>{ROOM_LABELS[room.room_type]} · {formatIdr(room.price_idr)} / jamaah</option>)}
+                {roomChoices.length > 0 || Object.keys(roomTypes).length > 0 ? picked.map((person) => (
+                  <FormSelect key={person.id} label={`Kamar ${person.name}`} htmlFor={`room-${person.id}`} value={roomTypes[person.id] ?? ""} required={existingPrice(person.id, "") === undefined} onChange={(event) => setRoomTypes((prev) => ({...prev, [person.id]: event.target.value as RoomType}))}>
+                    <option value="">{existingPrice(person.id, "") !== undefined ? "Pertahankan harga standar booking" : "— pilih kamar —"}</option>
+                    {roomTypes[person.id] && !roomChoices.some((room) => room.room_type === roomTypes[person.id]) ? <option value={roomTypes[person.id]}>{ROOM_LABELS[roomTypes[person.id]]} · harga booking {formatIdr(existingPrice(person.id, roomTypes[person.id]) ?? 0)}</option> : null}
+                    {roomChoices.map((room) => <option key={room.room_type} value={room.room_type}>{ROOM_LABELS[room.room_type]} · {formatIdr(existingPrice(person.id, room.room_type) ?? room.price_idr)} / jamaah</option>)}
                   </FormSelect>
                 )) : null}
                 <p className="text-sm font-semibold">Perkiraan total: {formatIdr(estimatedTotal)}</p>
@@ -485,11 +517,12 @@ export default function BookingPage() {
             ) : null}
             <div className="form-submit">
               <Btn type="submit" disabled={busy}>
-                {busy ? "Menyimpan…" : "Buat booking"}
+                {busy ? "Menyimpan…" : editing ? "Simpan perubahan" : "Buat booking"}
               </Btn>
+              {editing ? <Btn type="button" variant="tint" className="ml-2" onClick={resetForm}>Batal ubah</Btn> : null}
             </div>
-          </form>
-        </section>
+          </fieldset></form>
+        </section> : null}
       </div>
     </div>
   );
