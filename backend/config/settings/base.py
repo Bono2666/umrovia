@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "modules.payments",
     "modules.wallet",
     "modules.billing",
+    "modules.portal",
     "modules.audit",
     "modules.documents",
 ]
@@ -136,6 +137,8 @@ REST_FRAMEWORK = {
         "auth-forgot": "5/hour",
         "anon": "60/min",
         "contact-submit": "5/hour",
+        "portal-invite": "30/hour",
+        "portal-upload": "60/hour",
     },
     "EXCEPTION_HANDLER": "common.api.exception_handler",  # RFC7807-style (Spec §8)
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"] + (
@@ -202,6 +205,11 @@ MIDTRANS_IS_PRODUCTION = env_bool("MIDTRANS_IS_PRODUCTION", "False")
 # Key Fernet (urlsafe base64 32 byte). Production WAJIB eksplisit (production.py);
 # local.py menyediakan fallback deterministik dari SECRET_KEY hanya saat DEBUG.
 PII_ENCRYPTION_KEY = env("PII_ENCRYPTION_KEY", "")
+
+# --- Dokumen jamaah (S14, Spec §10): file privat di storage default ------------
+PILGRIM_DOCUMENT_MAX_MB = int(env("PILGRIM_DOCUMENT_MAX_MB", "10") or "10")
+SIGNED_URL_TTL_SECONDS = int(env("SIGNED_URL_TTL_SECONDS", "600") or "600")  # ≤ 10 menit (§10)
+PORTAL_INVITE_TTL_DAYS = int(env("PORTAL_INVITE_TTL_DAYS", "7") or "7")
 
 # --- Brand / produk (Spec §18.4) --------------------------------------------
 BRAND_NAME = env("BRAND_NAME", "Umrovia")

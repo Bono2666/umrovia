@@ -159,6 +159,8 @@ class PilgrimDocumentReviewSerializer(serializers.ModelSerializer):
 
 
 def document_payload(doc: PilgrimDocument) -> dict:
+    from modules.portal.files import has_file
+
     return {
         "id": str(doc.id),
         "pilgrim_id": str(doc.pilgrim_id),
@@ -170,6 +172,8 @@ def document_payload(doc: PilgrimDocument) -> dict:
         "reviewed_by": str(doc.reviewed_by_id) if doc.reviewed_by_id else None,
         "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
         "reason": doc.reason,
+        "uploaded_at": doc.created_at.isoformat(),
+        "has_file": has_file(doc),
     }
 
 
