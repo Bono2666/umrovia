@@ -5,6 +5,7 @@ import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, Statu
 import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasCharge, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 const LABELS: Record<string, string> = {CREATED: "Menunggu transfer", PENDING: "Menunggu verifikasi platform", PAID: "Saldo telah masuk", EXPIRED: "Kedaluwarsa", REJECTED: "Ditolak"};
 const KIND: Record<string, string> = {TOPUP: "Top-up", DEBIT: "Biaya SaaS", REFUND: "Refund SaaS"};
@@ -110,7 +111,7 @@ export default function WalletPage() {
   if (!canRead) return <EmptyState title="Anda tidak memiliki akses SaaS Wallet" />;
 
   return <div className="workspace-page">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold">SaaS Wallet</h1><Btn variant="solid" onClick={() => {setError(null); void load();}}>Perbarui</Btn></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><RevealText as="h1" variant="title" className="text-2xl font-bold">SaaS Wallet</RevealText><Btn variant="solid" onClick={() => {setError(null); void load();}}>Perbarui</Btn></div>
     <p className="mt-1 text-sm text-muted">Saldo prabayar untuk biaya layanan Umrovia. Dana DP dan pembayaran jamaah tercatat terpisah pada Pembayaran.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
     {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}

@@ -14,6 +14,7 @@ import { apiFetch, problemMessage, type BankAccount } from "@/lib/api";
 import { formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 /**
  * Kas & Bank (S06, §5.3): daftar rekening bank resmi travel (nomor hanya
@@ -121,7 +122,7 @@ export default function RekeningPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Kas &amp; Bank</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Kas &amp; Bank</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf dengan akses rekening"
@@ -134,7 +135,7 @@ export default function RekeningPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Kas &amp; Bank</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Kas &amp; Bank</RevealText>
       <p className="mt-1 text-sm text-muted">
         Rekening resmi travel yang dicantumkan pada invoice untuk pembayaran
         jamaah. Demi keamanan, hanya 4 digit terakhir nomor rekening yang

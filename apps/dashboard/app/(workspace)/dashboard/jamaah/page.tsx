@@ -21,6 +21,7 @@ import {
 import { formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 const EMPTY_PROFILE = {
   nationality: "ID", marital_status: "", address: "",
@@ -200,7 +201,7 @@ export default function JamaahPage() {
   if (noAccess) {
     return (
       <div className="workspace-page">
-        <h1 className="text-2xl font-bold">Jamaah</h1>
+        <RevealText as="h1" variant="title" className="text-2xl font-bold">Jamaah</RevealText>
         <div className="mt-6">
           <EmptyState
             title="Halaman ini khusus staf dengan akses jamaah"
@@ -213,7 +214,7 @@ export default function JamaahPage() {
 
   return (
     <div className="workspace-page">
-      <h1 className="text-2xl font-bold">Jamaah</h1>
+      <RevealText as="h1" variant="title" className="text-2xl font-bold">Jamaah</RevealText>
       <p className="mt-1 text-sm text-muted">
         Data jamaah travel Anda. NIK dan nomor paspor disimpan terenkripsi dan
         hanya ditampilkan 4 karakter terakhir. Jamaah dengan identitas sama

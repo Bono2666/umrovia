@@ -1281,6 +1281,24 @@
   }
 }
 
+/* Workspace entrance (WorkspaceReveal): blocks rise and fade like the
+   marketing text reveal. Without JS no ready marker exists, so nothing hides. */
+.ws-reveal[data-reveal-ready]:not([data-reveal-visible]) {
+  opacity: 0;
+  transform: translateY(32px);
+}
+.ws-reveal[data-reveal-ready][data-reveal-visible] {
+  transition: opacity 0.7s var(--ease-editorial), transform 0.7s var(--ease-editorial);
+  transition-delay: var(--ws-reveal-delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce), (update: slow) {
+  .ws-reveal[data-reveal-ready] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 /* Sticky header follows the section crossing its lower edge, including when
    smooth scrolling uses transforms instead of the browser scroll position. */
 .marketing-header {

@@ -5,6 +5,7 @@ import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, Loadi
 import { API_BASE, apiFetch, problemMessage, type ChargePreview, type TravelInvoice, type TravelPayment } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { RevealText } from "@/components/marketing/RevealText";
 
 type Account = {id:string;bank_name:string;account_name:string;account_masked:string};
 const STATUS: Record<string,string> = {DRAFT:"Draf",SUBMITTED:"Menunggu verifikasi",VERIFIED:"Terverifikasi",REJECTED:"Ditolak",REVERSED:"Direversal"};
@@ -112,7 +113,7 @@ export default function PaymentsPage() {
   if(loading)return <LoadingState/>;
   if(!can("payments.read"))return <EmptyState title="Anda tidak memiliki akses pembayaran"/>;
   return <div className="workspace-page">
-    <h1 className="text-2xl font-bold">Pembayaran</h1>
+    <RevealText as="h1" variant="title" className="text-2xl font-bold">Pembayaran</RevealText>
     <p className="mt-1 text-sm text-muted">Catat DP, cicilan, atau pelunasan dan alokasikan nominal ke masing-masing jamaah. Kuitansi diterbitkan setelah dana diverifikasi.</p>
     {message?<p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p>:null}
     {error?<div className="mt-4"><ErrorState message={error}/></div>:null}
