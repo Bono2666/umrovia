@@ -118,7 +118,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/manifest", label: "Manifest", permission: "manifest.read", icon: FileText },
       { href: "/dashboard/laporan", label: "Laporan", soon: "S17", icon: BarChart3 },
-      { href: "/dashboard/notifikasi", label: "Notifikasi", soon: "S16", icon: Bell },
+      { href: "/dashboard/notifikasi", label: "Notifikasi", permission: "notifications.read", icon: Bell },
     ],
   },
   {

@@ -1206,6 +1206,10 @@
   height: 64px;
   min-height: 64px;
 }
+/* Editor teks panjang (template notifikasi): tinggi cukup untuk membaca seluruh pesan. */
+.workspace-shell .form-control--textarea textarea.textarea-tall {
+  height: 320px;
+}
 .workspace-shell .form-label {
   font-size: 14px;
   letter-spacing: -0.02em;
