@@ -34,6 +34,8 @@ export type UserPayload = {
 
 /** Payload jamaah (S07, Spec §8.3) — field sensitif SELALU masked (§10.1). */
 export type Pilgrim = {
+  /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
+  deletable: boolean;
   id: string;
   code: string;
   environment: string;
@@ -77,6 +79,8 @@ export type PilgrimDocument = {
 
 /** Payload paket (S08, Spec §5.2/§8.3, MOD-05) — harga integer rupiah (§10.1). */
 export type TravelPackage = {
+  /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
+  deletable: boolean;
   id: string;
   environment: string;
   code: string;
@@ -100,6 +104,8 @@ export type TravelPackage = {
  * blocked` (formula MOD-06).
  */
 export type Departure = {
+  /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
+  deletable: boolean;
   has_bookings: boolean;
   id: string;
   environment: string;
@@ -216,6 +222,8 @@ export type BookingPriceLine = {
  * perubahan harga paket (UAT-04).
  */
 export type Booking = {
+  /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
+  deletable: boolean;
   id: string;
   environment: string;
   code: string;
@@ -362,6 +370,8 @@ export type SettingsPayload = {
 
 /** Baris GET /bank-accounts (S05 — hanya nomor masked, §5.3). */
 export type BankAccount = {
+  /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
+  deletable: boolean;
   number_editable: boolean;
   id: string;
   bank_name: string;

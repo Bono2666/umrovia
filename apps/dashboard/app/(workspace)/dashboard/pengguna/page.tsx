@@ -22,8 +22,8 @@ import {
 
 /**
  * Pengguna & Role (S06, §4.1): daftar membership + undang staf
- * (POST /memberships), ganti role (PATCH), cabut akses (DELETE), dan daftar
- * role + permission (GET /roles). Aksi ditutup berdasarkan permission
+ * (POST /memberships), ganti role (PATCH), cabut akses (DELETE), dan role
+ * custom: tambah/ubah/hapus (POST/PATCH/DELETE /roles; hapus hanya bila tak dipakai). Aksi ditutup berdasarkan permission
  * klien (`memberships.write/.manage`) — server tetap menegaskan ulang.
  */
 export default function PenggunaPage() {
@@ -42,6 +42,7 @@ export default function PenggunaPage() {
   const [roleDraft, setRoleDraft] = useState("");
   const [roleBusy, setRoleBusy] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleRow | null>(null);
+  const [creatingRole, setCreatingRole] = useState(false);
   const [roleName, setRoleName] = useState("");
   const [rolePermissions, setRolePermissions] = useState("");
 
@@ -75,6 +76,7 @@ export default function PenggunaPage() {
   const canInvite = perms ? hasPermission(perms, "memberships.write") : false;
   const canManage = perms ? hasPermission(perms, "memberships.manage") : false;
   const canReadRoles = perms ? hasPermission(perms, "roles.read") : true;
+  const canWriteRoles = perms ? hasPermission(perms, "roles.write") : false;
   const hasSidePanels = canInvite || (canReadRoles && roles.length > 0);
 
   async function onInvite(event: React.FormEvent) {
@@ -121,6 +123,17 @@ export default function PenggunaPage() {
     }
     setEditingMember(null);
     setMessage(`Peran ${row.user.email} diubah.`);
+    load();
+  }
+
+  async function onDeleteRole(role: RoleRow) {
+    if (!window.confirm(`Hapus peran ${role.name}? Peran yang masih dipakai anggota tidak dapat dihapus.`)) return;
+    setRoleBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/roles/${role.id}`, { method: "DELETE" });
+    setRoleBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    if (editingRole?.id === role.id) setEditingRole(null);
+    setMessage(`Peran ${role.name} dihapus.`);
     load();
   }
 
@@ -287,20 +300,23 @@ export default function PenggunaPage() {
 
       {canReadRoles && roles.length > 0 ? (
         <section className="card p-6">
-          <h2 className="font-semibold">Peran</h2>
-          {editingRole ? <form className="mt-6" onSubmit={async (event) => {
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Peran</h2>
+            {canWriteRoles && !editingRole && !creatingRole ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setCreatingRole(true); setRoleName(""); setRolePermissions(""); setError(null);}}>Tambah peran</Btn> : null}</div>
+          {editingRole || creatingRole ? <form className="mt-6" onSubmit={async (event) => {
             event.preventDefault(); setRoleBusy(true); setError(null);
-            const result = await apiFetch(`/roles/${editingRole.id}`, {method:"PATCH", body:JSON.stringify({name:roleName.trim(), permissions:rolePermissions.split(/[\n,]/).map((item) => item.trim()).filter(Boolean)})});
+            const body = JSON.stringify({name:roleName.trim(), permissions:rolePermissions.split(/[\n,]/).map((item) => item.trim()).filter(Boolean)});
+            const result = editingRole ? await apiFetch(`/roles/${editingRole.id}`, {method:"PATCH", body}) : await apiFetch("/roles", {method:"POST", body});
             setRoleBusy(false);
             if (!result.ok) {setError(problemMessage(result.error)); return;}
-            setEditingRole(null); setMessage("Definisi peran tersimpan."); load();
-          }}><fieldset className="min-w-0" disabled={roleBusy}><FormField label="Nama peran" htmlFor="role-name" value={roleName} onChange={(event) => setRoleName(event.target.value)} required maxLength={64} /><FormTextarea label="Izin peran" htmlFor="role-permissions" value={rolePermissions} onChange={(event) => setRolePermissions(event.target.value)} hint="Satu izin per baris. Perubahan berlaku untuk semua anggota yang memakai peran ini." /><div className="flex flex-wrap gap-2"><Btn type="submit">Simpan perubahan</Btn><Btn type="button" variant="tint" onClick={() => setEditingRole(null)}>Batal ubah</Btn></div></fieldset></form> : null}
+            setMessage(editingRole ? "Definisi peran tersimpan." : `Peran ${roleName.trim()} ditambahkan.`); setEditingRole(null); setCreatingRole(false); load();
+          }}><fieldset className="min-w-0" disabled={roleBusy}><FormField label="Nama peran" htmlFor="role-name" value={roleName} onChange={(event) => setRoleName(event.target.value)} required maxLength={64} /><FormTextarea label="Izin peran" htmlFor="role-permissions" value={rolePermissions} onChange={(event) => setRolePermissions(event.target.value)} hint="Satu izin per baris. Perubahan berlaku untuk semua anggota yang memakai peran ini." /><div className="flex flex-wrap gap-2"><Btn type="submit">{editingRole ? "Simpan perubahan" : "Tambah peran"}</Btn><Btn type="button" variant="tint" onClick={() => {setEditingRole(null); setCreatingRole(false);}}>{editingRole ? "Batal ubah" : "Batal"}</Btn></div></fieldset></form> : null}
           <ul className="mt-3 space-y-3">
             {roles.map((role) => (
               <li key={role.id}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{role.name}</span>
-                  {perms && hasPermission(perms, "roles.write") && !role.is_system && role.name !== "Owner" ? <Btn variant="link" size="xs" disabled={roleBusy} onClick={() => {setEditingRole(role); setRoleName(role.name); setRolePermissions(role.permissions.join("\n")); setError(null);}}>Ubah definisi peran</Btn> : null}
+                  {canWriteRoles && !role.is_system && role.name !== "Owner" ? <Btn variant="link" size="xs" disabled={roleBusy} onClick={() => {setCreatingRole(false); setEditingRole(role); setRoleName(role.name); setRolePermissions(role.permissions.join("\n")); setError(null);}}>Ubah definisi peran</Btn> : null}
+                  {canWriteRoles && !role.is_system && role.name !== "Owner" && rows !== null && !rows.some((row) => row.role_id === role.id) ? <Btn variant="link" size="xs" disabled={roleBusy || editingRole?.id === role.id} onClick={() => void onDeleteRole(role)}>Hapus</Btn> : null}
                   {role.is_system ? (
                     <StatusBadge>SISTEM</StatusBadge>
                   ) : null}

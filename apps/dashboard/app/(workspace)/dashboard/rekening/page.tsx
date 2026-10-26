@@ -86,6 +86,16 @@ export default function RekeningPage() {
     setEditing(null); setBankName(""); setAccountName(""); setAccountNumber(""); setActive(true); setFormErrors({});
   }
 
+  async function removeAccount(account: BankAccount) {
+    if (!window.confirm(`Hapus rekening ${account.bank_name} ${account.account_masked}? Rekening yang pernah dipakai cukup dinonaktifkan. Data yang belum pernah dipakai dihapus permanen.`)) return;
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch(`/bank-accounts/${account.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`Rekening ${account.bank_name} ${account.account_masked} dihapus.`);
+    load();
+  }
+
   function editAccount(account: BankAccount) {
     resetForm(); setEditing(account); setBankName(account.bank_name); setAccountName(account.account_name); setActive(account.active);
     setMessage(null); setError(null); focusForm("bank-form");
@@ -172,7 +182,8 @@ export default function RekeningPage() {
                 {can("bank_accounts.write") ? <><Btn variant="tint" className="ml-auto" disabled={busy} onClick={() => editAccount(account)}>Ubah rekening</Btn>
                 <Btn variant="tint" disabled={busy} onClick={() => onToggle(account)}>
                   {account.active ? "Nonaktifkan" : "Aktifkan"}
-                </Btn></> : null}
+                </Btn>
+                {account.deletable ? <Btn variant="danger" disabled={busy || editing?.id === account.id} onClick={() => void removeAccount(account)}>Hapus</Btn> : null}</> : null}
               </li>
             ))}
           </ul>
