@@ -328,7 +328,7 @@ def test_duplicate_active_booking_per_pilgrim_mod07(auth_client, tenant_a):
 
 
 @pytest.mark.django_db
-def test_status_chain_end_to_end(auth_client, tenant_a):
+def test_status_chain_end_to_end(auth_client, tenant_a, settle_demo_dp):
     """DRAFT→RESERVED→CONFIRMED→DOCUMENT_PROCESS→READY_TO_DEPART→DEPARTED→
     COMPLETED; peserta §6.2 sinkron; booking DEPARTED menunggu departure."""
     _seed_env(tenant_a)
@@ -349,6 +349,7 @@ def test_status_chain_end_to_end(auth_client, tenant_a):
     statuses = {p["pilgrim_name"]: p["participant_status"] for p in ok.json()["participants"]}
     assert set(statuses.values()) == {ParticipantStatus.REGISTERED}
 
+    settle_demo_dp(auth_client, bid)
     ok = _transition(auth_client, bid, BookingStatus.CONFIRMED)
     assert ok.status_code == 200
     assert all(p["participant_status"] == ParticipantStatus.CONFIRMED for p in ok.json()["participants"])

@@ -142,7 +142,9 @@ class PilgrimDocumentReviewSerializer(serializers.ModelSerializer):
         attrs = super().validate(attrs)
         # Object-level: `validate_reason` tidak terpanggil bila `reason` tidak
         # dikirim sama sekali — reject tanpa alasan wajib tetap tertangkap (UI-11).
-        status_value = attrs.get("status", self.initial_data.get("status"))
+        if "status" not in attrs:
+            raise serializers.ValidationError({"status": "Status hasil review wajib diisi."})
+        status_value = attrs["status"]
         reason = (attrs.get("reason") or "").strip()
         if status_value == "REJECTED" and not reason:
             raise serializers.ValidationError({"reason": "Alasan penolakan wajib diisi."})

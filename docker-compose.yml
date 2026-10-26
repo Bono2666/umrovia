@@ -50,8 +50,13 @@ services:
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-False}
       EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-10}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Umrovia <no-reply@umrovia.com>}
+      WALLET_MANUAL_BANK_NAME: ${WALLET_MANUAL_BANK_NAME:-}
+      WALLET_MANUAL_ACCOUNT_NAME: ${WALLET_MANUAL_ACCOUNT_NAME:-}
+      WALLET_MANUAL_ACCOUNT_NUMBER: ${WALLET_MANUAL_ACCOUNT_NUMBER:-}
     ports:
       - "${API_PORT:-8001}:8000"
+    volumes:
+      - api_media:/backend/media
     depends_on:
       db:
         condition: service_healthy
@@ -79,3 +84,4 @@ services:
 
 volumes:
   pgdata:
+  api_media:

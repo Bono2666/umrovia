@@ -88,6 +88,15 @@ DEFAULT_ROLE_PERMISSIONS: dict[str, list[str]] = {
     "Document Reviewer": ["documents.review", "bookings.read", "pilgrims.read"],
 }
 
+# S11: pemisahan pencatatan, pembacaan, verifikasi, dan reversal dana travel.
+for _name in ("Admin", "Finance"):
+    DEFAULT_ROLE_PERMISSIONS[_name] = list(dict.fromkeys(DEFAULT_ROLE_PERMISSIONS[_name] + [
+        "invoices.read", "invoices.issue", "payments.create", "payments.read", "payments.read_all", "receipts.read",
+    ]))
+DEFAULT_ROLE_PERMISSIONS["Sales"] += ["payments.create", "payments.read", "receipts.read"]
+DEFAULT_ROLE_PERMISSIONS["Finance"] += ["payments.reverse"]
+DEFAULT_ROLE_PERMISSIONS["Finance"] += ["wallet.read", "wallet.export"]
+
 
 def permission_list(role) -> list[str]:
     """Daftar grant permission sebuah role (normalisasi dict lama → list)."""

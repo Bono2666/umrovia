@@ -6,6 +6,7 @@ from modules.departures import views
 app_name = "departures"
 
 urlpatterns = [
+    path("departures/staff", views.DepartureStaffView.as_view(), name="departure-staff"),
     path("departures", views.DepartureListCreateView.as_view(), name="departure-list"),
     path("departures/<uuid:departure_id>", views.DepartureDetailView.as_view(), name="departure-detail"),
     path(

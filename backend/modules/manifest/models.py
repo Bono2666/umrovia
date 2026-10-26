@@ -19,6 +19,7 @@ Aturan:
 - Kolom persis §5.2 (integrity: snapshot tidak diedit; baris manifest
   selalu dibangun ulang dari data sumber).
 """
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from common.models import BaseAppModel
@@ -121,3 +122,11 @@ class ManifestVersion(TenantScopedModel, BaseAppModel):
 
     def __str__(self) -> str:
         return f"{self.departure_id} v{self.version_no}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("manifest_versions bersifat append-only; terbitkan versi baru.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("manifest_versions bersifat append-only; terbitkan versi baru.")

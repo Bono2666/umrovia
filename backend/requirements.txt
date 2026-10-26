@@ -10,3 +10,4 @@ gunicorn>=23,<24
 whitenoise>=6.8,<7
 redis>=5,<9  # cache Django (throttle) saat REDIS_URL aktif — Spec §8 rate limit
 cryptography>=44,<47  # enkripsi field sensitif jamaah (NIK/paspor, Spec §5.2 identity_encrypted)
+reportlab>=5.1,<6  # PDF invoice dan kuitansi dari snapshot immutable

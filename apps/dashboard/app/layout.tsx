@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { themeScript } from "@/lib/theme";
 import { geistMono, poppins } from "./fonts";
 import "./globals.css";
 
@@ -15,8 +16,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="id"
+      suppressHydrationWarning
       className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

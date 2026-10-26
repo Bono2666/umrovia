@@ -182,11 +182,12 @@ review reason) · `ruff` clean ✓ · `makemigrations --check` no-change ✓ ·
 `npm run lint` + `tsc --noEmit` ✓ · `npm run build` ✓ (rute
 /dashboard/jamaah) · smoke live ✓
 
-**Catatan/tundaan:** FK dokumen ke `booking_participant` (§5.2 varian) →
-S09 saat tabel `booking_participants` ada — pada S07 dokumen melekat pada
-jamaah (PRD data model); signed-URL upload/download → S14 (object storage);
-wali/mahram & catatan kebutuhan khusus sudah di model/detail payload —
-UI form penuh menyusul bersama booking S09.
+**Catatan/tundaan:** Dokumen melekat pada master jamaah (PRD data model),
+dan dipakai oleh checklist peserta booking; varian FK per `booking_participant`
+belum diimplementasikan. Signed-URL upload/download → S14 (object storage).
+Audit 25 Oktober 2026 menutup tindak lanjut formulir wali/mahram, kontak
+darurat, kebutuhan khusus dan metadata paspor; detail UI kini mengambil
+endpoint detail agar catatan kebutuhan khusus dapat ditampilkan.
 
 ## Sprint S08 — Minggu 8 — Paket, keberangkatan & alokasi kursi (F04)
 
@@ -215,13 +216,12 @@ kursi terakhir & 10-thread/5-kursi, keduanya tepat-satu/tepat-lima pemenang,
 `npm run build` ✓ (rute /dashboard/paket & /dashboard/keberangkatan) ·
 smoke live ✓
 
-**Catatan/tundaan:** konsumsi kursi oleh booking & rekonsiliasi
-`seats_taken` vs daftar booking → S09 (counter = cache seperti
-`balance_cached_idr`, §5.4); varian harga per tipe kamar (QUAD/TRIPLE/…)
-→ S09 (`booking_price_lines`); checklist lengkap sebagai gerbang READY →
-S10 (hook `checklist_complete` sudah terpasang, sementara selalu lulus);
-PIC/`lead_staff` tersedia di API (validasi staf aktif) — pemilih PIC di UI
-menunggu endpoint daftar staf ber-permission (S09); `FULL`/`CLOSED` MOD-06
+**Catatan/tundaan:** konsumsi kursi atomik oleh booking sudah dipasang S09;
+rekonsiliasi berkala `seats_taken` vs daftar booking → S16/S17. Varian harga
+per tipe kamar (QUAD/TRIPLE/DOUBLE/SINGLE) telah dipasang S11. Gerbang checklist READY sudah diisi
+S10. Audit 25 Oktober 2026 melengkapi pemilih PIC melalui
+`GET /departures/staff` (`departures.write`) dan validasi PIC sebagai anggota
+tenant aktif dengan akun aktif pada create/PATCH. `FULL`/`CLOSED` MOD-06
 diturunkan dari data (available==0 / deadline terlampaui), bukan status
 tersimpan — kontrak tersimpan mengikuti §6.5.
 
@@ -253,13 +253,11 @@ RLS 3 tabel) · `ruff` clean ✓ · `makemigrations --check` no-change ✓ ·
 schema spectacular OK (hanya graceful-fallback APIView pre-existing) ✓
 
 **Catatan/tundaan:** agen/`agent_id` & cabang pada booking mengikuti §15 (P1 —
-agensi & portal agen); tahap DP peserta (`AWAITING_DP` →
-`DP_VERIFIED_PENDING_CHARGE`) + gerbang aturan DP pada konfirmasi → S11/S12
-(hook `dp_confirmed` terpasang — sementara shortcut REGISTERED→CONFIRMED karena
-aturan DP belum ada); kelengkapan dokumen sebagai gerbang READY_TO_DEPART →
-S10 (hook `documents_complete` sementara selalu lulus); varian harga per tipe
-kamar (QUAD/TRIPLE) → S11 (snapshot per peserta sudah ada); invoice dari
-`booking_price_lines` → S11 (`issue-invoice`); auto-expiry job EXPIRED → S16
+agensi & portal agen). S11 mengisi tahap DP peserta dan gerbang konfirmasi:
+produksi menunggu DP eligible serta charge S12/S13; demo dapat dikonfirmasi
+tanpa ledger produksi. Kelengkapan dokumen READY_TO_DEPART sudah diisi S10;
+varian harga kamar dan invoice dari snapshot booking telah dipasang S11.
+Auto-expiry job EXPIRED → S16
 (transisi manual terkontrol dulu); rekonsiliasi `seats_taken` vs booking aktif
 → S16/S17 (counter kini diperbarui atomik lewat reservasi/pelepasan);
 penanganan massal booking saat keberangkatan CANCELED → tundaan operasional.
@@ -280,7 +278,7 @@ OPS-02, OPS-03, UAT-14).
 | S10-05 | `POST /departures/{id}/manifest/publish` (`manifest.publish`): snapshot JSON roster di storage (`manifests/{tenant}/{env}/{dep}/v{n}.json`) + `ManifestVersion` bernomor urut unik di bawah lock departure + checksum sha256; audit `manifest.published`; read-only env 403 | §7.6, OPS-04 | DONE | `services.py::publish_manifest`; test versi 1→2, file+checksum, unik, audit |
 | S10-06 | **Exit gate:** ekspor CSV `GET /departures/{id}/manifest/export` (`manifest.export`): BOM UTF-8, prefiks nama `DEMO-manifest-` (§7.2), filter MOD-12, audit `manifest.exported` (format/pii/rows/filters); `?pii=1` menuntut `manifest.export_pii` → tanpa izin **403 + audit `manifest.export_denied`** (OPS-03), dengan izin → NIK/paspor hasil dekripsi + kebutuhan khusus | §7.6, §3, OPS-03, UAT-14 | DONE | `services.py::export_csv`; test masked/denied+audit/Owner-full |
 | S10-07 | CRUD `/document-requirements` (`documents.requirements.manage`): create duplikat per lingkup 400, override per-kind paket menimpa global, PATCH/DELETE, guard environment (tulis 403 saat read-only), audit `document_requirements.*` | §5.2, UI-11, MOD-08 | DONE | `manifest/views.py`; test CRUD+override+RBAC+read-only |
-| S10-08 | Matriks RBAC §3: Admin/Ops += `manifest.read/publish/export` + `documents.requirements.manage` (§8.3 Ops/Admin); **`manifest.export_pii` hanya Owner** (Admin/Ops = S → tidak di-grant v1); Sales/Finance tanpa `manifest.*` | §3, §8.3 | DONE | `rbac.py::DEFAULT_ROLE_PERMISSIONS`; test matriks. *Catatan: role lama di DB hidup memakai grant saat pembuatan — Owner wildcard tetap menang; role baru/buat ulang memakai default baru.* |
+| S10-08 | Matriks RBAC §3: Admin/Ops += `manifest.read/publish/export` + `documents.requirements.manage` (§8.3 Ops/Admin); **`manifest.export_pii` hanya Owner** (Admin/Ops = S → tidak di-grant v1); Sales/Finance tanpa `manifest.*` | §3, §8.3 | DONE | `rbac.py::DEFAULT_ROLE_PERMISSIONS`; test matriks; audit menambah migrasi `tenants/0005` untuk upgrade grant bawaan lama yang masih identik dengan baseline S05/S07/S08, tanpa menimpa role kustom. |
 | S10-09 | Halaman `/dashboard/manifest` (UI-11/UI-12): pemilih keberangkatan + filter q/status dokumen, roster dengan badge kelengkapan & identitas masked, banner kekurangan checklist (petunjuk approved exception), tombol publikasi versi + daftar versi (checksum), panel checklist per paket (tambah/hapus, `before_ready`/`before_departure`), ekspor CSV dengan checkbox "Sertakan PII" bila `manifest.export_pii`; sidebar Manifest aktif `manifest.read` (penanda S10 dilepas) | §4.1, UI-11, UI-12 | DONE | `dashboard/manifest/page.tsx`, `lib/api.ts` (tipe Manifest*), `WorkspaceShell.tsx` |
 
 **Exit gate S10 (Basic departure manifests export):** `pytest` 203/203 ✓
@@ -294,18 +292,105 @@ DEMO- prefix, OPS-03 denied+audited, PII Owner, RLS 2 tabel) · `ruff` clean ✓
 `npm run build` ✓ (rute /dashboard/manifest) · schema spectacular OK (hanya
 graceful-fallback APIView pre-existing) ✓
 
-**Catatan/tundaan:** role lama di DB hidup tidak otomatis mendapat grant baru
-(default hanya dipakai saat role dibuat — Owner wildcard menutup semua;
-buat ulang/assign role untuk memakai default S10); PII pada **tampilan**
+**Catatan/tundaan:** role kustom tetap memakai grant yang dipilih tenant;
+role bawaan lama yang belum dikustomisasi ditingkatkan oleh `tenants/0005`.
+PII pada **tampilan**
 manifest (bukan ekspor) sengaja tidak dibuka — §10.1 default masked, kebutuhan
 buka di layar menyusul bila ada permintaan; ekspor PDF/XLSX + antrean
 `POST /exports` (§8.3 job) → sprint export (S17); generator dokumen cetak
-MOD-12 (formulir/invoice/amplop KBIH/rooming list) → S11+; filter manifest per
+MOD-12: invoice/kuitansi PDF tersedia S11; formulir/amplop KBIH/rooming list
+menyusul S15/S17. Filter manifest per
 penerbangan/grup ketika data dimuat; approval exception via alur multi-step
 (disetujui role lain) bila PRD menuntut — kini satu langkah transisi dengan
 alasan wajib + audit penuh (cukup untuk OPS-02 v1); dokumen melekat pada
 jamaah (S07) — pemindahan FK ke `booking_participant` (§5.2 `pilgrim_documents`)
 menyusul bila kontrak per-participant dibutuhkan.
+
+## Audit penyelesaian S07–S10 — 25 Oktober 2026
+
+**Status:** DONE untuk 32 task dan exit gate dasar S07–S10. Bukti dan batas
+ruang lingkup: [SPRINT_S07_S10_AUDIT.md](SPRINT_S07_S10_AUDIT.md).
+
+- Backend: **214/214 test lulus**, termasuk 11 regresi audit; Ruff lulus.
+- Migrasi dari database kosong, rollback/reapply `tenants/0005`, Django
+  system check dan `makemigrations --check --dry-run` lulus.
+- Frontend: lint, TypeScript dan pengujian Chrome formulir jamaah/PIC/
+  pengecualian checklist lulus. Build serta pemeriksaan container lokal
+  dicatat di laporan audit.
+- Perbaikan tambahan S10: checklist global terisolasi per environment,
+  review dokumen tanpa status menghasilkan 400, guard model snapshot
+  append-only, dan volume `api_media` untuk persistensi snapshot Docker.
+
+## Sprint S11 — Invoice/kuitansi, verifikasi DP & harga kamar (F06)
+
+**Status:** DONE — implementasi, pengujian, migrasi dan build/runtime lokal
+terverifikasi. Keputusan DP pengguna pada
+26 Oktober 2026: setiap alokasi VERIFIED > Rp0 memenuhi syarat; minimum
+tersedia sebagai target opsional dan tidak menghalangi pembayaran di bawahnya.
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S11-01 | Harga QUAD/TRIPLE/DOUBLE/SINGLE per jamaah, harga standar legacy, edit tarif dan RLS | DONE | `catalog/0002`, UI Paket; validasi harga dan booking campuran |
+| S11-02 | Pilihan kamar per peserta, snapshot harga stabil, baris booking dari snapshot | DONE | `booking/{services,serializers}.py`, UI Booking; UAT-04 dan browser edit harga |
+| S11-03 | Invoice dan line per peserta, penomoran terkunci, issue idempoten, penanggung jawab dan jatuh tempo | DONE | `payments/models.py`, `issue_invoice`; race 5 penerbit = 1 dokumen |
+| S11-04 | PDF invoice/kuitansi atomik dalam DB, checksum, issuer travel, DEMO watermark dan download berizin | DONE | `payments/pdf.py`, PDF views; unduhan browser dan QA visual |
+| S11-05 | Record DRAFT/SUBMITTED, bukti/referensi, rekening aktif, alokasi tepat sesuai nominal dan batas tagihan | DONE | `record_payment`, evidence PATCH; validasi dan race over-allocation |
+| S11-06 | Verify VERIFIED/REJECTED, eligibility > Rp0, target DP opsional dan maker-checker configurable | DONE | `policy.py`, settings; test Rp1 di bawah target Rp5 juta |
+| S11-07 | Satu payment satu receipt; saldo dari VERIFIED allocations; idempotency dan outbox durable | DONE | unique receipt, `PaymentOperation`, `PaymentEvent`; race 10 verifier |
+| S11-08 | Reversal beralasan dengan actor berbeda, histori/PDF tetap, saldo dan eligibility diperbarui; unpaid cancel → VOIDED | DONE | `reverse_payment`, cancellation hook; test status perjalanan lama tetap |
+| S11-09 | Produksi mencatat DP/receipt sambil menunggu S12/S13; demo simulasi tanpa ledger; konfirmasi tanpa shortcut | DONE | `booking_dp_confirmed`, test demo/production/read-only |
+| S11-10 | RBAC, Sales scope pembayaran sendiri, upgrade default tanpa menimpa custom; RLS 9 tabel baru | DONE | `tenants/0006`; IDOR, matriks role, probe PostgreSQL non-superuser |
+| S11-11 | UI Invoice/Pembayaran, alokasi per jamaah, target DP, verify/reject/reverse, PDF, sidebar dan quick-start | DONE | `/dashboard/invoice`, `/dashboard/pembayaran`; E2E API nyata pada DB sementara |
+| S11-12 | Regresi, migrasi clean/rollback, lint/TypeScript/build, OpenAPI, verifikasi runtime dan catatan sprint | DONE | 253/253 test; [laporan verifikasi](SPRINT_S11_VERIFICATION.md), [ADR-0007](../adr/0007-travel-payments-room-pricing.md) |
+
+**Exit gate S11 (Payment state machine tests):** 253/253 backend test lulus
+(39 test baru S11); test penanggung jawab invoice tambahan lulus pada DB
+terpisah. Ruff, lint frontend, TypeScript dan build Docker API/web lulus.
+Migrasi clean/rollback/reapply lulus. Runtime: seluruh migrasi terpasang,
+19 tabel bisnis ber-RLS ENABLE+FORCE, tidak ada default role lama tertinggal,
+API healthy, halaman Invoice/Pembayaran HTTP 200 dan endpoint anonim 403.
+E2E browser API nyata + QA PDF serta pemeriksaan build produksi lulus.
+
+**Batas tahap:** wallet/top-up/ledger dan primitive debit diselesaikan pada
+S12 di bawah. Charge dari event DP, retry dan kompensasi SaaS → S13.
+Gateway live masih menunggu provider; unggah/scan bukti nyata dan portal → S14+. Worker PDF/email
+→ S16. Pajak/diskon otomatis, credit note dan invoice per peserta belum
+diimplementasikan; konfigurasi otomatis nonzero ditolak agar tidak diabaikan.
+Tahap ini menyelesaikan payment state machine dasar.
+
+## Sprint S12 — Prepaid wallet, top-up manual & immutable ledger (F06)
+
+**Status:** DONE — implementasi, 290/290 test, browser, migrasi dan
+build/runtime Docker lokal terverifikasi.
+Keputusan pengguna 26 Oktober 2026: **transfer manual dahulu**.
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S12-01 | Wallet IDR unik per tenant, saldo BIGINT nonnegatif dan isolasi demo/produksi | DONE | `wallet/models.py`, `production_tenant`; GET demo tidak membuat wallet |
+| S12-02 | Top-up manual, instruksi rekening platform snapshot dan Idempotency-Key | DONE | `create_topup`; 10 request serentak menghasilkan satu top-up |
+| S12-03 | Submit bukti/referensi tanpa kredit saldo; nominal/field/status ketat | DONE | `submit_topup`; retry tidak mengganti bukti yang sudah diajukan |
+| S12-04 | Review/settlement petugas platform berizin, actor berbeda, nominal cocok dan referensi bank unik | DONE | platform list/settle API; Owner tenant tidak berhak PAID |
+| S12-05 | Kredit ledger + saldo/version + top-up PAID + outbox atomik | DONE | rollback saat outbox gagal; 10 settlement serentak = satu kredit |
+| S12-06 | Primitive debit internal idempoten, lock wallet dan larangan overdraft | DONE | 5 debit dengan saldo untuk 2 → 2 posted, 3 tidak didebit |
+| S12-07 | Ledger append-only di model/SQL, tenant parent guard, top-up immutable dan RLS 6 tabel | DONE | `wallet/0001`, SQL mutation tests dan RLS nyata non-superuser |
+| S12-08 | Rekonsiliasi ledger/cache/chain/version/top-up; snapshot immutable, alert dan command harian | DONE | `reconcile_wallets`; mismatch exit nonzero tanpa memperbaiki saldo |
+| S12-09 | Expiry CREATED aman, PENDING tetap dapat direview; tenant RESTRICTED tetap dapat top-up | DONE | expiry/late settlement/frozen/restricted tests |
+| S12-10 | API saldo, ledger/top-up paginated, filter UTC, CSV aman dan izin Finance default konservatif | DONE | `/wallet/*`, `tenants/0007`, RBAC/CSRF/IDOR/CSV tests |
+| S12-11 | UI wallet, top-up/bukti/status, mutasi/CSV, kartu dashboard, dark/mobile | DONE | browser API nyata di DB terpisah; sidebar mobile overlay/rail, tanpa overflow |
+| S12-12 | Regresi penuh, migrasi clean/rollback/reapply, OpenAPI, lint/TypeScript/build/runtime dan dokumentasi | DONE | [verifikasi S12](SPRINT_S12_VERIFICATION.md), [ADR-0008](../adr/0008-prepaid-wallet-manual-topups.md) |
+
+**Exit gate:** 290/290 test backend lulus (37 tambahan S12); konkurensi,
+rekonsiliasi, financial rollback dan RLS nyata lulus. Lint/TypeScript dan
+browser desktop/dark/mobile serta CSV lulus. Migrasi clean/rollback/reapply
+lulus; build produksi 25 route, API healthy, migrasi terpasang, 6 tabel wallet
+RLS ENABLE+FORCE, source runtime cocok dan smoke browser produksi lulus.
+
+**Batas tahap:** debit dari DP terverifikasi, charge unit/tarif snapshot,
+pending-charge FIFO/retry, reversal/kompensasi dan milestone M4 → S13.
+Wallet S12 tidak otomatis mengubah konfirmasi peserta. Payment gateway live
+belum dihubungkan sesuai pilihan transfer manual. Upload/scan file bukti,
+worker umum dan platform console menyeluruh mengikuti sprint berikutnya.
+Top-up nyata tetap nonaktif sampai rekening penerima platform dikonfigurasi.
 
 ## Sprint berikutnya
 
@@ -320,7 +405,9 @@ menyusul bila kontrak per-participant dibutuhkan.
 | S08 | 8 | Paket, keberangkatan & alokasi kursi (capacity concurrency tests) | DONE |
 | S09 | 9 | Booking status, linking pilgrims to departures (booking end-to-end) | DONE |
 | S10 | 10 | Manifest base & checklist operasional (ekspor manifest dasar) | DONE |
-| S11–S19 | 11–19 | mengikuti Roadmap §3 | TODO |
+| S11 | 11 | Invoice/kuitansi, verifikasi DP dan varian harga kamar | DONE |
+| S12 | 12 | Prepaid wallet, top-up manual dan immutable ledger | DONE |
+| S13–S19 | 13–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 

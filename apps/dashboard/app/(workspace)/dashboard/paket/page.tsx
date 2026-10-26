@@ -12,13 +12,14 @@ import {
   StatusBadge,
 } from "@/components/workspace/ui";
 import { formatIdr } from "@/lib/format";
-import { apiFetch, problemMessage, type TravelPackage } from "@/lib/api";
+import { apiFetch, problemMessage, type TravelPackage, type RoomType } from "@/lib/api";
+import { EMPTY_ROOM_PRICES, ROOM_LABELS } from "@/lib/rooms";
 
 /**
  * Master Paket (S08, UI-04; MOD-05; Spec §5.2/§8.3): daftar + CRUD draft/
  * publish. Publish hanya sah dari status Aktif (guard server); harga paket
  * yang sudah punya booking tidak mengubah invoice lama (snapshot booking,
- * S09). Varian harga per tipe kamar menyusul S09.
+ * S09). S11: harga kamar dipilih dan di-snapshot per peserta booking.
  */
 const KIND_LABEL: Record<string, string> = {
   umroh: "Umroh",
@@ -45,6 +46,8 @@ export default function PaketPage() {
   const [kind, setKind] = useState("umroh");
   const [durationDays, setDurationDays] = useState("");
   const [price, setPrice] = useState("");
+  const [roomPrices, setRoomPrices] = useState(EMPTY_ROOM_PRICES);
+  const [editing, setEditing] = useState<TravelPackage | null>(null);
   const [description, setDescription] = useState("");
   const [inclusions, setInclusions] = useState("");
   const [exclusions, setExclusions] = useState("");
@@ -83,7 +86,8 @@ export default function PaketPage() {
   async function onAdd(event: React.FormEvent) {
     event.preventDefault();
     const duration = Number(durationDays);
-    const priceValue = Number(price);
+    const variants = Object.entries(roomPrices).filter(([, value]) => value.trim() !== "").map(([room_type, value]) => ({ room_type, price_idr: Number(value) }));
+    const priceValue = variants.length ? Math.min(...variants.map((row) => row.price_idr)) : Number(price);
     const errors: Record<string, string | null> = {
       name: name.trim() ? null : "Nama paket wajib diisi.",
       duration_days:
@@ -91,9 +95,10 @@ export default function PaketPage() {
           ? null
           : "Durasi 0–365 hari.",
       price_idr:
-        Number.isInteger(priceValue) && priceValue >= 0 && priceValue <= 10_000_000_000
+        (variants.length > 0 || price.trim() !== "") && Number.isInteger(priceValue) && priceValue >= 0 && priceValue <= 10_000_000_000
           ? null
           : "Harga Rp0 – Rp10 miliar (integer rupiah).",
+      room_prices: variants.every((row) => Number.isInteger(row.price_idr) && row.price_idr >= 0 && row.price_idr <= 10_000_000_000) ? null : "Harga kamar harus integer Rp0–Rp10 miliar.",
     };
     setFormErrors(errors);
     if (Object.values(errors).some(Boolean)) return;
@@ -101,13 +106,14 @@ export default function PaketPage() {
     setBusy(true);
     setMessage(null);
     setError(null);
-    const result = await apiFetch<TravelPackage>("/packages", {
-      method: "POST",
+    const result = await apiFetch<TravelPackage>(editing ? `/packages/${editing.id}` : "/packages", {
+      method: editing ? "PATCH" : "POST",
       body: JSON.stringify({
         name: name.trim(),
         kind,
         duration_days: duration,
         price_idr: priceValue,
+        room_prices: variants,
         description: description.trim(),
         inclusions: inclusions.split("\n").map((line) => line.trim()).filter(Boolean),
         exclusions: exclusions.split("\n").map((line) => line.trim()).filter(Boolean),
@@ -122,11 +128,22 @@ export default function PaketPage() {
     setKind("umroh");
     setDurationDays("");
     setPrice("");
+    setRoomPrices(EMPTY_ROOM_PRICES);
+    setEditing(null);
     setDescription("");
     setInclusions("");
     setExclusions("");
-    setMessage(`Paket ${result.data.code} tersimpan sebagai draf.`);
+    setMessage(`Paket ${result.data.code} tersimpan${editing ? "; harga booking yang sudah ada tetap" : " sebagai draf"}.`);
     load(query);
+  }
+
+  function editPackage(pkg: TravelPackage) {
+    setEditing(pkg);
+    setName(pkg.name); setKind(pkg.kind); setDurationDays(String(pkg.duration_days));
+    setPrice(String(pkg.price_idr)); setDescription(pkg.description);
+    setInclusions(pkg.inclusions.join("\n")); setExclusions(pkg.exclusions.join("\n"));
+    setRoomPrices({ ...EMPTY_ROOM_PRICES, ...Object.fromEntries((pkg.room_prices ?? []).map((row) => [row.room_type, String(row.price_idr)])) });
+    setFormErrors({});
   }
 
   if (noAccess) {
@@ -195,14 +212,16 @@ export default function PaketPage() {
                     <p className="font-semibold">{pkg.name}</p>
                     <p className="text-xs text-muted">
                       {pkg.code} · {KIND_LABEL[pkg.kind] ?? pkg.kind} ·{" "}
-                      {pkg.duration_days} hari · {formatIdr(pkg.price_idr)}
+                      {pkg.duration_days} hari · {(pkg.room_prices ?? []).length ? "Mulai " : ""}{formatIdr(pkg.price_idr)}
                     </p>
+                    {(pkg.room_prices ?? []).length ? <p className="mt-1 text-xs text-muted">{pkg.room_prices.map((room) => `${ROOM_LABELS[room.room_type]} ${formatIdr(room.price_idr)}`).join(" · ")}</p> : null}
                   </div>
                   <StatusBadge tone={STATUS_TONE[pkg.status] ?? "neutral"}>
                     {pkg.status}
                   </StatusBadge>
                   {pkg.published ? <StatusBadge tone="success">TERBIT</StatusBadge> : null}
                   <span className="ml-auto flex flex-wrap gap-1.5">
+                    <Btn variant="tint" size="xs" onClick={() => editPackage(pkg)}>Ubah paket / harga</Btn>
                     {pkg.status === "DRAFT" ? (
                       <Btn
                         variant="tint"
@@ -261,7 +280,7 @@ export default function PaketPage() {
         </section>
 
         <section className="card p-6">
-          <h2 className="font-semibold">Tambah paket</h2>
+          <h2 className="font-semibold">{editing ? `Ubah ${editing.code}` : "Tambah paket"}</h2>
           {/* Workspace controls use compact typography and field spacing. */}
           <form onSubmit={onAdd} className="mt-6">
             <FormField
@@ -293,15 +312,23 @@ export default function PaketPage() {
               placeholder="12"
             />
             <FormField
-              label="Harga dasar (Rp)"
+              label="Harga standar tanpa varian (Rp)"
               htmlFor="package-price"
-              hint="Integer rupiah tanpa desimal — varian harga per kamar menyusul S09."
+              hint="Isi bila tidak memakai harga per tipe kamar. Semua harga dihitung per jamaah."
               error={formErrors.price_idr}
               value={price}
               onChange={(event) => setPrice(event.target.value)}
               inputMode="numeric"
               placeholder="28500000"
             />
+            <fieldset className="my-6 border-t border-border pt-6">
+              <legend className="text-sm font-semibold">Harga per tipe kamar (Rp / jamaah)</legend>
+              <p className="mt-2 text-xs text-muted">Isi tipe kamar yang tersedia. Kosongkan tipe yang tidak ditawarkan.</p>
+              {(Object.keys(ROOM_LABELS) as RoomType[]).map((room) => (
+                <FormField key={room} label={`Harga ${ROOM_LABELS[room]}`} htmlFor={`price-${room.toLowerCase()}`} inputMode="numeric" value={roomPrices[room]} onChange={(event) => setRoomPrices((prev) => ({...prev, [room]: event.target.value}))} />
+              ))}
+              {formErrors.room_prices ? <p className="error-message" role="alert">{formErrors.room_prices}</p> : null}
+            </fieldset>
             <FormTextarea
               label="Deskripsi"
               htmlFor="package-description"
@@ -332,8 +359,9 @@ export default function PaketPage() {
             ) : null}
             <div className="form-submit">
               <Btn type="submit" disabled={busy}>
-                {busy ? "Menyimpan…" : "Tambah paket"}
+                {busy ? "Menyimpan…" : editing ? "Simpan perubahan" : "Tambah paket"}
               </Btn>
+              {editing ? <Btn variant="tint" type="button" className="ml-2" onClick={() => { setEditing(null); setName(""); setPrice(""); setRoomPrices(EMPTY_ROOM_PRICES); setKind("umroh"); setDurationDays(""); setDescription(""); setInclusions(""); setExclusions(""); }}>Batal ubah</Btn> : null}
             </div>
           </form>
         </section>

@@ -18,7 +18,9 @@ import {
   type Booking,
   type Departure,
   type Pilgrim,
+  type RoomType,
 } from "@/lib/api";
+import { ROOM_LABELS } from "@/lib/rooms";
 
 /**
  * Booking end-to-end (S09, UI-07; MOD-07; Spec §5.2/§6.2/§8.3): daftar booking
@@ -103,6 +105,7 @@ export default function BookingPage() {
   const [pilgrimQuery, setPilgrimQuery] = useState("");
   const [pilgrimResults, setPilgrimResults] = useState<Pilgrim[]>([]);
   const [picked, setPicked] = useState<Pilgrim[]>([]);
+  const [roomTypes, setRoomTypes] = useState<Record<string, RoomType>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
 
@@ -172,6 +175,8 @@ export default function BookingPage() {
     setPicked((prev) => (prev.some((p) => p.id === pilgrim.id) ? prev : [...prev, pilgrim]));
     setPilgrimQuery("");
     setPilgrimResults([]);
+    const first = departures.find((dep) => dep.id === departureId)?.room_prices?.[0]?.room_type;
+    if (first) setRoomTypes((prev) => ({...prev, [pilgrim.id]: first}));
   }
 
   async function onCreate(event: React.FormEvent) {
@@ -191,6 +196,7 @@ export default function BookingPage() {
       body: JSON.stringify({
         departure: departureId,
         participants: picked.map((p) => p.id),
+        room_types: Object.fromEntries(picked.filter((p) => roomTypes[p.id]).map((p) => [p.id, roomTypes[p.id]])),
         notes: notes.trim(),
       }),
     });
@@ -202,6 +208,7 @@ export default function BookingPage() {
     setDepartureId("");
     setNotes("");
     setPicked([]);
+    setRoomTypes({});
     setPilgrimQuery("");
     setMessage(
       `Booking ${result.data.code} dibuat (draf) untuk ${result.data.participant_count} peserta — ` +
@@ -227,6 +234,9 @@ export default function BookingPage() {
   const visible =
     rows && statusFilter ? rows.filter((row) => row.status === statusFilter) : rows;
   const searchable = pilgrimResults.filter((p) => !picked.some((s) => s.id === p.id)).slice(0, 8);
+  const selectedDeparture = departures.find((dep) => dep.id === departureId);
+  const roomChoices = selectedDeparture?.room_prices ?? [];
+  const estimatedTotal = picked.reduce((total, person) => total + (roomChoices.find((room) => room.room_type === roomTypes[person.id])?.price_idr ?? selectedDeparture?.package_price_idr ?? 0), 0);
 
   return (
     <div className="workspace-page">
@@ -313,7 +323,7 @@ export default function BookingPage() {
                       >
                         {p.pilgrim_name}
                         <span className="text-muted">
-                          · {PARTICIPANT_LABEL[p.participant_status] ?? p.participant_status}
+                          · {String(p.pricing_snapshot.room_type || "Standar")} · {formatIdr(Number(p.pricing_snapshot.unit_price_idr ?? 0))} · {PARTICIPANT_LABEL[p.participant_status] ?? p.participant_status}
                         </span>
                       </li>
                     ))}
@@ -372,7 +382,11 @@ export default function BookingPage() {
               hint="Hanya keberangkatan dengan pendaftaran dibuka (OPEN)."
               error={formErrors.departure}
               value={departureId}
-              onChange={(event) => setDepartureId(event.target.value)}
+              onChange={(event) => {
+                setDepartureId(event.target.value);
+                const first = departures.find((dep) => dep.id === event.target.value)?.room_prices?.[0]?.room_type;
+                setRoomTypes(first ? Object.fromEntries(picked.map((p) => [p.id, first])) : {});
+              }}
             >
               <option value="">— pilih keberangkatan —</option>
               {departures.map((dep) => (
@@ -442,6 +456,18 @@ export default function BookingPage() {
               <p className="error-message" role="alert">
                 {formErrors.participants}
               </p>
+            ) : null}
+
+            {picked.length > 0 ? (
+              <div className="my-6 border-t border-border pt-6">
+                {roomChoices.length > 0 ? picked.map((person) => (
+                  <FormSelect key={person.id} label={`Kamar ${person.name}`} htmlFor={`room-${person.id}`} value={roomTypes[person.id] ?? ""} required onChange={(event) => setRoomTypes((prev) => ({...prev, [person.id]: event.target.value as RoomType}))}>
+                    <option value="">— pilih kamar —</option>
+                    {roomChoices.map((room) => <option key={room.room_type} value={room.room_type}>{ROOM_LABELS[room.room_type]} · {formatIdr(room.price_idr)} / jamaah</option>)}
+                  </FormSelect>
+                )) : null}
+                <p className="text-sm font-semibold">Perkiraan total: {formatIdr(estimatedTotal)}</p>
+              </div>
             ) : null}
 
             <FormTextarea

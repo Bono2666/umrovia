@@ -72,6 +72,10 @@ class TenantSettingsSerializer(serializers.Serializer):
         return _validate_section(value, "invoice_config_json")
 
     def validate_rules_json(self, value):
+        if isinstance(value, dict) and "payments" in value:
+            from modules.payments.policy import validate_payment_rules
+
+            validate_payment_rules(value["payments"])
         return _validate_section(value, "rules_json")
 
 

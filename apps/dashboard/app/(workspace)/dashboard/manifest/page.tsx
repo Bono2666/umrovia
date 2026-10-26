@@ -278,7 +278,7 @@ export default function ManifestPage() {
       ) : null}
 
       <section className="card mt-6 p-6">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="manifest-filters grid gap-x-3 gap-y-8 md:grid-cols-3">
           <FormSelect
             label="Keberangkatan"
             htmlFor="manifest-departure"
@@ -335,7 +335,7 @@ export default function ManifestPage() {
           <p className="mt-1 text-xs">
             Transisi keberangkatan ke <strong>READY</strong> akan ditolak server kecuali memakai
             <em> approved exception</em> dengan alasan (dicatat di audit, OPS-02) — ubah lewat menu
-            Keberangkatan, atau lengkapi dokumen jamaah di menu Jamaah.
+            Keberangkatan melalui “Siapkan dengan pengecualian”, atau lengkapi dokumen jamaah.
           </p>
         </div>
       ) : null}

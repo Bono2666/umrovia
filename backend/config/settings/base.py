@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     "modules.departures",
     "modules.booking",
     "modules.manifest",
+    "modules.payments",
+    "modules.wallet",
     "modules.audit",
     "modules.documents",
 ]
@@ -151,6 +153,9 @@ SPECTACULAR_SETTINGS = {
 # --- CORS -------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 CORS_ALLOW_CREDENTIALS = True
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 
 # --- Locale -----------------------------------------------------------------
 LANGUAGE_CODE = "id"
@@ -181,6 +186,12 @@ EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", "False")
 EMAIL_TIMEOUT = int(env("EMAIL_TIMEOUT", "10") or "10")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "Umrovia <no-reply@umrovia.com>")
 CONTACT_RECIPIENT_EMAIL = env("CONTACT_RECIPIENT_EMAIL", "bonoworxx@gmail.com")
+
+# Platform receiving account, independent of every travel's bank accounts.
+# Empty by default: financial top-up requests stay disabled until configured.
+WALLET_MANUAL_BANK_NAME = env("WALLET_MANUAL_BANK_NAME", "")
+WALLET_MANUAL_ACCOUNT_NAME = env("WALLET_MANUAL_ACCOUNT_NAME", "")
+WALLET_MANUAL_ACCOUNT_NUMBER = env("WALLET_MANUAL_ACCOUNT_NUMBER", "")
 
 # --- Enkripsi PII jamaah (Spec §5.2 identity_encrypted, §10.1) ---------------
 # Key Fernet (urlsafe base64 32 byte). Production WAJIB eksplisit (production.py);

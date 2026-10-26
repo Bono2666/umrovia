@@ -450,7 +450,7 @@ def test_departure_departed_gate_before_departure(auth_client, tenant_a):
 
 
 @pytest.mark.django_db
-def test_booking_ready_to_depart_documents_gate(auth_client, tenant_a):
+def test_booking_ready_to_depart_documents_gate(auth_client, tenant_a, settle_demo_dp):
     """Hook S09 `documents_complete` terisi: booking → READY_TO_DEPART ditolak
     sampai dokumen wajib peserta APPROVED (PRD "checklist per jamaah")."""
     _seed_env(tenant_a)
@@ -460,6 +460,7 @@ def test_booking_ready_to_depart_documents_gate(auth_client, tenant_a):
     _requirement(tenant_a, kind="ktp")
 
     assert _transition_booking(auth_client, booking["id"], "RESERVED").status_code == 200
+    settle_demo_dp(auth_client, booking["id"])
     assert _transition_booking(auth_client, booking["id"], "CONFIRMED").status_code == 200
     assert _transition_booking(auth_client, booking["id"], "DOCUMENT_PROCESS").status_code == 200
 

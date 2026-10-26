@@ -51,6 +51,8 @@ from modules.pilgrims.models import (
     PilgrimDocumentKind,
     PilgrimDocumentStatus,
 )
+from modules.tenants.context import get_current_tenant
+from modules.tenants.environment import resolve_active_environment
 
 # Booking yang tidak lagi memegang kursi/kewajiban → tidak masuk checklist
 # maupun manifest (MOD-07 terminal negatif).
@@ -58,13 +60,15 @@ INACTIVE_BOOKING_STATUSES = (BookingStatus.CANCELED, BookingStatus.EXPIRED)
 
 
 def effective_requirements(package) -> list[DocumentRequirement]:
-    """Checklist efektif: global (package null) ditimpa per-kind oleh paket."""
+    """Checklist dalam satu environment; paket menimpa global per jenis."""
+    environment = package.environment if package is not None else resolve_active_environment(get_current_tenant())
+    requirements = DocumentRequirement.objects.filter(environment=environment)
     by_kind = {
         r.kind: r
-        for r in DocumentRequirement.objects.filter(package__isnull=True)
+        for r in requirements.filter(package__isnull=True)
     }
     if package is not None:
-        for row in DocumentRequirement.objects.filter(package=package):
+        for row in requirements.filter(package=package):
             by_kind[row.kind] = row
     return sorted(by_kind.values(), key=lambda r: r.kind)
 

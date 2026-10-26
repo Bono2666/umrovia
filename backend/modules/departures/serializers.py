@@ -2,6 +2,7 @@
 from rest_framework import serializers
 
 from modules.departures.models import Departure, DepartureStatus
+from modules.tenants.models import MembershipStatus, TenantMembership
 
 
 def departure_payload(dep: Departure) -> dict:
@@ -12,6 +13,8 @@ def departure_payload(dep: Departure) -> dict:
         "package_id": str(dep.package_id),
         "package_code": dep.package.code,
         "package_name": dep.package.name,
+        "package_price_idr": dep.package.price_idr,
+        "room_prices": [{"room_type": r.room_type, "price_idr": r.price_idr} for r in dep.package.room_prices.all()],
         "start_at": dep.start_at.isoformat(),
         "end_at": dep.end_at.isoformat() if dep.end_at else None,
         "city_of_origin": dep.city_of_origin,
@@ -54,6 +57,13 @@ class DepartureWriteSerializer(serializers.ModelSerializer):
         if not value.strip():
             raise serializers.ValidationError("Kota asal wajib diisi.")
         return value.strip()
+
+    def validate_lead_staff(self, value):
+        if value is not None and not TenantMembership.objects.filter(
+            user=value, status=MembershipStatus.ACTIVE, user__status="ACTIVE"
+        ).exists():
+            raise serializers.ValidationError("PIC harus staf aktif pada workspace ini.")
+        return value
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

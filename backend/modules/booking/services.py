@@ -16,10 +16,9 @@ Alur (S09 "Booking end-to-end"):
   (deadline lewat/keberangkatan READY+); dari RESERVED melepas kursi.
 - **Peserta** di-advance sinkron dengan header (§6.2 ↔ MOD-07): RESERVED →
   REGISTERED, CONFIRMED → CONFIRMED, READY_TO_DEPART → READY, DEPARTED →
-  DEPARTED, COMPLETED → COMPLETED, CANCELED/EXPIRED → CANCELED. S09 tanpa
-  modul pembayaran: tahap DP (AWAITING_DP → DP_VERIFIED_PENDING_CHARGE)
-  dilewati — lihat hook `dp_confirmed`. S11/S12 memasukkan tahap DP dan
-  memakai `advance_participant` dengan graph §6.2 penuh.
+  DEPARTED, COMPLETED → COMPLETED, CANCELED/EXPIRED → CANCELED. S11 memakai
+  tahap AWAITING_DP → DP_VERIFIED_PENDING_CHARGE; konfirmasi produksi
+  menunggu charge S12/S13, sedangkan simulasi demo tidak menyentuh ledger.
 - **Kuota trial (POL-08):** selama trial berjalan, pembuatan booking
   mengonsumsi `TenantTrial.dummy_count` — SATU UNIT = SATU PESERTA
   (booking-jamaah; §16 "20 dummy jamaah"). Increment SEBELUM create dan
@@ -42,6 +41,7 @@ from modules.booking.models import (
     SaasChargeState,
     generate_booking_code,
 )
+from modules.catalog.models import TravelPackage
 from modules.departures.models import Departure, DepartureStatus
 from modules.departures.services import release_seats, reserve_seats
 from modules.manifest.services import booking_documents_complete
@@ -136,12 +136,9 @@ HEADER_PARTICIPANT_TARGET: dict[str, str | None] = {
 }
 
 # Tangga advance peserta di jalur header (status peserta saat ini → target).
-# REGISTERED→CONFIRMED adalah shortcut S09 tanpa aturan DP (lihat
-# `dp_confirmed`); S11 menghapus shortcut itu dengan mengisi hook dan
-# meng-advance peserta melewati tahap DP sendiri.
+# Tahap DP dijalankan layanan pembayaran; tidak ada shortcut REGISTERED→CONFIRMED.
 HEADER_PARTICIPANT_LADDER: dict[str, str] = {
     ParticipantStatus.DRAFT: ParticipantStatus.REGISTERED,
-    ParticipantStatus.REGISTERED: ParticipantStatus.CONFIRMED,
     ParticipantStatus.CONFIRMED: ParticipantStatus.READY,
     ParticipantStatus.READY: ParticipantStatus.DEPARTED,
     ParticipantStatus.DEPARTED: ParticipantStatus.COMPLETED,
@@ -152,14 +149,12 @@ def dp_confirmed(booking: Booking) -> tuple[bool, str]:
     """Gerbang CONFIRMED (MOD-07: "Reserved hanya dikonfirmasi sesuai aturan
     DP/pelunasan yang dapat dikonfigurasi").
 
-    Hook untuk modul pembayaran S11/S12 — selama aturan DP belum ada di
-    sistem, True (tidak ada yang bisa kurang) dan peserta di-advance
-    REGISTERED→CONFIRMED langsung. Saat S11 mengaktifkan aturan DP, hook ini
-    mengembalikan False bila ada peserta yang DP-nya belum terverifikasi —
-    peserta sudah lebih dulu di-advance `AWAITING_DP` →
-    `DP_VERIFIED_PENDING_CHARGE` → `CONFIRMED` oleh layanan pembayaran.
+    S11 menuntut DP eligible setiap peserta; produksi juga menunggu charge
+    SaaS S12/S13. Simulasi demo dapat dikonfirmasi tanpa ledger produksi.
     """
-    return True, ""
+    from modules.payments.services import booking_dp_confirmed
+
+    return booking_dp_confirmed(booking)
 
 
 def documents_complete(booking: Booking) -> tuple[bool, str]:
@@ -273,12 +268,19 @@ def _consume_trial_quota(tenant, units: int) -> None:
     trial.save(update_fields=["dummy_count", "updated_at"])
 
 
-def _snapshot_unit_price(departure: Departure) -> dict:
+def _snapshot_unit_price(departure: Departure, room_type: str = "") -> dict:
     pkg = departure.package
+    prices = {row.room_type: row.price_idr for row in pkg.room_prices.all()}
+    if prices and room_type not in prices:
+        raise ValidationError({"room_types": "Pilih tipe kamar yang tersedia untuk setiap jamaah."})
+    if not prices and room_type:
+        raise ValidationError({"room_types": "Paket ini belum memiliki harga tipe kamar tersebut."})
     return {
         "package_id": str(pkg.id),
         "package_code": pkg.code,
-        "unit_price_idr": int(pkg.price_idr),
+        "package_name": pkg.name,
+        "room_type": room_type,
+        "unit_price_idr": int(prices[room_type] if prices else pkg.price_idr),
         "snapshot_at": timezone.now().isoformat(),
     }
 
@@ -287,17 +289,24 @@ def _create_price_line(*, booking: Booking, qty: int) -> None:
     """Baris harga snapshot (§5.2, UAT-04) — dibuat ulang selama DRAFT;
     setelah RESERVED baris dibekukan (PATCH hanya DRAFT)."""
     booking.price_lines.all().delete()
-    unit = booking.departure.package.price_idr
-    BookingPriceLine.objects.create(
-        tenant=booking.tenant,
-        environment=booking.environment,
-        booking=booking,
-        item_type="package",
-        description=booking.departure.package.name,
-        qty=qty,
-        unit_price=Decimal(unit),
-        amount=Decimal(unit * qty),
-    )
+    groups = {}
+    for participant in booking.participants.all():
+        snapshot = participant.pricing_snapshot_json
+        key = (snapshot.get("package_name", booking.departure.package.name), snapshot.get("room_type", ""), int(snapshot["unit_price_idr"]))
+        groups[key] = groups.get(key, 0) + 1
+    for (name, room, unit), count in sorted(groups.items()):
+        BookingPriceLine.objects.create(
+            tenant=booking.tenant, environment=booking.environment, booking=booking,
+            item_type="package", description=f"{name} · {room}" if room else name,
+            qty=count, unit_price=Decimal(unit), amount=Decimal(unit * count),
+        )
+
+
+def _room_choices(room_types, pilgrim_ids):
+    choices = {str(key): value for key, value in (room_types or {}).items()}
+    if set(choices) - {str(pid) for pid in pilgrim_ids}:
+        raise ValidationError({"room_types": "Pilihan kamar harus mengacu pada peserta booking."})
+    return choices
 
 
 @transaction.atomic
@@ -310,6 +319,7 @@ def create_booking(
     notes: str = "",
     allow_duplicate: bool = False,
     actor=None,
+    room_types=None,
 ) -> Booking:
     """Buat booking DRAFT dengan peserta & snapshot harga (UI-07, UAT-03/04).
 
@@ -323,6 +333,7 @@ def create_booking(
     except (Departure.DoesNotExist, ValueError, ValidationError):
         raise ValidationError({"departure": "Keberangkatan tidak ditemukan."}) from None
     _guard_departure_bookable(departure, environment=environment)
+    departure.package = TravelPackage.objects.select_for_update().prefetch_related("room_prices").get(pk=departure.package_id)
     _check_duplicate_active(
         departure=departure,
         pilgrim_ids=[p.pk for p in pilgrims],
@@ -349,8 +360,9 @@ def create_booking(
     else:
         raise ValidationError({"code": "Gagal membuat booking, coba lagi."})
 
-    snapshot = _snapshot_unit_price(departure)
+    choices = _room_choices(room_types, [p.pk for p in pilgrims])
     for pilgrim in pilgrims:
+        snapshot = _snapshot_unit_price(departure, choices.get(str(pilgrim.pk), ""))
         BookingParticipant.objects.create(
             tenant=tenant,
             environment=environment,
@@ -373,6 +385,7 @@ def update_draft_booking(
     pilgrim_ids=None,
     notes: str | None = None,
     allow_duplicate: bool = False,
+    room_types=None,
 ) -> Booking:
     """Update booking DRAFT saja (§8.3 "Detail/update draft").
 
@@ -398,6 +411,7 @@ def update_draft_booking(
         booking.departure = departure
     else:
         departure = Departure.objects.get(pk=booking.departure_id)
+    departure.package = TravelPackage.objects.select_for_update().prefetch_related("room_prices").get(pk=departure.package_id)
 
     participants_changed = False
     if pilgrim_ids is not None:
@@ -418,7 +432,7 @@ def update_draft_booking(
             _consume_trial_quota(booking.tenant, delta)  # TR03: tidak pernah dikurangi
         if removed:
             BookingParticipant.objects.filter(pk__in=[p.pk for p in removed]).delete()
-        snapshot = _snapshot_unit_price(departure)
+        choices = _room_choices(room_types, wanted_ids)
         for pilgrim in added:
             BookingParticipant.objects.create(
                 tenant=booking.tenant,
@@ -427,9 +441,18 @@ def update_draft_booking(
                 pilgrim=pilgrim,
                 participant_status=ParticipantStatus.DRAFT,
                 saas_charge_state=SaasChargeState.NOT_ELIGIBLE,
-                pricing_snapshot_json=snapshot,
+                pricing_snapshot_json=_snapshot_unit_price(departure, choices.get(str(pilgrim.pk), "")),
             )
         participants_changed = True
+
+    current_rows = list(booking.participants.all())
+    choices = _room_choices(room_types, [p.pilgrim_id for p in current_rows])
+    for row in current_rows:
+        requested = choices.get(str(row.pilgrim_id), row.pricing_snapshot_json.get("room_type", ""))
+        if departure_changed or (str(row.pilgrim_id) in choices and requested != row.pricing_snapshot_json.get("room_type", "")):
+            row.pricing_snapshot_json = _snapshot_unit_price(departure, requested)
+            row.save(update_fields=["pricing_snapshot_json", "updated_at"])
+            participants_changed = True
 
     if notes is not None:
         booking.notes = notes.strip()
@@ -570,4 +593,8 @@ def transition_booking(
         booking.canceled_by = actor if getattr(actor, "is_authenticated", False) else None
         fields += ["cancel_reason", "canceled_by"]
     booking.save(update_fields=fields)
+    if target in (BookingStatus.CANCELED, BookingStatus.EXPIRED):
+        from modules.payments.services import cancel_booking_invoice
+
+        cancel_booking_invoice(booking, reason or "Booking kedaluwarsa")
     return booking
