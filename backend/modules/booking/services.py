@@ -608,6 +608,10 @@ def transition_booking(
         booking.canceled_by = actor if getattr(actor, "is_authenticated", False) else None
         fields += ["cancel_reason", "canceled_by"]
     booking.save(update_fields=fields)
+    if target == BookingStatus.RESERVED:
+        from modules.notifications.services import booking_reserved
+
+        booking_reserved(booking)  # NTF-01 "booking berhasil": kursi sudah diamankan
     if target in (BookingStatus.CANCELED, BookingStatus.EXPIRED):
         from modules.billing.services import void_pending_for_booking
         from modules.payments.services import cancel_booking_invoice

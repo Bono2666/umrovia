@@ -8,7 +8,7 @@ import { UmroviaMark } from "@/components/UmroviaMark";
 import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import {
   API_BASE, apiFetch, apiUpload, downloadFromApi, problemMessage,
-  type PortalAccessView, type PortalBooking, type PortalDocumentItem, type PortalProfile, type UserPayload,
+  type PortalAccessView, type PortalBooking, type PortalDocumentItem, type PortalNotification, type PortalProfile, type UserPayload,
 } from "@/lib/api";
 import { formatDate, formatIdr, formatMasked } from "@/lib/format";
 import { ROOM_LABELS } from "@/lib/rooms";
@@ -71,10 +71,75 @@ export default function PortalPage() {
             {me?.memberships.some((m) => m.status === "ACTIVE") ? <p className="mt-4 text-center text-sm"><Link className="text-primary underline" href="/dashboard">Buka dashboard travel</Link></p> : null}
           </div>
         ) : (
-          accesses.map((access) => <AccessSection key={access.access_id} access={access} onChanged={load} />)
+          <>
+            <InboxPanel />
+            {accesses.map((access) => <AccessSection key={access.access_id} access={access} onChanged={load} />)}
+          </>
         )}
       </main>
     </div>
+  );
+}
+
+/** Inbox NTF-02: pemberitahuan travel (booking, invoice, pembayaran, dokumen, jadwal). */
+function InboxPanel() {
+  const [inbox, setInbox] = useState<{ results: PortalNotification[]; unread: number } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  const load = useCallback(() => {
+    apiFetch<{ results: PortalNotification[]; unread: number }>("/portal/notifications").then((result) => {
+      if (result.ok) setInbox(result.data);
+    });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  function markRead(item: PortalNotification) {
+    if (item.read_at) return;
+    const readAt = new Date().toISOString();
+    setInbox((value) => value && { unread: Math.max(value.unread - 1, 0), results: value.results.map((row) => row.id === item.id ? { ...row, read_at: readAt } : row) });
+    void apiFetch(`/portal/accesses/${item.access_id}/notifications/${item.id}/read`, { method: "POST" });
+  }
+
+  async function readAll() {
+    const result = await apiFetch("/portal/notifications/read-all", { method: "POST" });
+    if (result.ok) load();
+  }
+
+  if (inbox === null || inbox.results.length === 0) return null;
+  const items = showAll ? inbox.results : inbox.results.slice(0, 4);
+  return (
+    <section className="card p-6" aria-labelledby="portal-inbox-title">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="portal-inbox-title" className="flex items-center gap-2 font-semibold">
+          Pemberitahuan
+          {inbox.unread ? <StatusBadge tone="warning">{inbox.unread} baru</StatusBadge> : null}
+        </h2>
+        {inbox.unread ? <Btn size="xs" variant="link" onClick={() => void readAll()}>Tandai semua dibaca</Btn> : null}
+      </div>
+      <ul className="mt-3 divide-y divide-border">
+        {items.map((item) => {
+          const expanded = open === item.id;
+          return (
+            <li key={item.id} className="py-3">
+              <button type="button" aria-expanded={expanded} className="flex w-full items-start justify-between gap-3 text-left"
+                onClick={() => { setOpen(expanded ? null : item.id); markRead(item); }}>
+                <span className="min-w-0">
+                  <span className={`block text-sm ${item.read_at ? "" : "font-semibold"}`}>
+                    {item.read_at ? null : <span className="mr-2 inline-block h-2 w-2 rounded-full bg-primary align-middle" aria-label="Belum dibaca" />}
+                    {item.subject}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">{new Date(item.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}</span>
+                </span>
+                <span className="shrink-0 text-xs text-primary">{expanded ? "Tutup" : "Baca"}</span>
+              </button>
+              {expanded ? <pre className="mt-3 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground">{item.body}</pre> : null}
+            </li>
+          );
+        })}
+      </ul>
+      {inbox.results.length > 4 ? <Btn className="mt-2" size="xs" variant="link" onClick={() => setShowAll((value) => !value)}>{showAll ? "Tampilkan lebih sedikit" : `Tampilkan semua (${inbox.results.length})`}</Btn> : null}
+    </section>
   );
 }
 

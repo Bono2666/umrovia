@@ -485,6 +485,33 @@ uji manual pengguna.
 ekspor asinkron `POST /exports` dan notifikasi perubahan jadwal (S16);
 laporan operasional siap pakai (S17).
 
+## Sprint S16 — Notifikasi email, retry & template (F07)
+
+**Status:** DONE (26 Oktober 2026), branch `sprint/s16-notifications`.
+Keputusan: [ADR-0012](../adr/0012-notification-outbox.md). Bukti:
+[verifikasi S16](SPRINT_S16_VERIFICATION.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S16-01 | Modul `notifications`: outbox transaksional + log pengiriman (RLS), unique key dedupe per event × penerima × kanal | DONE | `uq_notification_dedupe`, RLS test |
+| S16-02 | Event NTF-01: booking berhasil, invoice, pembayaran terverifikasi, lunas, dokumen disetujui/ditolak, perubahan jadwal; alert owner charge tertunda | DONE | hook di service, test per event |
+| S16-03 | Antrean platform ID-only, klaim SKIP LOCKED + lease, retry backoff, DLQ (`DEAD`), kirim ulang beraudit | DONE | NTF01, test klaim paralel |
+| S16-04 | Hook tidak pernah menggagalkan DP/charge (savepoint); SMTP di luar transaksi | DONE | `test_hook_failure_never_breaks_payment` |
+| S16-05 | Template berversi: teks travel, validasi variabel wajib/tak dikenal/subjek satu baris, pratinjau, reset | DONE | NTF-03 |
+| S16-06 | Inbox portal jamaah (pesan milik sendiri, tandai dibaca) | DONE | NTF-02 |
+| S16-07 | Pengingat trial H-7/H-3/H-1 ke owner, satu pesan logis per hari × penerima | DONE | TR07 |
+| S16-08 | Worker `run_worker` (antrean + expiry/pengingat trial + retry pending charge) dan service Docker `worker` | DONE | compose |
+| S16-09 | Dashboard Notifikasi: ringkasan status, filter, isi pesan, kirim ulang, editor template | DONE | Playwright |
+| S16-10 | Grant `notifications.read/manage` + migrasi role default; regresi | DONE | 397/397 backend |
+
+**Exit gate S16 (Queue/idempotency tests):** dedupe event diproses ulang,
+klaim antrean tanpa pengiriman ganda, retry → DLQ → kirim ulang, dan isolasi
+tenant lulus otomatis.
+
+**Batas tahap:** WhatsApp/SMS (P1), email HTML, webhook bounce provider,
+preferensi pesan non-transaksional; antrean ekspor manifest asinkron pindah ke
+backlog (ekspor tetap sinkron).
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -503,7 +530,8 @@ laporan operasional siap pakai (S17).
 | S13 | 13 | Billing event flow, saldo kurang, refund (M4) | DONE |
 | S14 | 14 | Portal jamaah, autentikasi, profil & unggah dokumen | DONE |
 | S15 | 15 | Operasional keberangkatan, manifest & ekspor PDF | DONE |
-| S16–S19 | 16–19 | mengikuti Roadmap §3 | TODO |
+| S16 | 16 | Notifikasi email, retry & template | DONE |
+| S17–S19 | 17–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 

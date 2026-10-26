@@ -190,6 +190,20 @@ export type WalletLedger = {
   description: string; created_at: string;
 };
 export type Paginated<T> = {count: number; next: string | null; previous: string | null; results: T[]};
+export type NotificationStatus = "PENDING" | "SENT" | "FAILED" | "DEAD";
+export type NotificationDelivery = {
+  id: string; created_at: string; event_type: string; template_key: string; template_label: string; template_version: number;
+  channel: "EMAIL" | "IN_APP"; recipient_type: "PILGRIM" | "USER"; recipient_name: string; recipient_email: string;
+  subject: string; status: NotificationStatus; attempts: number; resend_count: number; last_error: string;
+  next_attempt_at: string | null; sent_at: string | null; read_at: string | null; body?: string;
+};
+export type NotificationLog = Paginated<NotificationDelivery> & {summary: Record<NotificationStatus, number>};
+export type NotificationTemplate = {
+  key: string; label: string; audience: "pilgrim" | "owner"; editable: boolean; subject: string; body: string;
+  version: number; customized: boolean; default_subject: string; default_body: string;
+  variables: {name: string; label: string; required: boolean}[];
+};
+export type PortalNotification = {id: string; access_id: string; travel: string; event_type: string; subject: string; body: string; created_at: string; read_at: string | null};
 export type TravelPayment = {
   id: string; environment: string; booking_id: string; booking_code: string;
   invoice_id: string; invoice_number: string; amount_idr: number; status: string;

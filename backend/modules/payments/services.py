@@ -16,6 +16,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from modules.audit.services import log_event
 from modules.billing.services import charge_verified_booking, lock_wallet, void_pending_for_booking
 from modules.booking.models import Booking, BookingParticipant
+from modules.notifications.services import invoice_issued, payment_verified
 from modules.payments.dates import tenant_today
 from modules.payments.models import (
     FinancialSequence,
@@ -151,6 +152,7 @@ def issue_invoice(*, booking_id, actor, due_at=None, buyer_name=""):
         if participant.participant_status == "REGISTERED":
             participant.participant_status = "AWAITING_DP"
             participant.save(update_fields=["participant_status", "updated_at"])
+    invoice_issued(invoice)
     log_event(action="invoice.issued", tenant=booking.tenant, actor=actor, object_type="invoice", object_id=invoice.pk, changes={"number": number, "total_idr": total})
     return invoice
 
@@ -329,7 +331,8 @@ def verify_payment(*, payment_id, actor, note=""):
     eligible = _refresh_eligibility(invoice)
     if payment.environment == "production":
         charge_verified_booking(booking=booking, payment=payment, actor=actor)
-    _receipt(payment, actor)
+    receipt = _receipt(payment, actor)
+    payment_verified(payment, receipt)
     PaymentEvent.objects.get_or_create(
         tenant=payment.tenant, environment=payment.environment, payment=payment, kind="payment.verified",
         defaults={"payload_json": {"payment_id": str(payment.pk), "eligible_participant_ids": eligible, "simulated": payment.simulated}},

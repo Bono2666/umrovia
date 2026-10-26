@@ -230,6 +230,7 @@ def test_payment_role_migration_preserves_custom_roles(tenant_a, tenant_b):
         migration.upgrade_payment_roles(apps, SimpleNamespace(connection=connection))
         # Defaults now include S12 wallet grants; exercise the full upgrade path.
         import_module("modules.tenants.migrations.0007_wallet_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
+        import_module("modules.tenants.migrations.0008_notification_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
     for role in Role.objects.filter(tenant=tenant_a):
         assert set(role.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS[role.name])
     assert "payments.verify" not in DEFAULT_ROLE_PERMISSIONS["Admin"]
