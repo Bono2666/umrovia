@@ -36,7 +36,7 @@ export default function NotificationsPage() {
     <p className="mt-1 max-w-3xl text-sm text-muted">Pesan otomatis untuk jamaah saat booking, invoice, pembayaran, dokumen dan jadwal berubah — masuk ke portal jamaah dan dikirim lewat email. Email yang gagal dicoba ulang otomatis; kegagalan email tidak mengubah data pembayaran.</p>
     <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label="Bagian notifikasi">
       {([["log", "Riwayat pengiriman"], ["templates", "Template pesan"]] as const).map(([key, label]) => (
-        <Btn key={key} role="tab" aria-selected={tab === key} size="sm" variant={tab === key ? "solid" : "tint"} onClick={() => {setTab(key); setError(null); setMessage(null);}}>{label}</Btn>
+        <Btn key={key} role="tab" aria-selected={tab === key} variant={tab === key ? "solid" : "tint"} onClick={() => {setTab(key); setError(null); setMessage(null);}}>{label}</Btn>
       ))}
     </div>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
@@ -237,10 +237,10 @@ function TemplateEditor({canManage, onError, onMessage}: {canManage: boolean; on
         ))}</div>
       </div>
       <div className="mt-5 flex flex-wrap gap-2">
-        <Btn variant="tint" size="sm" disabled={busy} onClick={() => void showPreview()}>Pratinjau</Btn>
-        {editable ? <Btn size="sm" disabled={busy || !dirty} loading={busy && dirty} onClick={() => void save()}>Simpan</Btn> : null}
-        {editable && dirty ? <Btn size="sm" variant="link" onClick={() => choose(current)}>Batalkan perubahan</Btn> : null}
-        {editable && current.customized && !dirty ? <Btn size="sm" variant="link" disabled={busy} onClick={() => void reset()}>Kembalikan ke bawaan</Btn> : null}
+        <Btn variant="tint" disabled={busy} onClick={() => void showPreview()}>Pratinjau</Btn>
+        {editable ? <Btn disabled={busy || !dirty} loading={busy && dirty} onClick={() => void save()}>Simpan</Btn> : null}
+        {editable && dirty ? <Btn variant="link" onClick={() => choose(current)}>Batalkan perubahan</Btn> : null}
+        {editable && current.customized && !dirty ? <Btn variant="link" disabled={busy} onClick={() => void reset()}>Kembalikan ke bawaan</Btn> : null}
       </div>
       {preview ? <div className="mt-5 border border-border bg-surface p-4"><p className="text-xs uppercase tracking-wide text-muted">Pratinjau dengan data contoh</p>
         <p className="mt-2 text-sm font-semibold">{preview.subject}</p><pre className="mt-3 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed">{preview.body}</pre></div> : null}
