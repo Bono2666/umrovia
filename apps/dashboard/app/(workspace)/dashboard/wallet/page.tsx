@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, BtnLink, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasCharge, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
 
 const LABELS: Record<string, string> = {CREATED: "Menunggu transfer", PENDING: "Menunggu verifikasi platform", PAID: "Saldo telah masuk", EXPIRED: "Kedaluwarsa", REJECTED: "Ditolak"};
+const ONLINE_LABELS: Record<string, string> = {CREATED: "Menunggu pembayaran", PENDING: "Menunggu konfirmasi Midtrans", PAID: "Saldo telah masuk", EXPIRED: "Kedaluwarsa", REJECTED: "Gagal / dibatalkan"};
+const topupLabel = (topup: WalletTopup) => (topup.provider === "midtrans" ? ONLINE_LABELS : LABELS)[topup.status] ?? topup.status;
 const KIND: Record<string, string> = {TOPUP: "Top-up", DEBIT: "Biaya SaaS", REFUND: "Refund SaaS"};
 const CHARGE: Record<string, string> = {POSTED: "Terpotong", PENDING_INSUFFICIENT_FUNDS: "Menunggu saldo", PENDING_WALLET_UNAVAILABLE: "Wallet tidak tersedia", VOID: "Dibatalkan", REFUNDED: "Direfund"};
 const PARTICIPANT: Record<string, string> = {AWAITING_DP: "Menunggu DP", DP_VERIFIED_PENDING_CHARGE: "DP terverifikasi", CONFIRMED: "Terkonfirmasi", READY: "Siap", DEPARTED: "Berangkat", COMPLETED: "Selesai", CANCELED: "Batal", REVIEW_REQUIRED: "Perlu review"};
@@ -34,7 +36,8 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const attempt = useRef<{amount: number; key: string} | null>(null);
+  const attempt = useRef<{amount: number; method: string; key: string} | null>(null);
+  const returned = useRef(false);
   const loadSequence = useRef(0);
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString();
 
@@ -60,20 +63,51 @@ export default function WalletPage() {
   }, [ledgerPage, topupPage, chargePage, chargeStatus, query]);
   useEffect(() => {if (!loading && canRead) void load();}, [loading, canRead, load]);
 
-  async function create(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError(null); setMessage(null);
+  async function create(method: "manual" | "midtrans") {
+    setBusy(true); setError(null); setMessage(null);
     const value = Number(amount);
     if (!Number.isSafeInteger(value) || value <= 0 || value > 10_000_000_000) {
       setError("Masukkan nominal integer Rp1–Rp10 miliar."); setBusy(false); return;
     }
-    if (attempt.current?.amount !== value) attempt.current = {amount:value, key:crypto.randomUUID()};
-    const result = await apiFetch<WalletTopup>("/wallet/topups", {method:"POST", headers:{"Idempotency-Key":attempt.current.key}, body:JSON.stringify({amount_idr:value})});
-    setBusy(false);
-    if (!result.ok) {setError(problemMessage(result.error)); return;}
-    attempt.current = null; setSelected(result.data); setAmount(""); setReference(""); setEvidence("");
+    if (attempt.current?.amount !== value || attempt.current.method !== method) attempt.current = {amount:value, method, key:crypto.randomUUID()};
+    const result = await apiFetch<WalletTopup>("/wallet/topups", {method:"POST", headers:{"Idempotency-Key":attempt.current.key}, body:JSON.stringify({amount_idr:value, method})});
+    if (!result.ok) {setBusy(false); setError(problemMessage(result.error)); return;}
+    attempt.current = null;
+    if (method === "midtrans" && result.data.payment_url) {
+      setMessage("Mengarahkan ke halaman pembayaran Midtrans…");
+      window.location.assign(result.data.payment_url);
+      return;
+    }
+    setBusy(false); setSelected(result.data); setAmount(""); setReference(""); setEvidence("");
     setMessage("Instruksi top-up dibuat. Saldo bertambah setelah dana diterima dan diverifikasi platform.");
     setTopupPage(1); void load();
   }
+
+  const applyRefresh = useCallback((result: Awaited<ReturnType<typeof apiFetch<WalletTopup>>>) => {
+    if (!result.ok) {setError(problemMessage(result.error)); return;}
+    setSelected(result.data);
+    setMessage(result.data.status === "PAID" ? "Pembayaran diterima. Saldo SaaS Wallet sudah bertambah."
+      : result.data.status === "REJECTED" || result.data.status === "EXPIRED" ? "Pembayaran tidak berhasil. Anda dapat membuat top-up baru."
+      : "Pembayaran belum dikonfirmasi Midtrans. Selesaikan pembayaran atau periksa lagi beberapa saat lagi.");
+    void load();
+  }, [load]);
+
+  async function refresh(topupId: string) {
+    setBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch<WalletTopup>(`/wallet/topups/${topupId}/refresh`, {method:"POST"});
+    setBusy(false);
+    applyRefresh(result);
+  }
+
+  // Kembali dari halaman Midtrans (?topup=…): periksa status sekali, lalu bersihkan URL.
+  useEffect(() => {
+    if (loading || !canRead || returned.current) return;
+    const topupId = new URLSearchParams(window.location.search).get("topup");
+    if (!topupId) return;
+    returned.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    void apiFetch<WalletTopup>(`/wallet/topups/${topupId}/refresh`, {method:"POST"}).then(applyRefresh);
+  }, [loading, canRead, applyRefresh]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (!selected) return;
@@ -130,7 +164,7 @@ export default function WalletPage() {
         <section className="card min-w-0 p-6"><h2 className="font-semibold">Riwayat top-up</h2>
           {topups === null ? <LoadingState /> : topups.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada top-up" /></div> : <>
             <ul className="mt-3 divide-y divide-border">{topups.results.map((topup) => <li className="py-4 text-sm" key={topup.id}>
-              <div className="flex flex-wrap items-center gap-2"><strong>{formatIdr(topup.amount_idr)}</strong><StatusBadge tone={topup.status === "PAID" ? "success" : topup.status === "REJECTED" ? "danger" : "neutral"}>{LABELS[topup.status]}</StatusBadge></div>
+              <div className="flex flex-wrap items-center gap-2"><strong>{formatIdr(topup.amount_idr)}</strong><StatusBadge tone={topup.status === "PAID" ? "success" : topup.status === "REJECTED" ? "danger" : "neutral"}>{topupLabel(topup)}</StatusBadge><span className="text-xs text-muted">{topup.provider === "midtrans" ? "Midtrans" : "Transfer manual"}</span></div>
               <p className="mt-2 break-all text-xs text-muted">{topup.number}</p><p className="mt-1 text-muted">{formatDate(topup.created_at)}{topup.paid_at ? ` · saldo masuk ${formatDate(topup.paid_at)}` : ""}</p>
               <Btn className="mt-2" size="xs" variant="link" onClick={() => pick(topup)}>Lihat rincian</Btn>
             </li>)}</ul>
@@ -139,11 +173,25 @@ export default function WalletPage() {
         </section>
         <div className="min-w-0 space-y-6">
           {can("wallet.topup") ? <section className="card p-6"><h2 className="font-semibold">Top-up saldo SaaS</h2>
-            {wallet.topup_available ? <form className="mt-5" onSubmit={create}><FormField label="Nominal top-up (Rp)" htmlFor="wallet-amount" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} required hint="Tidak ada minimum top-up yang ditetapkan. Saldo masuk setelah verifikasi dana oleh platform." /><Btn type="submit" disabled={busy || !amount}>Buat instruksi transfer</Btn></form> : <p className="mt-3 text-sm text-muted">{wallet.environment === "demo" ? "Top-up nyata tidak tersedia di mode demo." : "Top-up belum tersedia. Hubungi dukungan platform."}</p>}
+            {wallet.topup_available ? <form className="mt-5" onSubmit={(event) => {event.preventDefault(); void create(wallet.topup_methods.midtrans ? "midtrans" : "manual");}}>
+              <FormField label="Nominal top-up (Rp)" htmlFor="wallet-amount" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} required hint={wallet.topup_methods.midtrans ? "Bayar online lewat Midtrans (virtual account, e-wallet, kartu); saldo masuk otomatis setelah pembayaran dikonfirmasi." : "Tidak ada minimum top-up yang ditetapkan. Saldo masuk setelah verifikasi dana oleh platform."} />
+              <div className="flex flex-wrap items-center gap-2">
+                {wallet.topup_methods.midtrans ? <Btn type="submit" disabled={busy || !amount}>Bayar online</Btn> : null}
+                {wallet.topup_methods.manual ? <Btn type={wallet.topup_methods.midtrans ? "button" : "submit"} variant={wallet.topup_methods.midtrans ? "tint" : "solid"} disabled={busy || !amount} onClick={wallet.topup_methods.midtrans ? () => void create("manual") : undefined}>{wallet.topup_methods.midtrans ? "Transfer manual" : "Buat instruksi transfer"}</Btn> : null}
+              </div>
+            </form> : <p className="mt-3 text-sm text-muted">{wallet.environment === "demo" ? "Top-up nyata tidak tersedia di mode demo." : "Top-up belum tersedia. Hubungi dukungan platform."}</p>}
           </section> : null}
           {selected ? <section className="card p-6"><h2 className="font-semibold">Rincian top-up</h2><p className="mt-2 break-all text-xs text-muted">{selected.number}</p>
-            <p className="mt-3 text-xl font-semibold">{formatIdr(selected.amount_idr)}</p><p className="mt-1 text-sm">{LABELS[selected.status]}</p>
-            {selected.status === "CREATED" ? <>
+            <p className="mt-3 text-xl font-semibold">{formatIdr(selected.amount_idr)}</p><p className="mt-1 text-sm">{topupLabel(selected)}</p>
+            {selected.provider === "midtrans" ? <div className="mt-4 space-y-2 break-all text-sm">
+              <p className="text-muted">Pembayaran online Midtrans{selected.payment_type ? ` · ${selected.payment_type.replace(/_/g, " ")}` : ""}</p>
+              {selected.provider_txn_id ? <p>ID transaksi Midtrans: {selected.provider_txn_id}</p> : null}
+              {selected.reason ? <p className="text-danger">{selected.reason}</p> : null}
+              {selected.payment_url ? <div className="flex flex-wrap gap-2 pt-1">
+                <BtnLink size="xs" href={selected.payment_url}>Lanjutkan pembayaran</BtnLink>
+                <Btn variant="tint" size="xs" disabled={busy} onClick={() => void refresh(selected.id)}>Periksa status</Btn>
+              </div> : null}
+            </div> : selected.status === "CREATED" ? <>
               <dl className="mt-4 space-y-2 text-sm"><div><dt className="text-muted">Bank penerima platform</dt><dd>{selected.instructions.bank_name}</dd></div><div><dt className="text-muted">Nama rekening</dt><dd>{selected.instructions.account_name}</dd></div><div><dt className="text-muted">Nomor rekening</dt><dd className="break-all font-semibold">{selected.instructions.account_number}</dd></div><div><dt className="text-muted">Batas transfer</dt><dd>{dateTime(selected.expires_at)}</dd></div></dl>
               {can("wallet.topup") ? <form className="mt-5" onSubmit={submit}><FormField label="Referensi transfer" htmlFor="topup-reference" maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} required /><FormField label="Lokasi bukti transfer" htmlFor="topup-evidence" maxLength={512} value={evidence} onChange={(event) => setEvidence(event.target.value)} required hint="Cantumkan referensi dokumen atau lokasi bukti untuk diperiksa petugas platform." /><Btn type="submit" disabled={busy || !reference.trim() || !evidence.trim()}>Ajukan verifikasi</Btn></form> : null}
             </> : <div className="mt-4 space-y-2 break-all text-sm"><p>Referensi: {selected.payment_reference || "—"}</p><p>Bukti: {selected.evidence_ref || "—"}</p>{selected.provider_txn_id ? <p>Referensi settlement: {selected.provider_txn_id}</p> : null}{selected.reason ? <p className="text-danger">{selected.reason}</p> : null}{selected.status === "EXPIRED" ? <p>Hubungi dukungan bila dana sudah dikirim.</p> : null}</div>}
