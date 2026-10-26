@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, problemMessage, type UserPayload } from "@/lib/api";
+import { landingPath, nextParam } from "@/lib/landing";
 import { UmroviaMark } from "@/components/UmroviaMark";
 import { Btn, FormField } from "@/components/workspace/ui";
 
@@ -21,7 +22,7 @@ export default function LoginPage() {
   useEffect(() => {
     let active = true;
     apiFetch<UserPayload>("/me").then((result) => {
-      if (active && result.ok) router.replace("/dashboard");
+      if (active && result.ok) router.replace(landingPath(result.data, nextParam()));
     });
     return () => {
       active = false;
@@ -37,7 +38,7 @@ export default function LoginPage() {
       body: JSON.stringify({ email, password }),
     });
     if (result.ok) {
-      router.push("/dashboard");
+      router.push(landingPath(result.data, nextParam()));
       return;
     }
     setBusy(false);
@@ -58,7 +59,7 @@ export default function LoginPage() {
           Umrovia
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Masuk ke workspace travel Anda
+          Masuk ke workspace travel atau portal jamaah
         </p>
         {/* Struktur form = form kontak web_template 1:1: form-group per
             field, error-message, form-footer--narrow, submit circle-xl

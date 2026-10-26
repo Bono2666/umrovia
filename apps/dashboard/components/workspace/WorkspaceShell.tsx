@@ -211,6 +211,11 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         setPhase("unauth");
         return;
       }
+      // Akun jamaah (tanpa workspace) memakai portal, bukan dashboard staf.
+      if (!result.data.memberships.some((m) => m.status === "ACTIVE") && result.data.portal_access_count > 0) {
+        router.replace("/portal");
+        return;
+      }
       setMe(result.data);
       setPhase("ok");
     });

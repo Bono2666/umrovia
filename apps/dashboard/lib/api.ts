@@ -28,6 +28,8 @@ export type UserPayload = {
   full_name: string;
   email_verified: boolean;
   memberships: Membership[];
+  /** Grant portal jamaah aktif (S14) — akun portal tidak punya membership. */
+  portal_access_count: number;
   /** Sesi switch aktif (S06); null = fallback membership ACTIVE pertama. */
   active_tenant_slug?: string | null;
 };
@@ -75,6 +77,9 @@ export type PilgrimDocument = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   reason: string;
+  uploaded_at: string;
+  /** Berkas nyata tersimpan (S14); dokumen lama hanya metadata. */
+  has_file: boolean;
 };
 
 /** Payload paket (S08, Spec §5.2/§8.3, MOD-05) — harga integer rupiah (§10.1). */
@@ -422,6 +427,32 @@ export async function ensureCsrfToken(): Promise<string> {
   }
 }
 
+/** Unggah multipart (tanpa Content-Type manual agar browser menulis boundary). */
+export async function apiUpload<T>(path: string, form: FormData): Promise<{ ok: true; data: T } | { ok: false; error: ProblemDetail }> {
+  try {
+    const csrf = await ensureCsrfToken();
+    const response = await fetch(`${API_BASE}/api/v1${path}`, {
+      method: "POST", body: form, credentials: "include",
+      headers: csrf ? { "X-CSRFToken": csrf } : undefined,
+      signal: AbortSignal.timeout(60_000),
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok ? { ok: true, data: data as T } : { ok: false, error: data as ProblemDetail };
+  } catch (err) {
+    return { ok: false, error: { type: "https://umrovia.com/problems/network", title: "Network error", status: 0, code: "network_error", detail: `Unggahan gagal: ${String(err)}` } };
+  }
+}
+
+/** Unduh dari path API bertanda tangan (cookie sesi ikut, tab tetap). */
+export function downloadFromApi(path: string) {
+  const link = document.createElement("a");
+  link.href = `${API_BASE}${path}`;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 export function problemMessage(error: ProblemDetail): string {
   if (error.field_errors) {
     const first = Object.values(error.field_errors)[0]?.[0];
@@ -471,3 +502,35 @@ export async function apiFetch<T>(
     };
   }
 }
+
+/** Portal jamaah (S14): hanya data milik jamaah pemilik grant. */
+export type PortalDocumentVersion = {
+  id: string; version: number; status: string; reason: string;
+  uploaded_at: string; reviewed_at: string | null; has_file: boolean;
+};
+export type PortalDocumentItem = {
+  kind: string; label: string; required: boolean; mandatory: boolean; deadline: string | null;
+  latest: PortalDocumentVersion | null; history: PortalDocumentVersion[]; can_upload: boolean;
+};
+export type PortalBooking = {
+  booking_id: string; code: string; status: string; participant_status: string; progress: number | null; room_type: string;
+  departure: {code: string; package_name: string; start_at: string; end_at: string | null; city_of_origin: string; route: string; meeting_point: string; status: string};
+  payment: {amount_idr: number; paid_idr: number; balance_idr: number; invoice_id: string | null; invoice_number: string | null; due_at: string | null; group_invoice: boolean};
+  receipts: {id: string | null; number: string | null; kind: string; amount_idr: number; received_at: string; downloadable: boolean}[];
+};
+export type PortalProfile = {
+  name: string; code: string; phone: string; email: string; address: string;
+  emergency_contact_name: string; emergency_contact_phone: string; identity_masked: string; passport_masked: string;
+};
+export type PortalAccessView = {
+  access_id: string; environment: string; travel: {name: string; phone: string};
+  profile: PortalProfile; bookings: PortalBooking[];
+};
+export type PortalInviteInfo = {
+  valid: boolean; code: string | null; detail: string; travel_name: string;
+  pilgrim_name: string; email: string; account_exists: boolean;
+};
+export type PilgrimPortalStatus = {
+  accesses: {id: string; email: string; status: string; created_at: string}[];
+  pending_invite: {id: string; email: string; expires_at: string} | null;
+};

@@ -14,14 +14,20 @@ import {
 } from "@/components/workspace/ui";
 import {
   apiFetch,
+  apiUpload,
+  downloadFromApi,
   problemMessage,
   type Pilgrim,
   type PilgrimDocument,
+  type PilgrimPortalStatus,
 } from "@/lib/api";
-import { formatMasked } from "@/lib/format";
+import { formatDate, formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+
+const DOC_KIND: Record<string, string> = { ktp: "KTP", passport: "Paspor", photo: "Foto", kk: "Kartu Keluarga", other: "Dokumen lain" };
+const DOC_STATUS: Record<string, string> = { UPLOADED: "Menunggu review", UNDER_REVIEW: "Ditinjau", APPROVED: "Disetujui", REJECTED: "Ditolak" };
 
 const EMPTY_PROFILE = {
   nationality: "ID", marital_status: "", address: "",
@@ -59,6 +65,10 @@ export default function JamaahPage() {
   const [rows, setRows] = useState<Pilgrim[] | null>(null);
   const [selected, setSelected] = useState<Pilgrim | null>(null);
   const [documents, setDocuments] = useState<PilgrimDocument[]>([]);
+  const [portal, setPortal] = useState<PilgrimPortalStatus | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [uploadKind, setUploadKind] = useState("passport");
+  const [docBusy, setDocBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [noAccess, setNoAccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +102,8 @@ export default function JamaahPage() {
   function openDetail(pilgrim: Pilgrim) {
     setSelected(pilgrim);
     setDocuments([]);
+    setPortal(null);
+    setInviteEmail(pilgrim.email || "");
   }
 
   const selectedId = selected?.id;
@@ -101,15 +113,80 @@ export default function JamaahPage() {
     Promise.all([
       apiFetch<Pilgrim>(`/pilgrims/${selectedId}`),
       apiFetch<{ results: PilgrimDocument[] }>(`/pilgrims/${selectedId}/documents`),
-    ]).then(([detail, docs]) => {
+      apiFetch<PilgrimPortalStatus>(`/pilgrims/${selectedId}/portal`),
+    ]).then(([detail, docs, access]) => {
       if (cancelled) return;
       if (detail.ok) setSelected(detail.data);
       else setError(problemMessage(detail.error));
       if (docs.ok) setDocuments(docs.data.results);
       else setError(problemMessage(docs.error));
+      if (access.ok) setPortal(access.data);
     });
     return () => { cancelled = true; };
   }, [selectedId]);
+
+  async function reloadDocuments(pilgrimId: string) {
+    const [docs, access] = await Promise.all([
+      apiFetch<{ results: PilgrimDocument[] }>(`/pilgrims/${pilgrimId}/documents`),
+      apiFetch<PilgrimPortalStatus>(`/pilgrims/${pilgrimId}/portal`),
+    ]);
+    if (docs.ok) setDocuments(docs.data.results);
+    if (access.ok) setPortal(access.data);
+  }
+
+  async function sendInvite(pilgrim: Pilgrim) {
+    setDocBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch<PilgrimPortalStatus>(`/pilgrims/${pilgrim.id}/portal`, { method: "POST", body: JSON.stringify({ email: inviteEmail.trim() }) });
+    setDocBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setPortal(result.data);
+    setMessage(`Undangan portal dikirim ke ${result.data.pending_invite?.email ?? inviteEmail}.`);
+  }
+
+  async function revokePortal(pilgrim: Pilgrim, body: { access_id?: string; invite_id?: string }) {
+    if (!window.confirm(body.access_id ? "Cabut akses portal jamaah ini? Jamaah tidak dapat lagi melihat data atau mengunggah dokumen." : "Batalkan undangan yang belum dipakai?")) return;
+    setDocBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch<PilgrimPortalStatus>(`/pilgrims/${pilgrim.id}/portal/revoke`, { method: "POST", body: JSON.stringify(body) });
+    setDocBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setPortal(result.data);
+    setMessage(body.access_id ? "Akses portal dicabut." : "Undangan dibatalkan.");
+  }
+
+  async function reviewDocument(pilgrim: Pilgrim, doc: PilgrimDocument, status: "APPROVED" | "REJECTED") {
+    let reason = "";
+    if (status === "REJECTED") {
+      const input = window.prompt(`Alasan menolak ${DOC_KIND[doc.kind] ?? doc.kind} v${doc.version} (akan terlihat oleh jamaah):`);
+      if (input === null) return;
+      if (!input.trim()) { setError("Alasan penolakan wajib diisi."); return; }
+      reason = input.trim();
+    }
+    setDocBusy(true); setError(null); setMessage(null);
+    const result = await apiFetch<PilgrimDocument>(`/pilgrims/${pilgrim.id}/documents/${doc.id}`, { method: "PATCH", body: JSON.stringify(status === "REJECTED" ? { status, reason } : { status }) });
+    setDocBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`${DOC_KIND[doc.kind] ?? doc.kind} ${status === "APPROVED" ? "disetujui" : "ditolak"}.`);
+    void reloadDocuments(pilgrim.id);
+  }
+
+  async function uploadDocument(pilgrim: Pilgrim, file: File) {
+    setDocBusy(true); setError(null); setMessage(null);
+    const form = new FormData();
+    form.append("kind", uploadKind);
+    form.append("file", file);
+    const result = await apiUpload<PilgrimDocument>(`/pilgrims/${pilgrim.id}/documents/upload`, form);
+    setDocBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setMessage(`${DOC_KIND[uploadKind] ?? uploadKind} terunggah dan menunggu review.`);
+    void reloadDocuments(pilgrim.id);
+  }
+
+  async function openDocument(pilgrim: Pilgrim, doc: PilgrimDocument) {
+    setError(null);
+    const result = await apiFetch<{ path: string }>(`/pilgrims/${pilgrim.id}/documents/${doc.id}/download-url`, { method: "POST" });
+    if (result.ok) downloadFromApi(result.data.path);
+    else setError(problemMessage(result.error));
+  }
 
   async function onAdd(event: React.FormEvent) {
     event.preventDefault();
@@ -334,31 +411,74 @@ export default function JamaahPage() {
             <h4 className="mt-4 text-sm font-semibold">Dokumen</h4>
             {documents.length === 0 ? (
               <p className="mt-2 text-sm text-muted">
-                Belum ada dokumen terdaftar untuk jamaah ini.
+                Belum ada dokumen untuk jamaah ini.
               </p>
             ) : (
               <ul className="mt-2 divide-y divide-border/60">
-                {documents.map((doc) => (
-                  <li key={doc.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-                    <span className="min-w-24 font-medium uppercase">{doc.kind}</span>
-                    <span className="text-xs text-muted">v{doc.version}</span>
-                    <StatusBadge
-                      tone={
-                        doc.status === "APPROVED"
-                          ? "success"
-                          : doc.status === "REJECTED"
-                            ? "danger"
-                            : "neutral"
-                      }
-                    >
-                      {doc.status}
-                    </StatusBadge>
-                    {doc.reason ? (
-                      <span className="text-xs text-muted">{doc.reason}</span>
-                    ) : null}
-                  </li>
-                ))}
+                {documents.map((doc) => {
+                  const latest = !documents.some((other) => other.kind === doc.kind && other.version > doc.version);
+                  const reviewable = latest && can("documents.review") && canEditEnvironment(selected.environment) && (doc.status === "UPLOADED" || doc.status === "UNDER_REVIEW");
+                  return (
+                    <li key={doc.id} className="py-3 text-sm">
+                      <p className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{DOC_KIND[doc.kind] ?? doc.kind}</span>
+                        <span className="text-xs text-muted">v{doc.version} · {formatDate(doc.uploaded_at)}</span>
+                        <StatusBadge tone={doc.status === "APPROVED" ? "success" : doc.status === "REJECTED" ? "danger" : "warning"}>{DOC_STATUS[doc.status] ?? doc.status}</StatusBadge>
+                      </p>
+                      {doc.reason ? <p className="mt-1 text-xs text-muted">Alasan: {doc.reason}</p> : null}
+                      {doc.has_file || reviewable ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {doc.has_file ? <Btn size="xs" variant="tint" onClick={() => void openDocument(selected, doc)}>Lihat berkas</Btn> : null}
+                          {reviewable ? <Btn size="xs" disabled={docBusy} onClick={() => void reviewDocument(selected, doc, "APPROVED")}>Setujui</Btn> : null}
+                          {reviewable ? <Btn size="xs" variant="danger" disabled={docBusy} onClick={() => void reviewDocument(selected, doc, "REJECTED")}>Tolak</Btn> : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
+            )}
+            {can("pilgrims.write") && canEditEnvironment(selected.environment) ? (
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <FormSelect label="Unggah dokumen" htmlFor="staff-doc-kind" value={uploadKind} onChange={(event) => setUploadKind(event.target.value)}>
+                  {Object.entries(DOC_KIND).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
+                </FormSelect>
+                <label className={`btn btn--primary btn--xs ${docBusy ? "pointer-events-none opacity-60" : "cursor-pointer"}`}>
+                  Pilih berkas
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" disabled={docBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void uploadDocument(selected, file); }} />
+                </label>
+              </div>
+            ) : null}
+
+            <h4 className="mt-6 text-sm font-semibold">Portal jamaah</h4>
+            {portal === null ? (
+              <p className="mt-2 text-sm text-muted">Memuat status portal…</p>
+            ) : (
+              <div className="mt-2 space-y-2 text-sm">
+                {portal.accesses.filter((row) => row.status === "ACTIVE").map((row) => (
+                  <p key={row.id} className="flex flex-wrap items-center gap-2">
+                    <StatusBadge tone="success">Aktif</StatusBadge>
+                    <span className="break-all">{row.email}</span>
+                    <span className="text-xs text-muted">sejak {formatDate(row.created_at)}</span>
+                    {can("pilgrims.write") ? <Btn size="xs" variant="link" disabled={docBusy} onClick={() => void revokePortal(selected, { access_id: row.id })}>Cabut akses</Btn> : null}
+                  </p>
+                ))}
+                {portal.pending_invite ? (
+                  <p className="flex flex-wrap items-center gap-2">
+                    <StatusBadge tone="warning">Undangan terkirim</StatusBadge>
+                    <span className="break-all">{portal.pending_invite.email}</span>
+                    <span className="text-xs text-muted">berlaku s.d. {formatDate(portal.pending_invite.expires_at)}</span>
+                    {can("pilgrims.write") ? <Btn size="xs" variant="link" disabled={docBusy} onClick={() => void revokePortal(selected, { invite_id: portal.pending_invite!.id })}>Batalkan</Btn> : null}
+                  </p>
+                ) : null}
+                {!portal.accesses.some((row) => row.status === "ACTIVE") && !portal.pending_invite ? <p className="text-muted">Jamaah belum memiliki akses portal.</p> : null}
+                {can("pilgrims.write") && canEditEnvironment(selected.environment) ? (
+                  <div className="flex flex-wrap items-end gap-3">
+                    <FormField label="Email jamaah" htmlFor="portal-invite-email" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} hint="Jamaah menerima tautan sekali pakai untuk melihat jadwal, pembayaran dan mengunggah dokumen." />
+                    <Btn size="xs" disabled={docBusy || !inviteEmail.trim()} onClick={() => void sendInvite(selected)}>{portal.pending_invite || portal.accesses.length ? "Kirim ulang undangan" : "Undang ke portal"}</Btn>
+                  </div>
+                ) : null}
+              </div>
             )}
           </div>
         ) : null}

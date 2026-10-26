@@ -14,7 +14,8 @@ import { Btn } from "@/components/workspace/ui";
  * tidak pernah bisa macet menampilkan "Keluar…" selamanya; kegagalan
  * ditampilkan sebagai pesan agar bisa dicoba ulang.
  */
-export function LogoutButton() {
+/** `onLoggedOut` mengganti navigasi ke /login (mis. tetap di halaman undangan). */
+export function LogoutButton({ onLoggedOut }: { onLoggedOut?: () => void } = {}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,8 @@ export function LogoutButton() {
     });
     setBusy(false);
     if (result.ok) {
-      router.push("/login");
+      if (onLoggedOut) onLoggedOut();
+      else router.push("/login");
       return;
     }
     setError(problemMessage(result.error));

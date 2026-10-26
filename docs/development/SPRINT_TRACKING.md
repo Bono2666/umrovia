@@ -434,6 +434,32 @@ DP; rekonsiliasi konsisten setelah charge, retry dan refund. M4 tercapai.
 menunggu keputusan bisnis; platform console UI refund → S18 (API tersedia);
 pengiriman notifikasi outbox billing dan penjadwalan command → S16.
 
+## Sprint S14 — Portal jamaah, autentikasi, profil & unggah dokumen (F07)
+
+**Status:** DONE (26 Oktober 2026), branch `sprint/s14-pilgrim-portal`.
+Keputusan desain: [ADR-0011](../adr/0011-pilgrim-portal.md). Bukti:
+[verifikasi S14](SPRINT_S14_VERIFICATION.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S14-01 | Undangan sekali pakai via email (hash token, TTL 7 hari, ganti/cabut), inspeksi publik tersamar | DONE | `portal/services.py`, test undangan/expired/revoked |
+| S14-02 | Terima undangan: akun baru terverifikasi atau login wajib untuk email terdaftar; tanpa membership (TR04) | DONE | `login_required`, redirect shell → `/portal` |
+| S14-03 | Grant `PortalAccess` + konteks RLS + filter `pilgrim_id` di setiap endpoint (object-level) | DONE | POR02: akses orang lain/UUID tebakan 404, booking grup tanpa data jamaah lain |
+| S14-04 | Ringkasan perjalanan: jadwal, progres peserta, tagihan/terbayar/sisa milik sendiri, kuitansi | DONE | PDF hanya untuk dokumen solo |
+| S14-05 | Unggah PDF/JPEG/PNG (magic bytes, maks 10 MB, tolak PDF aktif), penyimpanan privat, versi baru | DONE | test berkas tidak aman, batas ukuran, APPROVED terkunci |
+| S14-06 | Signed download ≤10 menit terikat user, cek ulang izin, audit | DONE | SEC02, pencabutan langsung berlaku |
+| S14-07 | Riwayat versi + alasan penolakan terlihat jamaah, unggah ulang | DONE | POR01 |
+| S14-08 | Koreksi kontak oleh jamaah; identitas tetap via travel | DONE | test profil |
+| S14-09 | UI portal (`/portal`, `/portal/undangan`) dan sisi staf: undang/cabut, unggah, lihat berkas, setujui/tolak | DONE | Playwright API nyata, mobile |
+| S14-10 | Migrasi RLS, regresi, lint/TypeScript, dokumentasi | DONE | 373/373 backend |
+
+**Exit gate S14 (Object-level permissions):** jamaah hanya dapat membaca dan
+menulis data jamaah miliknya; akses lintas jamaah/tenant, PDF grup, dan unduhan
+setelah dicabut atau kedaluwarsa ditolak oleh test otomatis.
+
+**Batas tahap:** antimalware scanning, notifikasi portal/email berbasis event
+(S16), presign S3 saat object storage produksi dipilih.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -450,7 +476,8 @@ pengiriman notifikasi outbox billing dan penjadwalan command → S16.
 | S11 | 11 | Invoice/kuitansi, verifikasi DP dan varian harga kamar | DONE |
 | S12 | 12 | Prepaid wallet, top-up manual dan immutable ledger | DONE |
 | S13 | 13 | Billing event flow, saldo kurang, refund (M4) | DONE |
-| S14–S19 | 14–19 | mengikuti Roadmap §3 | TODO |
+| S14 | 14 | Portal jamaah, autentikasi, profil & unggah dokumen | DONE |
+| S15–S19 | 15–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 

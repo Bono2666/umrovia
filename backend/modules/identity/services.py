@@ -153,4 +153,6 @@ def user_payload(user: User) -> dict:
         "full_name": user.full_name,
         "email_verified": user.is_email_verified,
         "memberships": membership_summary(user),
+        # Portal jamaah (S14): grant aktif, tanpa membership tenant.
+        "portal_access_count": user.portal_accesses.filter(status="ACTIVE").count(),
     }
