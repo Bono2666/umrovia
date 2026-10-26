@@ -51,6 +51,40 @@ mengubah PDF invoice/kuitansi yang sudah diterbitkan.
 - Pembayaran terverifikasi menggunakan reversal/koreksi terpisah. Invoice,
   kuitansi dan ledger wallet tetap mengikuti aturan immutable yang sudah ada.
 
+## Matriks CRUD per form (pembaruan 26 Oktober 2026, setelah S13)
+
+**Hapus** hanya untuk data yang belum pernah dipakai, sehingga entri keliru
+atau duplikat dapat dibersihkan. Data yang sudah dipakai memakai alur yang
+menjaga histori. Tombol Hapus hanya tampil bila `deletable` bernilai true;
+backend tetap memeriksa ulang di bawah lock baris, izin tulis yang sama dengan
+Ubah, environment aktif dan isolasi tenant. Audit mencatat penghapusan tanpa
+nama/NIK jamaah.
+
+| Form | Create | Read | Update | Delete / pengganti |
+|---|---|---|---|---|
+| Jamaah | Tambah | Daftar, detail | Ubah jamaah | Hapus bila belum ikut booking dan belum punya dokumen; selebihnya **Arsip** |
+| Paket | Tambah | Daftar, detail | Ubah paket / harga | Hapus bila belum dipakai keberangkatan; selebihnya status **Diarsipkan** |
+| Keberangkatan | Tambah | Daftar, detail | Ubah keberangkatan, blokir kursi | Hapus bila masih Draf tanpa booking, riwayat status atau manifest; selebihnya **Batalkan** |
+| Booking | Tambah | Daftar, detail | Ubah booking (Draf) | **Hapus draf** (belum menahan kursi; kuota trial tidak dikembalikan); selebihnya **Batalkan** |
+| Kas & Bank | Tambah | Daftar | Ubah rekening | Hapus bila belum dipakai pembayaran; selebihnya **Nonaktifkan** |
+| Pengguna & Role | Undang, tambah role | Daftar | Ubah peran, ubah definisi role | Cabut akses, hapus role custom |
+| Syarat dokumen (Manifest) | Tambah | Daftar | Ubah | Hapus |
+| Profil Travel, aturan invoice/DP | — (satu per travel) | Lihat | Simpan per bagian | Tidak berlaku |
+| Invoice | Terbitkan | Daftar, PDF | Tidak (snapshot immutable) | VOID otomatis saat booking batal tanpa pembayaran |
+| Pembayaran | Catat | Daftar, kuitansi | Lengkapi bukti saat Draf | **Tolak** / **Reversal** beralasan; tidak dihapus |
+| SaaS Wallet | Top-up, ajukan bukti | Saldo, mutasi, charge | Tidak (ledger append-only) | Refund via persetujuan platform; tidak dihapus |
+| Dokumen jamaah | Daftarkan versi | Checklist | Review approve/reject | Versi baru menggantikan; riwayat tidak dihapus |
+
+Verifikasi pembaruan ini: `tests/test_crud_deletes.py` (7 kasus: hapus data
+belum dipakai + audit tanpa PII, booking draf, penolakan data terpakai dengan
+alternatif, keberangkatan OPEN, jamaah berdokumen, izin/read-only, lintas
+tenant). Browser Chrome/Playwright pada database fiktif `umrovia_crud_ui`:
+kelima tombol Hapus hanya muncul pada data belum dipakai dan hilang setelah
+dihapus; jamaah menjadi dapat dihapus setelah booking drafnya dihapus; paket
+terpakai tanpa tombol; tambah/hapus peran custom dari halaman Pengguna & Role
+(sebelumnya hanya tersedia lewat API); mobile tanpa overflow, tanpa pageerror.
+Tidak ada migrasi database.
+
 ## Bukti implementasi dan verifikasi
 
 - Backend: `PATCH` jamaah/keberangkatan/rekening dikunci secara transaksional;
