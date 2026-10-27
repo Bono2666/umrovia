@@ -9,7 +9,7 @@ import { RevealText } from "@/components/marketing/RevealText";
 
 const CATEGORIES = [
   ["TICKET", "Tiket pesawat"], ["HOTEL", "Hotel"], ["VISA", "Visa & dokumen"], ["TRANSPORT", "Transportasi darat"], ["CATERING", "Konsumsi"],
-  ["GUIDE", "Muthawif & tour leader"], ["EQUIPMENT", "Perlengkapan jamaah"], ["MARKETING", "Pemasaran"], ["OFFICE", "Operasional kantor"], ["OTHER", "Lainnya"],
+  ["GUIDE", "Muthawif & tour leader"], ["EQUIPMENT", "Perlengkapan jamaah"], ["MARKETING", "Pemasaran"], ["COMMISSION", "Komisi agen"], ["OFFICE", "Operasional kantor"], ["OTHER", "Lainnya"],
 ];
 type BankAccount = {id: string; bank_name: string; account_masked: string; active: boolean};
 const today = () => {const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;};

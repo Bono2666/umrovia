@@ -50,6 +50,33 @@ class TravelInvoice(TenantScopedModel, BaseAppModel):
         raise ValidationError("Invoice terbit tidak dapat dihapus.")
 
 
+class TravelInvoiceRevision(TenantScopedModel, BaseAppModel):
+    """INV-03: versi invoice sebelum direvisi (snapshot + PDF asli), tidak dapat diubah/dihapus."""
+
+    environment = models.CharField(max_length=16)
+    invoice = models.ForeignKey(TravelInvoice, on_delete=models.PROTECT, related_name="revisions")
+    version = models.PositiveIntegerField()
+    invoice_number = models.CharField(max_length=64)
+    total_idr = models.PositiveBigIntegerField()
+    snapshot_json = models.JSONField(default=dict)
+    pdf_data = models.BinaryField()
+    checksum = models.CharField(max_length=64)
+    reason = models.TextField()
+    revised_by = models.ForeignKey("identity.User", on_delete=models.SET_NULL, null=True, related_name="+")
+
+    class Meta:
+        ordering = ["-version"]
+        constraints = [models.UniqueConstraint(fields=["invoice", "version"], name="uq_invoice_revision_version")]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Revisi invoice bersifat immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Revisi invoice tidak dapat dihapus.")
+
+
 class InvoiceLine(TenantScopedModel, BaseAppModel):
     environment = models.CharField(max_length=16)
     invoice = models.ForeignKey(TravelInvoice, on_delete=models.PROTECT, related_name="lines")

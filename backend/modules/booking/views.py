@@ -27,14 +27,24 @@ from modules.booking.serializers import (
     BookingUpdateSerializer,
     booking_payload,
 )
-from modules.booking.services import create_booking, delete_draft_booking, transition_booking, update_draft_booking
+from modules.booking.services import (
+    UNSET,
+    create_booking,
+    delete_draft_booking,
+    transition_booking,
+    update_draft_booking,
+)
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
-from modules.tenants.rbac import require_permission
+from modules.tenants.rbac import has_permission, permission_list, require_permission
+
+
+def _can_discount(request) -> bool:
+    return has_permission(permission_list(request.membership.role), "bookings.discount")
 
 
 def _get_booking(booking_id) -> Booking:
     try:
-        return Booking.objects.select_related("departure", "departure__package").get(pk=booking_id)
+        return Booking.objects.select_related("departure", "departure__package", "agent").get(pk=booking_id)
     except (Booking.DoesNotExist, ValueError, DjangoValidationError):
         raise NotFound("Booking tidak ditemukan.") from None
 
@@ -73,7 +83,7 @@ class BookingListCreateView(APIView):
                 | Q(participants__pilgrim__code__icontains=q)
             ).distinct()
         rows = (
-            qs.select_related("departure", "departure__package", "created_by", "canceled_by")
+            qs.select_related("departure", "departure__package", "created_by", "canceled_by", "agent")
             .prefetch_related("participants__pilgrim", "price_lines")
             .order_by("-booked_at", "code")
         )
@@ -96,6 +106,10 @@ class BookingListCreateView(APIView):
                 notes=serializer.validated_data.get("notes", ""),
                 allow_duplicate=serializer.validated_data.get("allow_duplicate", False),
                 actor=request.user,
+                payer_name=serializer.validated_data.get("payer_name", ""),
+                agent_id=serializer.validated_data.get("agent"),
+                adjustments=serializer.validated_data.get("adjustments"),
+                can_discount=_can_discount(request),
             )
         except DjangoValidationError as exc:
             # service memakai DjangoValidationError (domain) → petakan ke DRF 400
@@ -146,6 +160,11 @@ class BookingDetailView(APIView):
                 room_types=validated.get("room_types"),
                 notes=validated.get("notes") if "notes" in validated else None,
                 allow_duplicate=validated.get("allow_duplicate", False),
+                payer_name=validated.get("payer_name"),
+                agent_id=validated["agent"] if "agent" in validated else UNSET,
+                adjustments=validated.get("adjustments"),
+                can_discount=_can_discount(request),
+                actor=request.user,
             )
         except DjangoValidationError as exc:
             raise ValidationError(

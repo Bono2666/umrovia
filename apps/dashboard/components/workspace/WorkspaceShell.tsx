@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BadgePercent,
   BarChart3,
   Bell,
   Building2,
   ClipboardList,
   CreditCard,
   FileText,
+  Handshake,
   Landmark,
   LayoutDashboard,
   LifeBuoy,
@@ -99,6 +101,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         icon: PlaneTakeoff,
       },
       { href: "/dashboard/booking", label: "Booking", permission: "bookings.read", icon: ClipboardList },
+      { href: "/dashboard/agen", label: "Agen", permission: "agents.read", icon: Handshake },
     ],
   },
   {
@@ -113,6 +116,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         icon: Landmark,
       },
       { href: "/dashboard/pengeluaran", label: "Pengeluaran", permission: "expenses.read", icon: Receipt },
+      { href: "/dashboard/komisi", label: "Komisi Agen", permission: "commissions.read", icon: BadgePercent },
       { href: "/dashboard/wallet", label: "SaaS Wallet", permission: "wallet.read", icon: Wallet },
     ],
   },

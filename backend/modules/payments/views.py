@@ -1,6 +1,7 @@
 import hashlib
 from uuid import UUID
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.http import HttpResponse
@@ -17,14 +18,22 @@ from modules.billing.services import charge_preview, lock_wallet
 from modules.booking.models import Booking, BookingParticipant
 from modules.booking.serializers import booking_payload
 from modules.payments import services
-from modules.payments.models import PaymentAllocation, TravelInvoice, TravelPayment, TravelReceipt
+from modules.payments.models import (
+    PaymentAllocation,
+    TravelInvoice,
+    TravelInvoiceRevision,
+    TravelPayment,
+    TravelReceipt,
+)
 from modules.payments.policy import payment_rules, validate_payment_rules
 from modules.payments.serializers import (
+    InvoiceReviseSerializer,
     IssueInvoiceSerializer,
     PaymentActionSerializer,
     PaymentCreateSerializer,
     PaymentEvidenceSerializer,
     PaymentRulesSerializer,
+    invoice_detail_payload,
     invoice_payload,
     payment_payload,
 )
@@ -99,7 +108,7 @@ class InvoiceDetailView(APIView):
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request, invoice_id):
-        return Response(invoice_payload(_get(TravelInvoice.objects.select_related("booking"), pk=invoice_id)))
+        return Response(invoice_detail_payload(_get(TravelInvoice.objects.select_related("booking"), pk=invoice_id)))
 
 
 class IssueInvoiceView(APIView):
@@ -283,6 +292,36 @@ class InvoicePdfView(APIView):
         return _pdf_response(request, _get(TravelInvoice.objects, pk=invoice_id), "invoice_number")
 
 
+class InvoiceRevisionPdfView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("invoices.read")]
+
+    @extend_schema(responses={(200, "application/pdf"): OpenApiTypes.BINARY}, description="PDF versi invoice sebelum revisi (arsip INV-03).")
+    def get(self, request, invoice_id, version):
+        revision = _get(TravelInvoiceRevision.objects, invoice_id=invoice_id, version=version)
+        return _pdf_response(request, revision, "invoice_number", filename=f"{revision.invoice_number}-v{revision.version}")
+
+
+class InvoiceReviseView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("invoices.issue")]
+
+    @extend_schema(request=InvoiceReviseSerializer, responses=OpenApiTypes.OBJECT, description="INV-03 revisi berversi: hanya invoice tanpa pembayaran DRAFT/SUBMITTED/VERIFIED. Versi lama (snapshot + PDF) diarsipkan; nomor invoice tetap. Mengubah diskon memerlukan `bookings.discount`.")
+    @transaction.atomic
+    def post(self, request, invoice_id):
+        invoice = _get(TravelInvoice.objects, pk=invoice_id)
+        serializer = InvoiceReviseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        adjustments = {str(row["participant_id"]): row for row in data.get("adjustments", [])}
+        try:
+            invoice = services.revise_invoice(
+                invoice_id=invoice.pk, actor=request.user, reason=data["reason"], buyer_name=data.get("buyer_name"), due_at=data.get("due_at"),
+                adjustments=adjustments or None, can_discount=has_permission(permission_list(request.membership.role), "bookings.discount"),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.message_dict if hasattr(exc, "message_dict") else exc.messages) from exc
+        return Response(invoice_detail_payload(TravelInvoice.objects.select_related("booking").get(pk=invoice.pk)))
+
+
 class ReceiptPdfView(APIView):
     permission_classes = [IsAuthenticated, require_permission("receipts.read")]
 
@@ -293,13 +332,13 @@ class ReceiptPdfView(APIView):
         return _pdf_response(request, receipt, "receipt_no")
 
 
-def _pdf_response(request, document, number_field):
+def _pdf_response(request, document, number_field, filename=None):
     data = bytes(document.pdf_data)
     if hashlib.sha256(data).hexdigest() != document.checksum:
         raise ValidationError({"document": "Checksum dokumen tidak cocok."})
     log_event(action="financial_document.downloaded", request=request, object_type=document._meta.label_lower, object_id=document.pk)
     response = HttpResponse(data, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{getattr(document, number_field)}.pdf"'
+    response["Content-Disposition"] = f'attachment; filename="{filename or getattr(document, number_field)}.pdf"'
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response

@@ -81,6 +81,11 @@ class Booking(TenantScopedModel, BaseAppModel):
     status = models.CharField(max_length=24, choices=BookingStatus.choices, default=BookingStatus.DRAFT)
     booked_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True, default="")
+    # MOD-07: pembayar (nama pada invoice) & agen yang mendapat kredit penjualan (MOD-10).
+    payer_name = models.CharField(max_length=160, blank=True, default="")
+    agent = models.ForeignKey(
+        "agents.Agent", null=True, blank=True, on_delete=models.PROTECT, related_name="bookings"
+    )
     cancel_reason = models.TextField(blank=True, default="")
     canceled_by = models.ForeignKey(
         "identity.User",

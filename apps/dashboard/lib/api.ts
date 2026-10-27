@@ -147,8 +147,12 @@ export type TravelInvoice = {
   invoice_number: string; status: string; issue_at: string; due_at: string;
   total_idr: number; paid_idr: number; balance_idr: number; overdue: boolean;
   buyer_name: string; checksum: string;
-  lines: {participant_id: string; pilgrim_name: string; description: string; amount_idr: number; room_type: string}[];
+  lines: {participant_id: string; pilgrim_name: string; description: string; amount_idr: number; room_type: string; gross_idr?: number; discount_idr?: number; extra_idr?: number}[];
   dp_policy: PaymentRules;
+  /** INV-03: revisi berversi — nomor tetap, versi naik. */
+  version: number; gross_idr: number; discount_idr: number; extra_idr: number; revision_reason: string;
+  revisions?: {version: number; total_idr: number; reason: string; revised_at: string; revised_by: string | null}[];
+  revisable?: boolean;
 };
 export type PaymentRules = {dp_policy?: "any_positive"; dp_minimum_idr?: number; maker_checker?: boolean};
 export type SaasWallet = {
@@ -226,8 +230,8 @@ export type LeadSummary = {
 export type ReportColumn = {key: string; label: string; type: "text" | "money" | "int" | "percent" | "date"};
 export type ReportSection = {key: string; title: string; description: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[]; totals: Record<string, string | number | null> | null; truncated: boolean};
 export type Report = {
-  report: "operational" | "finance" | "saas"; title: string; travel: string; environment: string; as_of: string; timezone: string;
-  period: {from: string; to: string}; filters: {package: string; departure: string; status: string}; note?: string;
+  report: "operational" | "finance" | "saas" | "sales" | "payments" | "commissions"; title: string; travel: string; environment: string; as_of: string; timezone: string;
+  period: {from: string; to: string}; filters: {package: string; departure: string; status: string; agent?: string; account?: string}; note?: string;
   kpis: {key: string; label: string; value: number | null; type: ReportColumn["type"]; hint: string}[];
   sections: ReportSection[]; checks: {label: string; ok: boolean; detail: string}[];
 };
@@ -309,6 +313,10 @@ export type Booking = {
   status: string;
   booked_at: string;
   notes: string;
+  /** MOD-07: nama pembayar pada invoice (kosong = peserta pertama). */
+  payer_name: string;
+  /** MOD-10: agen yang mendapat kredit penjualan. */
+  agent: {id: string; code: string; name: string} | null;
   cancel_reason: string;
   canceled_by_name: string | null;
   created_by_name: string | null;
@@ -610,4 +618,30 @@ export type ManifestReadiness = {
   confirmed: number; pending_charge: number; outstanding_idr: number;
   seat_capacity: number; seats_taken: number; available_seats: number;
   checklist_ready: boolean; gap_count: number;
+};
+
+// MOD-10 Agen & Komisi
+export type AgentRef = {id: string; code: string; name: string};
+export type Agent = AgentRef & {
+  phone: string; email: string; business_id: string; bank_name: string; bank_account_name: string; bank_account_masked: string;
+  area: string; level: string; active: boolean; notes: string; created_at: string;
+  booking_count: number; commission_open_idr: number; commission_paid_idr: number;
+};
+export type CommissionPolicy = {
+  id: string; name: string; agent: AgentRef | null; package: {id: string; name: string} | null;
+  kind: "FIXED_PER_PAX" | "PERCENT_NET"; kind_label: string; amount_idr: number; percent: number;
+  trigger: "DP_VERIFIED" | "FULLY_PAID"; trigger_label: string; valid_from: string | null; valid_until: string | null; active: boolean;
+};
+export type CommissionStatus = "ESTIMATED" | "ELIGIBLE" | "APPROVED" | "PAID" | "REVERSED";
+export type Commission = {
+  id: string; status: CommissionStatus; status_label: string; agent: AgentRef;
+  booking: {id: string; code: string; status: string; departure_code: string; package_name: string};
+  policy: {name: string; kind: string; amount_idr: number; percent: string; trigger: string};
+  pax: number; basis_idr: number; amount_idr: number; eligible_at: string | null; approved_at: string | null; approved_by: string | null;
+  paid_on: string | null; paid_by: string | null; bank_account: string | null; reference: string; expense_id: string | null;
+  reversed_at: string | null; reverse_reason: string; review_note: string; created_at: string;
+};
+export type BookingAgentInfo = {
+  agent: AgentRef | null; commission: Commission | null;
+  history: {id: string; from_agent: AgentRef | null; to_agent: AgentRef | null; reason: string; changed_by: string | null; changed_at: string}[];
 };

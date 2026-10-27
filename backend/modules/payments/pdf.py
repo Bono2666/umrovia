@@ -41,7 +41,8 @@ def render_financial_pdf(snapshot, *, receipt=False):
     number = snapshot["number"]
     title = "KUITANSI" if receipt else "INVOICE"
     doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=42, rightMargin=42, topMargin=48, bottomMargin=60, title=f"{title} {number}", author=snapshot["issuer"]["legal_name"])
-    story = [text(f"{title} {number}", heading), text(snapshot["issuer"]["legal_name"]), text(snapshot["issuer"].get("address", "-"), small)]
+    version = snapshot.get("version", 1)
+    story = [text(f"{title} {number}" + (f" · Revisi {version}" if not receipt and version > 1 else ""), heading), text(snapshot["issuer"]["legal_name"]), text(snapshot["issuer"].get("address", "-"), small)]
     zone = snapshot.get("timezone", "Asia/Jakarta")
     story.extend([Spacer(1, 12), text(f"Booking: {snapshot['booking_code']}"), text(f"Pelanggan: {snapshot['buyer_name']}"), text(f"{'Tanggal verifikasi' if receipt else 'Tanggal terbit'}: {document_date(snapshot['issued_at'], zone, with_time=True)}")])
     if receipt:
@@ -63,7 +64,15 @@ def render_financial_pdf(snapshot, *, receipt=False):
     ]))
     story.extend([Spacer(1, 12), table])
     if not receipt:
+        if snapshot.get("discount_idr") or snapshot.get("extra_idr"):
+            story.extend([Spacer(1, 10), text(f"Harga paket: {format_idr(snapshot['gross_idr'])}")])
+            if snapshot.get("discount_idr"):
+                story.append(text(f"Diskon: -{format_idr(snapshot['discount_idr'])}"))
+            if snapshot.get("extra_idr"):
+                story.append(text(f"Biaya tambahan: {format_idr(snapshot['extra_idr'])}"))
         story.extend([Spacer(1, 16), text(f"Total tagihan: {format_idr(snapshot['total_idr'])}", heading)])
+        if snapshot.get("revision"):
+            story.append(text(f"Revisi {snapshot['revision']['version']} menggantikan versi sebelumnya (total {format_idr(snapshot['revision']['previous_total_idr'])}). Alasan: {snapshot['revision']['reason']}", small))
         story.extend([text(f"Terbayar saat terbit: {format_idr(snapshot['paid_idr'])}"), text(f"Sisa tagihan saat terbit: {format_idr(snapshot['outstanding_idr'])}"), text("Sisa tagihan terkini dapat dilihat pada halaman Invoice.", small)])
         for account in snapshot.get("bank_accounts", []):
             story.append(text(f"{account['bank_name']} · {account['account_name']} · {account['account_masked']}", small))

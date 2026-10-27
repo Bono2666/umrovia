@@ -22,7 +22,8 @@ FORMATS = {
 }
 PARAMS = [
     OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE), OpenApiParameter("package", OpenApiTypes.UUID),
-    OpenApiParameter("departure", OpenApiTypes.UUID), OpenApiParameter("status", str), OpenApiParameter("file", str, enum=list(FORMATS)),
+    OpenApiParameter("departure", OpenApiTypes.UUID), OpenApiParameter("status", str), OpenApiParameter("agent", OpenApiTypes.UUID),
+    OpenApiParameter("account", str, description="UUID rekening atau CASH"), OpenApiParameter("file", str, enum=list(FORMATS)),
 ]
 
 
@@ -33,7 +34,22 @@ def filter_labels(f, environment):
         raise ValidationError({"package": "Paket tidak ditemukan."})
     if f["departure"] and departure is None:
         raise ValidationError({"departure": "Keberangkatan tidak ditemukan."})
-    return {"package": package.name if package else "", "departure": departure.code if departure else "", "status": dict(DepartureStatus.choices).get(f["status"], "")}
+    from modules.agents.models import Agent
+    from modules.travel_finance.models import TravelBankAccount
+
+    agent = Agent.objects.filter(pk=f["agent"], environment=environment).first() if f.get("agent") else None
+    if f.get("agent") and agent is None:
+        raise ValidationError({"agent": "Agen tidak ditemukan."})
+    account = ""
+    if f.get("account") == "CASH":
+        account = "Tunai"
+    elif f.get("account"):
+        row = TravelBankAccount.objects.filter(pk=f["account"]).first()
+        if row is None:
+            raise ValidationError({"account": "Rekening tidak ditemukan."})
+        account = f"{row.bank_name} {row.account_masked}"
+    return {"package": package.name if package else "", "departure": departure.code if departure else "", "status": dict(DepartureStatus.choices).get(f["status"], ""),
+            "agent": agent.name if agent else "", "account": account}
 
 
 class ReportView(APIView):

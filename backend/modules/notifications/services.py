@@ -251,7 +251,7 @@ def invoice_issued(invoice):
     for line in invoice.lines.select_related("participant__pilgrim"):
         rows += notify_pilgrim(
             pilgrim=line.participant.pilgrim, environment=invoice.environment, event_type="invoice.issued",
-            source_key=f"invoice:{invoice.pk}", key="invoice.issued",
+            source_key=f"invoice:{invoice.pk}" + (f":v{invoice.version}" if invoice.version > 1 else ""), key="invoice.issued",
             values={"nomor_invoice": invoice.invoice_number, "kode_booking": invoice.booking.code, "tagihan": format_idr(line.amount_idr), "jatuh_tempo": format_date(invoice.due_at, zone)},
         )
     return rows

@@ -69,10 +69,12 @@ def parse_filters(params, tenant):
     status = params.get("status") or ""
     if status and status not in DepartureStatus.values:
         raise ValidationError({"status": "Status keberangkatan tidak dikenal."})
+    account = params.get("account") or ""
     return {
         "from": start, "to": end, "zone": zone, "today": today,
         "start_dt": datetime.combine(start, time.min, zone), "end_dt": datetime.combine(end + timedelta(days=1), time.min, zone),
         "package": _uuid(params.get("package"), "package"), "departure": _uuid(params.get("departure"), "departure"), "status": status,
+        "agent": _uuid(params.get("agent"), "agent"), "account": account if account == "CASH" else _uuid(account, "account"),
     }
 
 
@@ -81,7 +83,7 @@ def _envelope(kind, title, tenant, environment, f, **extra):
         "report": kind, "title": title, "travel": tenant.display_name, "environment": environment,
         "as_of": timezone.now().isoformat(), "timezone": str(f["zone"]),
         "period": {"from": f["from"].isoformat(), "to": f["to"].isoformat()},
-        "filters": {key: str(f[key]) if f[key] else "" for key in ("package", "departure", "status")},
+        "filters": {key: str(f[key]) if f.get(key) else "" for key in ("package", "departure", "status", "agent", "account")},
         **extra,
     }
 
@@ -412,5 +414,190 @@ def saas_usage(tenant, environment, f):
     )
 
 
-BUILDERS = {"operational": operational, "finance": finance, "saas": saas_usage}
-PERMISSIONS = {"operational": "reports.read", "finance": "reports.finance", "saas": "wallet.read"}
+# ------------------------------------------------- penjualan / booking (MOD-13) --
+
+
+def _booking_scope(qs, f, prefix=""):
+    qs = _scope_departures(qs, f, f"{prefix}departure__")
+    if f.get("agent"):
+        qs = qs.filter(**{f"{prefix}agent_id": f["agent"]})
+    return qs
+
+
+def sales(tenant, environment, f):
+    """MOD-13 Booking & Penjualan: booking per periode pemesanan, gross/diskon/net per paket & agen."""
+    from modules.booking.services import participant_net
+
+    zone = f["zone"]
+    bookings = _booking_scope(Booking.objects.filter(environment=environment, booked_at__gte=f["start_dt"], booked_at__lt=f["end_dt"]).exclude(status="DRAFT"), f)
+    bookings = list(bookings.select_related("departure__package", "agent").prefetch_related("participants__pilgrim").order_by("booked_at", "code")[: ROW_LIMIT + 1])
+    truncated = len(bookings) > ROW_LIMIT
+    bookings = bookings[:ROW_LIMIT]
+    invoices = {i.booking_id: i for i in TravelInvoice.objects.filter(booking_id__in=[b.pk for b in bookings]).defer("pdf_data")}
+    status_label = dict(Booking._meta.get_field("status").choices)
+    rows, by_package, by_agent, by_status = [], defaultdict(lambda: defaultdict(int)), defaultdict(lambda: defaultdict(int)), defaultdict(lambda: {"count": 0, "pax": 0})
+    for booking in bookings:
+        participants = [p for p in booking.participants.all() if p.participant_status != "CANCELED" or booking.status in INACTIVE_BOOKINGS]
+        gross = sum(int(p.pricing_snapshot_json.get("unit_price_idr") or 0) for p in participants)
+        discount = sum(int(p.pricing_snapshot_json.get("discount_idr") or 0) for p in participants)
+        extra = sum(int(p.pricing_snapshot_json.get("extra_idr") or 0) for p in participants)
+        net = sum(participant_net(p.pricing_snapshot_json) for p in participants)
+        invoice = invoices.get(booking.pk)
+        active = booking.status not in INACTIVE_BOOKINGS
+        by_status[status_label.get(booking.status, booking.status)]["count"] += 1
+        by_status[status_label.get(booking.status, booking.status)]["pax"] += len(participants)
+        row = {
+            "booked_at": _local_date(booking.booked_at, zone), "booking_code": booking.code, "package": booking.departure.package.name,
+            "departure": booking.departure.code, "agent": booking.agent.name if booking.agent_id else "Langsung",
+            "payer": booking.payer_name or (participants[0].pilgrim.name if participants else ""), "pax": len(participants),
+            "gross_idr": gross if active else 0, "discount_idr": discount if active else 0, "extra_idr": extra if active else 0, "net_idr": net if active else 0,
+            "invoice": invoice.invoice_number if invoice else "—", "paid_idr": (invoice.total_idr - invoice.balance_idr) if invoice else 0,
+            "status": status_label.get(booking.status, booking.status),
+        }
+        rows.append(row)
+        if active:
+            for bucket in (by_package[booking.departure.package.name], by_agent[row["agent"]]):
+                bucket["bookings"] += 1
+                for key in ("pax", "gross_idr", "discount_idr", "extra_idr", "net_idr"):
+                    bucket[key] += row[key]
+    package_rows = [{"package": k, **v} for k, v in sorted(by_package.items())]
+    agent_rows = [{"agent": k, **v} for k, v in sorted(by_agent.items(), key=lambda item: -item[1]["net_idr"])]
+    status_rows = [{"status": k, **v} for k, v in sorted(by_status.items())]
+    totals = _sum(rows, "pax", "gross_idr", "discount_idr", "extra_idr", "net_idr", "paid_idr")
+    active_rows = [r for r, b in zip(rows, bookings, strict=True) if b.status not in INACTIVE_BOOKINGS]
+    invoiced = sum(invoices[b.pk].total_idr for b in bookings if b.pk in invoices and b.status not in INACTIVE_BOOKINGS and invoices[b.pk].status != "VOIDED")
+    invoiced_net = sum(r["net_idr"] for r, b in zip(rows, bookings, strict=True) if b.pk in invoices and b.status not in INACTIVE_BOOKINGS and invoices[b.pk].status != "VOIDED")
+    money = "money"
+    value_cols = [_col("pax", "Jamaah", "int"), _col("gross_idr", "Gross", money), _col("discount_idr", "Diskon", money), _col("extra_idr", "Tambahan", money), _col("net_idr", "Net", money)]
+    return _envelope(
+        "sales", "Laporan Booking & Penjualan", tenant, environment, f,
+        note="Periode berdasarkan tanggal booking. Booking batal/kedaluwarsa tetap tampil tetapi nilainya tidak dihitung dalam penjualan.",
+        kpis=[
+            {"key": "bookings", "label": "Booking aktif", "value": len(active_rows), "type": "int", "hint": f"{len(rows) - len(active_rows)} batal/kedaluwarsa"},
+            {"key": "pax", "label": "Jamaah", "value": sum(r["pax"] for r in active_rows), "type": "int", "hint": "Peserta booking aktif"},
+            {"key": "gross", "label": "Penjualan gross", "value": totals["gross_idr"], "type": money, "hint": "Harga paket sebelum penyesuaian"},
+            {"key": "discount", "label": "Diskon", "value": totals["discount_idr"], "type": money, "hint": f"Tambahan {_rp(totals['extra_idr'])}"},
+            {"key": "net", "label": "Penjualan net", "value": totals["net_idr"], "type": money, "hint": f"Terbayar {_rp(totals['paid_idr'])}"},
+        ],
+        sections=[
+            _section("bookings", "Daftar booking", [_col("booked_at", "Tanggal", "date"), _col("booking_code", "Booking"), _col("package", "Paket"), _col("departure", "Keberangkatan"), _col("agent", "Agen"), _col("payer", "Pembayar"),
+                     *value_cols, _col("invoice", "Invoice"), _col("paid_idr", "Terbayar", money), _col("status", "Status")],
+                     rows, totals={"booking_code": "Total", **totals}, truncated=truncated),
+            _section("packages", "Penjualan per paket", [_col("package", "Paket"), _col("bookings", "Booking", "int"), *value_cols], package_rows, totals={"package": "Total", **_sum(package_rows, "bookings", "pax", "gross_idr", "discount_idr", "extra_idr", "net_idr")}),
+            _section("agents", "Penjualan per agen", [_col("agent", "Agen"), _col("bookings", "Booking", "int"), *value_cols], agent_rows, totals={"agent": "Total", **_sum(agent_rows, "bookings", "pax", "gross_idr", "discount_idr", "extra_idr", "net_idr")}),
+            _section("statuses", "Booking per status", [_col("status", "Status"), _col("count", "Booking", "int"), _col("pax", "Jamaah", "int")], status_rows, totals={"status": "Total", **_sum(status_rows, "count", "pax")}),
+        ],
+        checks=[
+            {"label": "Gross − diskon + tambahan = net", "ok": totals["gross_idr"] - totals["discount_idr"] + totals["extra_idr"] == totals["net_idr"], "detail": f"Net {_rp(totals['net_idr'])}"},
+            {"label": "Net booking ber-invoice = total invoice aktif", "ok": invoiced_net == invoiced, "detail": f"Booking {_rp(invoiced_net)} · invoice {_rp(invoiced)}"},
+        ],
+    )
+
+
+def payments_report(tenant, environment, f):
+    """MOD-13 Pembayaran: penerimaan terverifikasi per rekening dan per petugas verifikasi."""
+    zone = f["zone"]
+    qs = _booking_scope(TravelPayment.objects.filter(environment=environment, verified_at__gte=f["start_dt"], verified_at__lt=f["end_dt"], status__in=["VERIFIED", "REVERSED"]), f, "booking__")
+    if f.get("account") == "CASH":
+        qs = qs.filter(bank_account__isnull=True)
+    elif f.get("account"):
+        qs = qs.filter(bank_account_id=f["account"])
+    payments = list(qs.select_related("invoice", "booking", "bank_account", "created_by", "verified_by").defer("invoice__pdf_data").order_by("verified_at", "id")[: ROW_LIMIT + 1])
+    truncated = len(payments) > ROW_LIMIT
+    payments = payments[:ROW_LIMIT]
+    name = lambda user: (user.full_name or user.email) if user else "—"  # noqa: E731
+    rows, by_account, by_officer = [], defaultdict(lambda: {"count": 0, "amount_idr": 0}), defaultdict(lambda: {"count": 0, "amount_idr": 0})
+    for p in payments:
+        account = f"{p.bank_account.bank_name} {p.bank_account.account_masked}" if p.bank_account_id else ("Tunai" if p.method == "CASH" else "Transfer (rekening tidak dicatat)")
+        amount = p.amount_idr if p.status == "VERIFIED" else 0
+        rows.append({
+            "verified_at": _local_date(p.verified_at, zone), "received_at": _local_date(p.received_at, zone), "invoice": p.invoice.invoice_number,
+            "booking_code": p.booking.code, "payer": p.invoice.snapshot_json.get("buyer_name", ""), "kind": PAYMENT_KIND.get(p.kind, p.kind),
+            "account": account, "reference": p.reference or "—", "recorded_by": name(p.created_by), "verified_by": name(p.verified_by),
+            "status": "Terverifikasi" if p.status == "VERIFIED" else "Direversal", "amount_idr": amount,
+        })
+        if amount:
+            for bucket in (by_account[account], by_officer[name(p.verified_by)]):
+                bucket["count"] += 1
+                bucket["amount_idr"] += amount
+    total = sum(r["amount_idr"] for r in rows)
+    reversed_count = sum(1 for p in payments if p.status == "REVERSED")
+    account_rows = [{"account": k, **v} for k, v in sorted(by_account.items())]
+    officer_rows = [{"officer": k, **v} for k, v in sorted(by_officer.items())]
+    money = "money"
+    return _envelope(
+        "payments", "Laporan Pembayaran", tenant, environment, f,
+        note="Periode berdasarkan tanggal verifikasi. Pembayaran yang kemudian direversal ditampilkan dengan nilai Rp0.",
+        kpis=[
+            {"key": "verified", "label": "Penerimaan terverifikasi", "value": total, "type": money, "hint": f"{len(rows) - reversed_count} pembayaran"},
+            {"key": "reversed", "label": "Direversal", "value": reversed_count, "type": "int", "hint": "Pembayaran periode ini yang dibatalkan"},
+            {"key": "accounts", "label": "Rekening/kas", "value": len(account_rows), "type": "int", "hint": "Tujuan penerimaan"},
+            {"key": "officers", "label": "Petugas verifikasi", "value": len(officer_rows), "type": "int", "hint": "Pemeriksa dana"},
+        ],
+        sections=[
+            _section("payments", "Rincian pembayaran", [_col("verified_at", "Diverifikasi", "date"), _col("received_at", "Diterima", "date"), _col("invoice", "Invoice"), _col("booking_code", "Booking"), _col("payer", "Pembayar"),
+                     _col("kind", "Jenis"), _col("account", "Rekening"), _col("reference", "Referensi"), _col("recorded_by", "Pencatat"), _col("verified_by", "Verifikator"), _col("status", "Status"), _col("amount_idr", "Nominal", money)],
+                     rows, totals={"invoice": "Total", "amount_idr": total}, truncated=truncated),
+            _section("accounts", "Per rekening", [_col("account", "Rekening"), _col("count", "Pembayaran", "int"), _col("amount_idr", "Nominal", money)], account_rows, totals={"account": "Total", **_sum(account_rows, "count", "amount_idr")}),
+            _section("officers", "Per petugas verifikasi", [_col("officer", "Petugas"), _col("count", "Pembayaran", "int"), _col("amount_idr", "Nominal", money)], officer_rows, totals={"officer": "Total", **_sum(officer_rows, "count", "amount_idr")}),
+        ],
+        checks=[
+            {"label": "Total per rekening = total rincian", "ok": sum(r["amount_idr"] for r in account_rows) == total, "detail": _rp(total)},
+            {"label": "Total per petugas = total rincian", "ok": sum(r["amount_idr"] for r in officer_rows) == total, "detail": _rp(total)},
+        ],
+    )
+
+
+def commissions_report(tenant, environment, f):
+    """MOD-13 Komisi: nilai estimasi, earned (layak), disetujui, dibayar per agen."""
+    from modules.agents.models import Commission, CommissionStatus
+
+    qs = _booking_scope(Commission.objects.filter(environment=environment, created_at__gte=f["start_dt"], created_at__lt=f["end_dt"]), f, "booking__")
+    rows_qs = list(qs.select_related("agent", "booking__departure__package").order_by("created_at", "id")[: ROW_LIMIT + 1])
+    truncated = len(rows_qs) > ROW_LIMIT
+    label = dict(CommissionStatus.choices)
+    by_agent = defaultdict(lambda: defaultdict(int))
+    rows = []
+    for c in rows_qs[:ROW_LIMIT]:
+        agent = f"{c.agent.code} · {c.agent.name}"
+        rows.append({
+            "created_at": _local_date(c.created_at, f["zone"]), "agent": agent, "booking_code": c.booking.code, "package": c.booking.departure.package.name,
+            "policy": c.policy_snapshot_json.get("name", ""), "pax": c.pax, "basis_idr": c.basis_idr, "status": label[c.status],
+            "amount_idr": 0 if c.status == CommissionStatus.REVERSED else c.amount_idr, "paid_on": c.paid_on.isoformat() if c.paid_on else None,
+        })
+        bucket = by_agent[agent]
+        bucket[c.status.lower() + "_idr"] += c.amount_idr
+        if c.status in (CommissionStatus.ELIGIBLE, CommissionStatus.APPROVED, CommissionStatus.PAID):
+            bucket["earned_idr"] += c.amount_idr
+    agent_rows = [{"agent": k, **{key: v.get(key, 0) for key in ("estimated_idr", "earned_idr", "approved_idr", "paid_idr", "reversed_idr")}} for k, v in sorted(by_agent.items())]
+    agent_totals = _sum(agent_rows, "estimated_idr", "earned_idr", "approved_idr", "paid_idr", "reversed_idr")
+    paid_period = Commission.objects.filter(environment=environment, status=CommissionStatus.PAID, paid_on__gte=f["from"], paid_on__lte=f["to"])
+    paid_period = _booking_scope(paid_period, f, "booking__").aggregate(n=Count("id"), t=Sum("amount_idr"))
+    expense_total = TravelExpense.objects.filter(environment=environment, category="COMMISSION", voided_at__isnull=True, spent_on__gte=f["from"], spent_on__lte=f["to"])
+    expense_total = expense_total.aggregate(t=Sum("amount_idr"))["t"] or 0
+    money = "money"
+    scoped = bool(f["package"] or f["departure"] or f.get("agent"))
+    return _envelope(
+        "commissions", "Laporan Komisi Agen", tenant, environment, f,
+        note="Komisi dikelompokkan menurut tanggal dibuat (booking direservasi). Earned = layak dibayar + disetujui + dibayar.",
+        kpis=[
+            {"key": "estimated", "label": "Estimasi", "value": agent_totals["estimated_idr"], "type": money, "hint": "Menunggu syarat pembayaran"},
+            {"key": "earned", "label": "Earned", "value": agent_totals["earned_idr"], "type": money, "hint": "Syarat terpenuhi"},
+            {"key": "approved", "label": "Disetujui (belum dibayar)", "value": agent_totals["approved_idr"], "type": money, "hint": "Siap dibayarkan"},
+            {"key": "paid_period", "label": "Dibayar periode ini", "value": paid_period["t"] or 0, "type": money, "hint": f"{paid_period['n']} komisi"},
+        ],
+        sections=[
+            _section("agents", "Ringkasan per agen", [_col("agent", "Agen"), _col("estimated_idr", "Estimasi", money), _col("earned_idr", "Earned", money), _col("approved_idr", "Disetujui", money), _col("paid_idr", "Dibayar", money), _col("reversed_idr", "Dibatalkan", money)],
+                     agent_rows, totals={"agent": "Total", **agent_totals}),
+            _section("commissions", "Rincian komisi", [_col("created_at", "Tanggal", "date"), _col("agent", "Agen"), _col("booking_code", "Booking"), _col("package", "Paket"), _col("policy", "Kebijakan"), _col("pax", "Jamaah", "int"),
+                     _col("basis_idr", "Basis (net)", money), _col("amount_idr", "Komisi", money), _col("status", "Status"), _col("paid_on", "Dibayar", "date")],
+                     rows, totals={"agent": "Total", **_sum(rows, "pax", "basis_idr", "amount_idr")}, truncated=truncated),
+        ],
+        checks=[] if scoped else [
+            {"label": "Komisi dibayar periode ini = pengeluaran kategori komisi", "ok": (paid_period["t"] or 0) == expense_total, "detail": f"Komisi {_rp(paid_period['t'])} · pengeluaran {_rp(expense_total)}"},
+        ],
+    )
+
+
+BUILDERS = {"operational": operational, "finance": finance, "saas": saas_usage, "sales": sales, "payments": payments_report, "commissions": commissions_report}
+PERMISSIONS = {"operational": "reports.read", "finance": "reports.finance", "saas": "wallet.read", "sales": "reports.read", "payments": "reports.finance", "commissions": "commissions.read"}

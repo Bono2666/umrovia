@@ -233,6 +233,7 @@ def test_payment_role_migration_preserves_custom_roles(tenant_a, tenant_b):
         import_module("modules.tenants.migrations.0008_notification_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
         import_module("modules.tenants.migrations.0009_report_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
         import_module("modules.tenants.migrations.0011_lead_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
+        import_module("modules.tenants.migrations.0012_agent_commission_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))  # agen & komisi
     for role in Role.objects.filter(tenant=tenant_a):
         assert set(role.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS[role.name])
     assert "payments.verify" not in DEFAULT_ROLE_PERMISSIONS["Admin"]
@@ -262,6 +263,7 @@ def test_financial_rls_denies_without_context_and_other_tenants(scenario, tenant
 def test_invoice_due_config_and_unimplemented_tax_are_not_ignored(scenario):
     from datetime import timedelta
 
+    from modules.audit.models import AuditEvent
     from modules.payments.dates import tenant_today
     from modules.tenants.models import TenantSettings
 
@@ -269,7 +271,12 @@ def test_invoice_due_config_and_unimplemented_tax_are_not_ignored(scenario):
     settings = TenantSettings.objects.get(tenant=s["tenant"])
     settings.invoice_config_json = {"due_days": 10, "tax_idr": 1000}
     settings.save(update_fields=["invoice_config_json"])
-    url = f"/api/v1/bookings/{s['booking']['id']}/issue-invoice"
+    pilgrim = ok(post(s["client"], "/api/v1/pilgrims", {"name": "Jamaah Pajak"}))
+    booking = ok(post(s["client"], "/api/v1/bookings", {"departure": s["departure"]["id"], "participants": [pilgrim["id"]], "room_types": {pilgrim["id"]: "QUAD"}}))
+    # INV-01 otomatis gagal karena pajak belum didukung → reservasi tetap sah, kegagalan diaudit.
+    assert ok(post(s["client"], f"/api/v1/bookings/{booking['id']}/transition", {"target": "RESERVED"}))["status"] == "RESERVED"
+    assert AuditEvent.objects.filter(action="invoice.auto_issue_failed", object_id=str(booking["id"])).exists()
+    url = f"/api/v1/bookings/{booking['id']}/issue-invoice"
     assert post(s["client"], url).status_code == 400
     settings.invoice_config_json = {"due_days": 10}
     settings.rules_json = {}  # target DP boleh tidak diisi sama sekali
