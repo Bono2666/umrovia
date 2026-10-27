@@ -88,7 +88,7 @@ def test_rpt01_finance_report_equals_source_records(books):
     assert values["cash_net"] == 15_000_000 - 3_500_000
     assert all(check["ok"] for check in report["checks"]), report["checks"]
     cash = {row["account"]: row for row in section(report, "cash")["rows"]}
-    assert cash["BSI ******5678"] == {"account": "BSI ******5678", "opening_idr": 0, "inflow_idr": 10_000_000, "reversal_idr": 0, "expense_idr": 3_000_000, "closing_idr": 7_000_000}
+    assert cash["BSI ******5678"] == {"account": "BSI ******5678", "opening_idr": 0, "inflow_idr": 10_000_000, "reversal_idr": 0, "expense_idr": 3_000_000, "transfer_in_idr": 0, "transfer_out_idr": 0, "closing_idr": 7_000_000}
     assert cash["Tunai"]["inflow_idr"] == 6_000_000 and cash["Tunai"]["reversal_idr"] == 1_000_000 and cash["Tunai"]["closing_idr"] == 4_500_000
     receipts = {row["kind"]: row["amount_idr"] for row in section(report, "receipts")["rows"]}
     assert receipts == {"DP": 16_000_000, "Reversal": -1_000_000}
@@ -156,7 +156,7 @@ def test_exports_pdf_xlsx_csv_are_audited(books):
     book = load_workbook(BytesIO(xlsx.content))
     assert book.sheetnames[0] == "Ringkasan" and "Kas & bank per rekening" in book.sheetnames
     cash = book["Kas & bank per rekening"]
-    assert cash["A1"].value == "Rekening" and cash.cell(cash.max_row, 6).value == 11_500_000
+    assert cash["A1"].value == "Rekening" and cash.cell(cash.max_row, 8).value == 11_500_000
     csv = client.get(f"/api/v1/reports/operational{WIDE}&file=csv")
     assert csv.status_code == 200 and "Kesiapan per keberangkatan" in csv.content.decode("utf-8-sig")
     assert client.get(f"/api/v1/reports/saas{WIDE}&file=pdf").content.startswith(b"%PDF-")

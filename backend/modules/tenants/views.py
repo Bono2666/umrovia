@@ -131,6 +131,7 @@ def _tenant_payload(membership: TenantMembership) -> dict:
         "role": membership.role.name if membership.role else None,
         "status": membership.status,
         "permissions": permission_list(membership.role),
+        "branch_id": str(membership.branch_id) if membership.branch_id else None,
     }
 
 
@@ -144,6 +145,7 @@ def _membership_row(m: TenantMembership) -> dict:
         },
         "role": m.role.name if m.role else None,
         "role_id": str(m.role_id) if m.role_id else None,
+        "branch": {"id": str(m.branch_id), "code": m.branch.code, "name": m.branch.name} if m.branch_id else None,
         "status": m.status,
         "permissions": permission_list(m.role),
     }
@@ -215,7 +217,7 @@ class ListCreateMembershipsView(APIView):
         return [IsAuthenticated(), require_permission("memberships.read")()]
 
     def get(self, request):
-        rows = TenantMembership.objects.select_related("user", "role").order_by("user__email")
+        rows = TenantMembership.objects.select_related("user", "role", "branch").order_by("user__email")
         return Response({"results": [_membership_row(m) for m in rows]}, status=status.HTTP_200_OK)
 
     def post(self, request):

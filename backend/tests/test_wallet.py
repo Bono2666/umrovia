@@ -310,6 +310,7 @@ def test_role_migration_preserves_custom_grants(wallet_setup):
         import_module("modules.tenants.migrations.0008_notification_role_defaults").upgrade(apps, editor)  # S16 grants
         import_module("modules.tenants.migrations.0009_report_role_defaults").upgrade(apps, editor)  # S17 grants
         import_module("modules.tenants.migrations.0012_agent_commission_role_defaults").upgrade(apps, editor)  # agen & komisi
+        import_module("modules.tenants.migrations.0014_branch_role_defaults").upgrade(apps, editor)  # cabang
     normal.refresh_from_db()
     custom.refresh_from_db()
     assert set(normal.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS["Finance"])

@@ -75,6 +75,14 @@ class TravelExpense(TenantScopedModel, BaseAppModel):
     void_reason = models.CharField(max_length=240, blank=True, default="")
     created_by = models.ForeignKey("identity.User", null=True, on_delete=models.SET_NULL, related_name="+")
     voided_by = models.ForeignKey("identity.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    branch = models.ForeignKey("tenants.Branch", null=True, blank=True, on_delete=models.PROTECT, related_name="expenses")
+    payee = models.CharField(max_length=160, blank=True, default="")  # penerima dana (MOD-11)
+    # Maker-checker (MOD-11): bila diaktifkan, pengeluaran baru PENDING sampai disetujui staf lain.
+    approval_status = models.CharField(max_length=16, choices=[("APPROVED", "Disetujui"), ("PENDING", "Menunggu persetujuan"), ("REJECTED", "Ditolak")], default="APPROVED")
+    approved_by = models.ForeignKey("identity.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.CharField(max_length=240, blank=True, default="")
+    evidence_key = models.CharField(max_length=300, blank=True, default="")  # lampiran bukti (privat)
 
     class Meta:
         ordering = ["-spent_on", "-created_at"]
@@ -83,9 +91,68 @@ class TravelExpense(TenantScopedModel, BaseAppModel):
 
     def save(self, *args, **kwargs):
         fields = set(kwargs.get("update_fields") or [])
-        if not self._state.adding and (not fields or not fields <= {"voided_at", "void_reason", "voided_by", "updated_at"}):
+        mutable = {"voided_at", "void_reason", "voided_by", "approval_status", "approved_by", "approved_at", "rejection_reason", "evidence_key", "updated_at"}
+        if not self._state.adding and (not fields or not fields <= mutable):
             raise ValidationError("Pengeluaran tidak dapat diubah; batalkan lalu catat ulang.")
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Pengeluaran tidak dapat dihapus; gunakan pembatalan.")
+
+
+class OpeningBalance(TenantScopedModel, BaseAppModel):
+    """Saldo awal rekening/kas tunai (MOD-11). `bank_account` kosong = kas tunai.
+
+    Saldo awal pertama langsung berlaku. Koreksi berikutnya menunggu
+    persetujuan (`bank_accounts.approve`) dan, bila disetujui, menggantikan
+    saldo awal sebelumnya (riwayat tetap tersimpan).
+    """
+
+    environment = models.CharField(max_length=16)
+    bank_account = models.ForeignKey(TravelBankAccount, null=True, blank=True, on_delete=models.PROTECT, related_name="opening_balances")
+    as_of = models.DateField()
+    amount_idr = models.BigIntegerField()
+    reason = models.CharField(max_length=240, blank=True, default="")
+    status = models.CharField(max_length=16, choices=[("APPROVED", "Berlaku"), ("PENDING", "Menunggu persetujuan"), ("REJECTED", "Ditolak"), ("SUPERSEDED", "Digantikan")], default="PENDING")
+    created_by = models.ForeignKey("identity.User", null=True, on_delete=models.SET_NULL, related_name="+")
+    decided_by = models.ForeignKey("identity.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.CharField(max_length=240, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["tenant", "environment", "bank_account"], condition=models.Q(status="APPROVED"), name="uq_opening_balance_active_account"),
+            models.UniqueConstraint(fields=["tenant", "environment"], condition=models.Q(status="APPROVED", bank_account__isnull=True), name="uq_opening_balance_active_cash"),
+        ]
+
+
+class CashTransfer(TenantScopedModel, BaseAppModel):
+    """Transfer antarrekening/kas (MOD-11): satu catatan = pasangan keluar/masuk,
+    sehingga total kas perusahaan tidak berubah. Koreksi dengan pembatalan."""
+
+    environment = models.CharField(max_length=16)
+    transferred_on = models.DateField()
+    from_account = models.ForeignKey(TravelBankAccount, null=True, blank=True, on_delete=models.PROTECT, related_name="transfers_out")
+    to_account = models.ForeignKey(TravelBankAccount, null=True, blank=True, on_delete=models.PROTECT, related_name="transfers_in")
+    amount_idr = models.PositiveBigIntegerField()
+    description = models.CharField(max_length=240, blank=True, default="")
+    reference = models.CharField(max_length=120, blank=True, default="")
+    branch = models.ForeignKey("tenants.Branch", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey("identity.User", null=True, on_delete=models.SET_NULL, related_name="+")
+    voided_at = models.DateTimeField(null=True, blank=True)
+    void_reason = models.CharField(max_length=240, blank=True, default="")
+    voided_by = models.ForeignKey("identity.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["-transferred_on", "-created_at"]
+        constraints = [models.CheckConstraint(condition=models.Q(amount_idr__gt=0), name="ck_transfer_positive")]
+
+    def save(self, *args, **kwargs):
+        fields = set(kwargs.get("update_fields") or [])
+        if not self._state.adding and (not fields or not fields <= {"voided_at", "void_reason", "voided_by", "updated_at"}):
+            raise ValidationError("Transfer tidak dapat diubah; batalkan lalu catat ulang.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Transfer tidak dapat dihapus; gunakan pembatalan.")

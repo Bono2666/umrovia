@@ -86,6 +86,9 @@ class Booking(TenantScopedModel, BaseAppModel):
     agent = models.ForeignKey(
         "agents.Agent", null=True, blank=True, on_delete=models.PROTECT, related_name="bookings"
     )
+    branch = models.ForeignKey(
+        "tenants.Branch", null=True, blank=True, on_delete=models.PROTECT, related_name="bookings"
+    )
     cancel_reason = models.TextField(blank=True, default="")
     canceled_by = models.ForeignKey(
         "identity.User",
@@ -207,3 +210,33 @@ class BookingPriceLine(TenantScopedModel, BaseAppModel):
 
 def generate_booking_code() -> str:
     return f"BK-{uuid.uuid4().hex[:8].upper()}"
+
+
+class WaitlistStatus(models.TextChoices):
+    WAITING = "WAITING", "Menunggu kursi"
+    BOOKED = "BOOKED", "Sudah dibuatkan booking"
+    CANCELED = "CANCELED", "Dibatalkan"
+
+
+class WaitlistEntry(TenantScopedModel, BaseAppModel):
+    """Daftar tunggu keberangkatan penuh (MOD-06). Urutan = waktu masuk.
+
+    Tidak menahan kursi. Saat kursi tersedia kembali, petugas membuat booking
+    dari entri (urutan teratas lebih dulu) dan entri ditandai BOOKED.
+    """
+
+    environment = models.CharField(max_length=16)
+    departure = models.ForeignKey("departures.Departure", on_delete=models.PROTECT, related_name="waitlist")
+    pilgrim = models.ForeignKey("pilgrims.Pilgrim", on_delete=models.PROTECT, related_name="waitlist_entries")
+    room_type = models.CharField(max_length=16, blank=True, default="")
+    notes = models.CharField(max_length=240, blank=True, default="")
+    status = models.CharField(max_length=16, choices=WaitlistStatus.choices, default=WaitlistStatus.WAITING)
+    booking = models.ForeignKey(Booking, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    cancel_reason = models.CharField(max_length=240, blank=True, default="")
+    created_by = models.ForeignKey("identity.User", null=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["departure", "pilgrim"], condition=models.Q(status="WAITING"), name="uq_waitlist_waiting_pilgrim"),
+        ]

@@ -111,6 +111,11 @@ DEFAULT_ROLE_PERMISSIONS["Admin"] += ["leads.manage"]
 DEFAULT_ROLE_PERMISSIONS["Admin"] += ["bookings.discount", "agents.read", "agents.manage", "commissions.read"]
 DEFAULT_ROLE_PERMISSIONS["Sales"] += ["agents.read"]
 DEFAULT_ROLE_PERMISSIONS["Finance"] += ["agents.read", "commissions.read", "commissions.policies", "commissions.approve", "commissions.pay"]
+# MOD-03 Cabang: semua staf operasional memilih cabang; Admin mengelola master.
+# `expenses.approve` & `bank_accounts.approve` (checker kas) default hanya Owner.
+for _name in ("Admin", "Sales", "Finance", "Operations"):
+    DEFAULT_ROLE_PERMISSIONS[_name] += ["branches.read"]
+DEFAULT_ROLE_PERMISSIONS["Admin"] += ["branches.manage"]
 
 
 def permission_list(role) -> list[str]:

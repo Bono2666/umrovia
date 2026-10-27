@@ -397,6 +397,7 @@ def create_booking(
     agent_id=None,
     adjustments=None,
     can_discount: bool = False,
+    branch=None,
 ) -> Booking:
     """Buat booking DRAFT dengan peserta & snapshot harga (UI-07, UAT-03/04).
 
@@ -425,6 +426,7 @@ def create_booking(
         departure=departure,
         notes=(notes or "").strip(),
         payer_name=(payer_name or "").strip(),
+        branch=branch,
         created_by=actor if getattr(actor, "is_authenticated", False) else None,
     )
     for _attempt in range(3):
@@ -475,6 +477,7 @@ def update_draft_booking(
     adjustments=None,
     can_discount: bool = False,
     actor=None,
+    branch=UNSET,
 ) -> Booking:
     """Update booking DRAFT saja (§8.3 "Detail/update draft").
 
@@ -551,6 +554,8 @@ def update_draft_booking(
         booking.notes = notes.strip()
     if payer_name is not None:
         booking.payer_name = payer_name.strip()
+    if branch is not UNSET:
+        booking.branch = branch
     if agent_id is not UNSET:
         from modules.agents.services import assign_agent
 
@@ -727,3 +732,70 @@ def transition_booking(
 
         sync_commission(booking, reason=reason or "Booking kedaluwarsa")
     return booking
+
+
+# ------------------------------------------------------------ daftar tunggu --
+@transaction.atomic
+def add_to_waitlist(*, tenant, environment, departure_id, pilgrim_id, room_type="", notes="", actor=None):
+    """MOD-06: daftar tunggu hanya untuk keberangkatan OPEN yang kursinya habis."""
+    from modules.booking.models import WaitlistEntry, WaitlistStatus
+
+    try:
+        departure = Departure.objects.select_for_update().get(pk=departure_id)
+    except (Departure.DoesNotExist, ValueError, ValidationError):
+        raise ValidationError({"departure": "Keberangkatan tidak ditemukan."}) from None
+    _guard_departure_bookable(departure, environment=environment)
+    if departure.available_seats > 0:
+        raise ValidationError({"departure": f"Masih ada {departure.available_seats} kursi — buat booking langsung."})
+    pilgrim = _resolve_pilgrims(environment=environment, pilgrim_ids=[pilgrim_id])[0]
+    _check_duplicate_active(departure=departure, pilgrim_ids=[pilgrim.pk], allow_duplicate=False)
+    if room_type:
+        _snapshot_unit_price(departure.__class__.objects.select_related("package").get(pk=departure.pk), room_type)
+    if WaitlistEntry.objects.filter(departure=departure, pilgrim=pilgrim, status=WaitlistStatus.WAITING).exists():
+        raise ValidationError({"pilgrim": "Jamaah sudah ada di daftar tunggu keberangkatan ini."})
+    return WaitlistEntry.objects.create(
+        tenant=tenant, environment=environment, departure=departure, pilgrim=pilgrim, room_type=room_type,
+        notes=(notes or "").strip()[:240], created_by=actor if getattr(actor, "is_authenticated", False) else None,
+    )
+
+
+def waitlist_position(entry) -> int:
+    from modules.booking.models import WaitlistEntry, WaitlistStatus
+
+    return WaitlistEntry.objects.filter(departure_id=entry.departure_id, status=WaitlistStatus.WAITING, created_at__lt=entry.created_at).count() + 1
+
+
+@transaction.atomic
+def book_from_waitlist(*, entry_id, actor=None, branch=None):
+    """Buat booking DRAFT dari entri (urut antrean: posisi N butuh ≥ N kursi tersedia)."""
+    from modules.booking.models import WaitlistEntry, WaitlistStatus
+
+    entry = WaitlistEntry.objects.select_for_update().select_related("departure").get(pk=entry_id)
+    if entry.status != WaitlistStatus.WAITING:
+        raise ValidationError({"status": "Entri daftar tunggu sudah diproses."})
+    departure = Departure.objects.get(pk=entry.departure_id)
+    position = waitlist_position(entry)
+    if departure.available_seats < position:
+        raise ValidationError({"departure": f"Posisi antrean {position}; kursi tersedia {departure.available_seats}. Proses antrean di depannya lebih dulu."})
+    booking = create_booking(
+        tenant=entry.tenant, environment=entry.environment, departure_id=entry.departure_id, pilgrim_ids=[entry.pilgrim_id],
+        notes=f"Dari daftar tunggu. {entry.notes}".strip(), actor=actor,
+        room_types={str(entry.pilgrim_id): entry.room_type} if entry.room_type else None, branch=branch,
+    )
+    entry.status, entry.booking = WaitlistStatus.BOOKED, booking
+    entry.save(update_fields=["status", "booking", "updated_at"])
+    return entry
+
+
+@transaction.atomic
+def cancel_waitlist(*, entry_id, reason):
+    from modules.booking.models import WaitlistEntry, WaitlistStatus
+
+    entry = WaitlistEntry.objects.select_for_update().get(pk=entry_id)
+    if entry.status != WaitlistStatus.WAITING:
+        raise ValidationError({"status": "Entri daftar tunggu sudah diproses."})
+    if not (reason or "").strip():
+        raise ValidationError({"reason": "Alasan wajib diisi."})
+    entry.status, entry.cancel_reason = WaitlistStatus.CANCELED, reason.strip()[:240]
+    entry.save(update_fields=["status", "cancel_reason", "updated_at"])
+    return entry

@@ -22,7 +22,7 @@ FORMATS = {
 }
 PARAMS = [
     OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE), OpenApiParameter("package", OpenApiTypes.UUID),
-    OpenApiParameter("departure", OpenApiTypes.UUID), OpenApiParameter("status", str), OpenApiParameter("agent", OpenApiTypes.UUID),
+    OpenApiParameter("departure", OpenApiTypes.UUID), OpenApiParameter("status", str), OpenApiParameter("agent", OpenApiTypes.UUID), OpenApiParameter("branch", OpenApiTypes.UUID),
     OpenApiParameter("account", str, description="UUID rekening atau CASH"), OpenApiParameter("file", str, enum=list(FORMATS)),
 ]
 
@@ -48,8 +48,14 @@ def filter_labels(f, environment):
         if row is None:
             raise ValidationError({"account": "Rekening tidak ditemukan."})
         account = f"{row.bank_name} {row.account_masked}"
+    from modules.tenants.models import Branch
+
+    branch = Branch.objects.filter(pk=f["branch"]).first() if f.get("branch") else None
+    if f.get("branch") and branch is None:
+        raise ValidationError({"branch": "Cabang tidak ditemukan."})
+    f["branch_obj"] = branch
     return {"package": package.name if package else "", "departure": departure.code if departure else "", "status": dict(DepartureStatus.choices).get(f["status"], ""),
-            "agent": agent.name if agent else "", "account": account}
+            "agent": agent.name if agent else "", "account": account, "branch": f"{branch.code} · {branch.name}" if branch else ""}
 
 
 class ReportView(APIView):
@@ -81,3 +87,15 @@ class ReportView(APIView):
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response
+
+
+class DashboardSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=OpenApiTypes.OBJECT, description="KPI Ringkasan (MOD-02): blok sesuai izin role, pengingat dan grafik 12 bulan.")
+    def get(self, request):
+        from modules.reports.dashboard import summary
+
+        if getattr(request, "membership", None) is None:
+            raise PermissionDenied("Workspace belum dipilih.")
+        return Response(summary(request))

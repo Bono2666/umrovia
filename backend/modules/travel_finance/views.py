@@ -22,9 +22,19 @@ from modules.audit.services import log_event
 from modules.departures.models import Departure
 from modules.payments.dates import tenant_today
 from modules.payments.models import TravelPayment
+from modules.tenants.branches import default_branch, resolve_branch
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import require_permission
-from modules.travel_finance.models import ExpenseCategory, TravelBankAccount, TravelExpense, mask_account_number
+from modules.travel_finance import services as cash
+from modules.travel_finance.models import (
+    CashTransfer,
+    ExpenseCategory,
+    OpeningBalance,
+    TravelBankAccount,
+    TravelExpense,
+    mask_account_number,
+)
+from modules.travel_finance.services import cash_rules
 
 
 def _payload(account: TravelBankAccount) -> dict:
@@ -166,6 +176,8 @@ class ExpenseSerializer(serializers.Serializer):
     bank_account = serializers.UUIDField(required=False, allow_null=True)
     description = serializers.CharField(max_length=240)
     reference = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    payee = serializers.CharField(max_length=160, required=False, allow_blank=True, default="")
+    branch = serializers.UUIDField(required=False, allow_null=True)
 
 
 class VoidExpenseSerializer(serializers.Serializer):
@@ -182,6 +194,10 @@ def expense_payload(expense: TravelExpense) -> dict:
         "bank_account": {"id": str(account.pk), "label": f"{account.bank_name} {account.account_masked}"} if account else None,
         "description": expense.description, "reference": expense.reference,
         "status": "VOIDED" if expense.voided_at else "RECORDED", "void_reason": expense.void_reason,
+        "approval_status": expense.approval_status, "approved_by_name": (expense.approved_by.full_name or expense.approved_by.email) if expense.approved_by_id else None,
+        "approved_at": expense.approved_at.isoformat() if expense.approved_at else None, "rejection_reason": expense.rejection_reason,
+        "payee": expense.payee, "has_evidence": bool(expense.evidence_key),
+        "branch": {"id": str(expense.branch_id), "code": expense.branch.code, "name": expense.branch.name} if expense.branch_id else None,
         "voided_at": expense.voided_at.isoformat() if expense.voided_at else None,
         "created_by_name": (expense.created_by.full_name or expense.created_by.email) if expense.created_by else None,
         "created_at": expense.created_at.isoformat(),
@@ -196,7 +212,7 @@ class ExpenseListCreateView(APIView):
         return [IsAuthenticated(), require_permission(grant)()]
 
     def get(self, request):
-        qs = TravelExpense.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("departure__package", "bank_account", "created_by")
+        qs = TravelExpense.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("departure__package", "bank_account", "created_by", "approved_by", "branch")
         params = request.query_params
         try:
             if params.get("from"):
@@ -205,6 +221,8 @@ class ExpenseListCreateView(APIView):
                 qs = qs.filter(spent_on__lte=date.fromisoformat(params["to"]))
             if params.get("departure"):
                 qs = qs.filter(departure_id=UUID(params["departure"]))
+            if params.get("branch"):
+                qs = qs.filter(branch_id=UUID(params["branch"]))
         except ValueError:
             raise ValidationError({"filter": "Tanggal (YYYY-MM-DD) atau keberangkatan tidak valid."}) from None
         if params.get("category"):
@@ -216,10 +234,16 @@ class ExpenseListCreateView(APIView):
             raise ValidationError({"status": "Status tidak dikenal."})
         if status_filter:
             qs = qs.filter(voided_at__isnull=status_filter == "RECORDED")
+        approval = params.get("approval", "")
+        if approval not in {"", "APPROVED", "PENDING", "REJECTED"}:
+            raise ValidationError({"approval": "Status persetujuan tidak dikenal."})
+        if approval:
+            qs = qs.filter(approval_status=approval)
         paginator = ExpensePagination()
         rows = paginator.paginate_queryset(qs.order_by("-spent_on", "-created_at", "id"), request)
         response = paginator.get_paginated_response([expense_payload(row) for row in rows])
-        response.data["total_idr"] = qs.filter(voided_at__isnull=True).aggregate(total=Sum("amount_idr"))["total"] or 0
+        response.data["total_idr"] = qs.filter(voided_at__isnull=True, approval_status="APPROVED").aggregate(total=Sum("amount_idr"))["total"] or 0
+        response.data["pending_count"] = TravelExpense.objects.filter(environment=resolve_active_environment(request.tenant), approval_status="PENDING", voided_at__isnull=True).count()
         return response
 
     @transaction.atomic
@@ -241,10 +265,14 @@ class ExpenseListCreateView(APIView):
             account = TravelBankAccount.objects.filter(pk=data["bank_account"], active=True).first()
             if account is None:
                 raise ValidationError({"bank_account": "Rekening tidak ditemukan atau nonaktif."})
+        branch = resolve_branch(data["branch"]) if "branch" in data else default_branch(request)
+        # Maker-checker kas (MOD-11): pengeluaran menunggu persetujuan staf lain bila diaktifkan.
+        pending = cash_rules(request.tenant)["maker_checker"]
         expense = TravelExpense.objects.create(
             tenant=request.tenant, environment=environment, spent_on=data["spent_on"], category=data["category"],
             amount_idr=data["amount_idr"], departure=departure, bank_account=account,
             description=data["description"].strip(), reference=data.get("reference", "").strip(), created_by=request.user,
+            payee=data.get("payee", "").strip(), branch=branch, approval_status="PENDING" if pending else "APPROVED",
         )
         log_event(action="expenses.recorded", request=request, object_type="travel_expense", object_id=expense.pk, changes={"category": expense.category, "amount_idr": expense.amount_idr, "departure": departure.code if departure else None})
         return Response(expense_payload(expense), status=status.HTTP_201_CREATED)
@@ -266,3 +294,212 @@ class ExpenseVoidView(APIView):
             expense.save(update_fields=["voided_at", "void_reason", "voided_by", "updated_at"])
             log_event(action="expenses.voided", request=request, object_type="travel_expense", object_id=expense.pk, changes={"amount_idr": expense.amount_idr, "reason": expense.void_reason})
         return Response(expense_payload(expense))
+
+
+class ExpenseDecisionView(APIView):
+    """Maker-checker pengeluaran (MOD-11): setujui/tolak oleh staf selain pencatat."""
+
+    permission_classes = [IsAuthenticated, require_permission("expenses.approve")]
+    action = "approve"
+
+    def post(self, request, expense_id):
+        expense = TravelExpense.objects.filter(pk=expense_id).first()
+        if expense is None:
+            raise NotFound("Pengeluaran tidak ditemukan.")
+        assert_environment_writable(request.tenant, expense.environment)
+        cash.decide_expense(expense_id=expense.pk, actor=request.user, approve=self.action == "approve", reason=str(request.data.get("reason") or ""))
+        return Response(expense_payload(TravelExpense.objects.select_related("departure__package", "bank_account", "created_by", "approved_by", "branch").get(pk=expense.pk)))
+
+
+class ExpenseEvidenceView(APIView):
+    """Lampiran bukti pengeluaran (PDF/JPG/PNG, privat). Unggah oleh pencatat (`expenses.write`)."""
+
+    def get_permissions(self):
+        return [IsAuthenticated(), require_permission("expenses.write" if self.request.method == "POST" else "expenses.read")()]
+
+    def post(self, request, expense_id):
+        import uuid
+
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        from modules.portal.files import inspect_upload
+
+        expense = TravelExpense.objects.filter(pk=expense_id).first()
+        if expense is None:
+            raise NotFound("Pengeluaran tidak ditemukan.")
+        assert_environment_writable(request.tenant, expense.environment)
+        if expense.voided_at is not None:
+            raise ValidationError({"expense": "Pengeluaran sudah dibatalkan."})
+        data, ext = inspect_upload(request.FILES.get("file"))
+        key = default_storage.save(f"tenants/{expense.tenant_id}/environments/{expense.environment}/expenses/{expense.pk}/{uuid.uuid4()}.{ext}", ContentFile(data))
+        expense.evidence_key = key
+        expense.save(update_fields=["evidence_key", "updated_at"])
+        log_event(action="expenses.evidence_uploaded", request=request, object_type="travel_expense", object_id=expense.pk, changes={"bytes": len(data)})
+        return Response(expense_payload(TravelExpense.objects.select_related("departure__package", "bank_account", "created_by", "approved_by", "branch").get(pk=expense.pk)))
+
+    def get(self, request, expense_id):
+        from django.core.files.storage import default_storage
+        from django.http import HttpResponse
+
+        from modules.portal.files import CONTENT_TYPES
+
+        expense = TravelExpense.objects.filter(pk=expense_id).first()
+        if expense is None or not expense.evidence_key:
+            raise NotFound("Lampiran tidak ditemukan.")
+        with default_storage.open(expense.evidence_key, "rb") as handle:
+            data = handle.read()
+        ext = expense.evidence_key.rsplit(".", 1)[-1]
+        log_event(action="expenses.evidence_downloaded", request=request, object_type="travel_expense", object_id=expense.pk)
+        response = HttpResponse(data, content_type=CONTENT_TYPES.get(ext, "application/octet-stream"))
+        response["Content-Disposition"] = f'inline; filename="bukti-pengeluaran-{expense.pk}.{ext}"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+# ------------------------------------------------------------- kas & bank --
+def _name(user):
+    return (user.full_name or user.email) if user else None
+
+
+def _account_label(account):
+    return f"{account.bank_name} {account.account_masked}" if account else "Tunai"
+
+
+def opening_payload(row):
+    return {
+        "id": str(row.pk), "bank_account": str(row.bank_account_id) if row.bank_account_id else None, "account": _account_label(row.bank_account),
+        "as_of": row.as_of.isoformat(), "amount_idr": row.amount_idr, "reason": row.reason, "status": row.status, "status_label": row.get_status_display(),
+        "created_by": _name(row.created_by), "decided_by": _name(row.decided_by), "decided_at": row.decided_at.isoformat() if row.decided_at else None,
+        "decision_note": row.decision_note, "created_at": row.created_at.isoformat(),
+    }
+
+
+def transfer_payload(row):
+    return {
+        "id": str(row.pk), "transferred_on": row.transferred_on.isoformat(), "from_account": _account_label(row.from_account), "to_account": _account_label(row.to_account),
+        "from_account_id": str(row.from_account_id) if row.from_account_id else None, "to_account_id": str(row.to_account_id) if row.to_account_id else None,
+        "amount_idr": row.amount_idr, "description": row.description, "reference": row.reference,
+        "branch": {"id": str(row.branch_id), "code": row.branch.code} if row.branch_id else None,
+        "status": "VOIDED" if row.voided_at else "RECORDED", "void_reason": row.void_reason, "created_by": _name(row.created_by), "created_at": row.created_at.isoformat(),
+    }
+
+
+class OpeningBalanceSerializer(serializers.Serializer):
+    bank_account = serializers.UUIDField(required=False, allow_null=True)
+    as_of = serializers.DateField()
+    amount_idr = serializers.IntegerField(min_value=-100_000_000_000, max_value=100_000_000_000)
+    reason = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
+
+
+class TransferSerializer(serializers.Serializer):
+    transferred_on = serializers.DateField()
+    from_account = serializers.UUIDField(required=False, allow_null=True)
+    to_account = serializers.UUIDField(required=False, allow_null=True)
+    amount_idr = serializers.IntegerField(min_value=1, max_value=100_000_000_000)
+    description = serializers.CharField(max_length=240, required=False, allow_blank=True, default="")
+    reference = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    branch = serializers.UUIDField(required=False, allow_null=True)
+
+
+class CashBookView(APIView):
+    """GET /cash/book?from=&to=&branch= — saldo awal, mutasi dan saldo akhir per rekening/kas."""
+
+    permission_classes = [IsAuthenticated, require_permission("bank_accounts.read")]
+
+    def get(self, request):
+        today = tenant_today(request.tenant)
+        try:
+            start = date.fromisoformat(request.query_params["from"]) if request.query_params.get("from") else today.replace(day=1)
+            end = date.fromisoformat(request.query_params["to"]) if request.query_params.get("to") else today
+            branch = resolve_branch(UUID(request.query_params["branch"])) if request.query_params.get("branch") else None
+        except ValueError:
+            raise ValidationError({"filter": "Tanggal (YYYY-MM-DD) atau cabang tidak valid."}) from None
+        if start > end:
+            raise ValidationError({"to": "Tanggal akhir tidak boleh sebelum tanggal awal."})
+        rows = cash.ledger(request.tenant, resolve_active_environment(request.tenant), start, end, branch=branch)
+        totals = {key: sum(row[key] for row in rows) for key in (*cash.BUCKETS, "closing_idr")}
+        return Response({"from": start.isoformat(), "to": end.isoformat(), "rows": rows, "totals": totals, "rules": cash_rules(request.tenant)})
+
+
+class CashSettingsView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), require_permission("bank_accounts.approve" if self.request.method == "PATCH" else "bank_accounts.read")()]
+
+    def get(self, request):
+        return Response(cash_rules(request.tenant))
+
+    def patch(self, request):
+        value = request.data.get("maker_checker")
+        if type(value) is not bool:
+            raise ValidationError({"maker_checker": "Harus boolean."})
+        result = cash.set_cash_rules(request.tenant, maker_checker=value)
+        log_event(action="cash.settings_updated", request=request, object_type="tenant_settings", object_id=request.tenant.pk, changes=result)
+        return Response(result)
+
+
+class OpeningBalanceListCreateView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), require_permission("bank_accounts.write" if self.request.method == "POST" else "bank_accounts.read")()]
+
+    def get(self, request):
+        rows = OpeningBalance.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("bank_account", "created_by", "decided_by")[:200]
+        return Response({"results": [opening_payload(r) for r in rows]})
+
+    @transaction.atomic
+    def post(self, request):
+        environment = resolve_active_environment(request.tenant)
+        assert_environment_writable(request.tenant, environment)
+        serializer = OpeningBalanceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        row = cash.request_opening_balance(tenant=request.tenant, environment=environment, bank_account_id=data.get("bank_account"), as_of=data["as_of"], amount_idr=data["amount_idr"], reason=data["reason"], actor=request.user)
+        return Response(opening_payload(row), status=status.HTTP_201_CREATED)
+
+
+class OpeningBalanceDecisionView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("bank_accounts.approve")]
+    action = "approve"
+
+    def post(self, request, balance_id):
+        row = OpeningBalance.objects.filter(pk=balance_id, environment=resolve_active_environment(request.tenant)).first()
+        if row is None:
+            raise NotFound("Saldo awal tidak ditemukan.")
+        assert_environment_writable(request.tenant, row.environment)
+        row = cash.decide_opening_balance(tenant=request.tenant, balance_id=row.pk, actor=request.user, approve=self.action == "approve", note=str(request.data.get("note") or ""))
+        return Response(opening_payload(row))
+
+
+class TransferListCreateView(APIView):
+    def get_permissions(self):
+        return [IsAuthenticated(), require_permission("bank_accounts.write" if self.request.method == "POST" else "bank_accounts.read")()]
+
+    def get(self, request):
+        rows = CashTransfer.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("from_account", "to_account", "branch", "created_by")[:200]
+        return Response({"results": [transfer_payload(r) for r in rows]})
+
+    @transaction.atomic
+    def post(self, request):
+        environment = resolve_active_environment(request.tenant)
+        assert_environment_writable(request.tenant, environment)
+        serializer = TransferSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        branch = resolve_branch(data["branch"]) if "branch" in data else default_branch(request)
+        row = cash.record_transfer(tenant=request.tenant, environment=environment, data=data, actor=request.user, branch=branch)
+        return Response(transfer_payload(row), status=status.HTTP_201_CREATED)
+
+
+class TransferVoidView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("bank_accounts.write")]
+
+    def post(self, request, transfer_id):
+        row = CashTransfer.objects.filter(pk=transfer_id, environment=resolve_active_environment(request.tenant)).first()
+        if row is None:
+            raise NotFound("Transfer tidak ditemukan.")
+        assert_environment_writable(request.tenant, row.environment)
+        serializer = VoidExpenseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        row = cash.void_transfer(transfer_id=row.pk, actor=request.user, reason=serializer.validated_data["reason"])
+        return Response(transfer_payload(row))
