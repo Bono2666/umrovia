@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "modules.portal",
     "modules.notifications",
     "modules.reports",
+    "modules.crm",
     "modules.audit",
     "modules.documents",
 ]
