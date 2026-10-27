@@ -114,4 +114,6 @@ next-env.d.ts
 .claude/
 
 .env
+.env.staging
+.env.production
 db.sqlite3

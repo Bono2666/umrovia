@@ -1,7 +1,7 @@
 # Direct dependencies — backend (Django/DRF modular monolith)
 # Versi di-lock penuh di requirements.lock (pip freeze) untuk reproduktifitas CI/deploy.
 Django>=5.2,<5.3
-djangorestframework>=3.15,<3.17
+djangorestframework>=3.18.3,<3.19  # S19: CVE fix (pip-audit)
 drf-spectacular>=0.28,<0.29
 dj-database-url>=2.2,<3
 psycopg[binary]>=3.2,<4
@@ -9,6 +9,6 @@ django-cors-headers>=4.6,<5
 gunicorn>=23,<24
 whitenoise>=6.8,<7
 redis>=5,<9  # cache Django (throttle) saat REDIS_URL aktif — Spec §8 rate limit
-cryptography>=44,<47  # enkripsi field sensitif jamaah (NIK/paspor, Spec §5.2 identity_encrypted)
+cryptography>=50.0.2,<51  # S19: CVE fix (pip-audit); enkripsi field sensitif jamaah (NIK/paspor, Spec §5.2 identity_encrypted)
 reportlab>=5.1,<6  # PDF invoice dan kuitansi dari snapshot immutable
 openpyxl>=3.1,<4  # ekspor manifest XLSX (S15, OPS-04)

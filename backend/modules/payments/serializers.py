@@ -86,8 +86,9 @@ def payment_payload(payment):
         "verified_at": payment.verified_at.isoformat() if payment.verified_at else None,
         "verified_by_name": (payment.verified_by.full_name or payment.verified_by.email) if payment.verified_by_id else None,
         "receipt": receipt_payload(receipt) if receipt else None,
-        "allocations": [{"booking_participant_id": str(a.participant_id), "pilgrim_name": a.participant.pilgrim.name, "amount_idr": a.amount_idr} for a in payment.allocations.select_related("participant__pilgrim")],
-        "participants": [participant_charge_payload(p) for p in payment.booking.participants.prefetch_related("saas_charges")],
+        # .all() memakai prefetch dari daftar; untuk objek tunggal tetap satu query.
+        "allocations": [{"booking_participant_id": str(a.participant_id), "pilgrim_name": a.participant.pilgrim.name, "amount_idr": a.amount_idr} for a in payment.allocations.all()],
+        "participants": [participant_charge_payload(p) for p in payment.booking.participants.all()],
     }
 
 

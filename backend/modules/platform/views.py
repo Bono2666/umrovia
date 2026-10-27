@@ -51,11 +51,41 @@ class HealthView(APIView):
         except Exception:
             logger.exception("health: database tidak dapat dihubungi")
             db_ok = False
+        checks = {"database": "ok" if db_ok else "error", **readiness_checks(db_ok)}
         payload = {
-            "status": "ok" if db_ok else "degraded",
+            "status": "ok" if db_ok and not {"error", "stale", "backlog"} & set(checks.values()) else "degraded",
             "service": "umrovia-api",
             "version": settings.VERSION,
             "time": timezone.now().isoformat(),
-            "checks": {"database": "ok" if db_ok else "error"},
+            # S19 monitoring: status saja (tanpa angka/data) — aman untuk probe publik.
+            "checks": checks,
         }
+        # Hanya database yang membuat probe gagal (503); cache/worker/antrean = sinyal alert.
         return Response(payload, status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+def readiness_checks(db_ok) -> dict:
+    """Cache, heartbeat worker dan antrean email macet (> 15 menit lewat jatuh tempo)."""
+    import time
+    from datetime import timedelta
+
+    from django.core.cache import cache
+
+    from modules.notifications.models import NotificationJob
+
+    result = {}
+    try:
+        cache.set("health:probe", "1", 30)
+        result["cache"] = "ok" if cache.get("health:probe") == "1" else "error"
+    except Exception:
+        logger.exception("health: cache tidak dapat dihubungi")
+        result["cache"] = "error"
+    beat = cache.get(WORKER_HEARTBEAT_KEY) if result["cache"] == "ok" else None
+    result["worker"] = "unknown" if beat is None else "ok" if time.time() - float(beat) < 120 else "stale"
+    if db_ok:
+        stuck = NotificationJob.objects.filter(due_at__lt=timezone.now() - timedelta(minutes=15)).exists()
+        result["email_queue"] = "backlog" if stuck else "ok"
+    return result
+
+
+WORKER_HEARTBEAT_KEY = "worker:heartbeat"

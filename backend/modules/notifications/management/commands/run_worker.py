@@ -8,6 +8,7 @@ import signal
 import time
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
@@ -20,6 +21,7 @@ SCHEDULE = [  # (perintah, interval detik)
     ("expire_trials", 3600),
     ("send_trial_reminders", 3600),
     ("retry_pending_charges", 900),
+    ("verify_integrity", 86400),  # S19: backup_validation / reconciliation_daily (read-only)
 ]
 
 
@@ -29,10 +31,16 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         stopping = []
         signal.signal(signal.SIGTERM, lambda *_: stopping.append(True))
-        last_run = {name: 0.0 for name, _ in SCHEDULE}
+        # -inf: setiap job berjalan sekali saat worker start. (0.0 keliru: monotonic() dihitung sejak
+        # mesin menyala, sehingga job ber-interval > uptime tidak pernah berjalan saat start.)
+        last_run = {name: float("-inf") for name, _ in SCHEDULE}
         self.stdout.write("worker: berjalan")
         while not stopping:
             close_old_connections()
+            try:  # heartbeat untuk /health (S19 monitoring); cache bersama = Redis di Docker/produksi
+                cache.set("worker:heartbeat", time.time(), 600)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("worker heartbeat failed; error=%s", type(exc).__name__)
             for name, interval in SCHEDULE:
                 if time.monotonic() - last_run[name] >= interval:
                     last_run[name] = time.monotonic()

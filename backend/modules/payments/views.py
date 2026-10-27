@@ -2,6 +2,7 @@ import hashlib
 from uuid import UUID
 
 from django.db import transaction
+from django.db.models import Prefetch, Q
 from django.http import HttpResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -10,12 +11,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.api import list_response
 from modules.audit.services import log_event
 from modules.billing.services import charge_preview, lock_wallet
-from modules.booking.models import Booking
+from modules.booking.models import Booking, BookingParticipant
 from modules.booking.serializers import booking_payload
 from modules.payments import services
-from modules.payments.models import TravelInvoice, TravelPayment, TravelReceipt
+from modules.payments.models import PaymentAllocation, TravelInvoice, TravelPayment, TravelReceipt
 from modules.payments.policy import payment_rules, validate_payment_rules
 from modules.payments.serializers import (
     IssueInvoiceSerializer,
@@ -40,7 +42,15 @@ def _get(queryset, **lookup):
 
 
 def _payments(request):
-    qs = TravelPayment.objects.select_related("booking", "invoice", "verified_by", "receipt")
+    # S19 (uji beban): tanpa N+1 dan tanpa memuat PDF di daftar.
+    qs = (
+        TravelPayment.objects.select_related("booking", "invoice", "verified_by", "receipt")
+        .defer("invoice__pdf_data", "invoice__snapshot_json", "receipt__pdf_data", "receipt__snapshot_json")
+        .prefetch_related(
+            Prefetch("allocations", queryset=PaymentAllocation.objects.select_related("participant__pilgrim")),
+            Prefetch("booking__participants", queryset=BookingParticipant.objects.prefetch_related("saas_charges")),
+        )
+    )
     if not has_permission(permission_list(request.membership.role), "payments.read_all"):
         qs = qs.filter(created_by=request.user)
     return qs
@@ -58,14 +68,19 @@ class InvoiceListView(APIView):
 
     @extend_schema(operation_id="invoices_list", responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("booking", OpenApiTypes.UUID), OpenApiParameter("status", str)])
     def get(self, request):
-        qs = TravelInvoice.objects.select_related("booking")
+        qs = TravelInvoice.objects.select_related("booking", "tenant").defer("pdf_data")  # S19: tanpa N+1/PDF
         if request.query_params.get("booking"):
             qs = qs.filter(booking_id=_filter_uuid(request.query_params["booking"], "booking"))
         if request.query_params.get("status"):
             if request.query_params["status"] not in {"ISSUED", "PARTIALLY_PAID", "PAID", "VOIDED"}:
                 raise ValidationError({"status": "Status invoice tidak dikenal."})
             qs = qs.filter(status=request.query_params["status"])
-        return Response({"results": [invoice_payload(row) for row in qs[:200]]})
+        if request.query_params.get("open") == "1":  # pilihan invoice untuk mencatat pembayaran
+            qs = qs.filter(status__in=["ISSUED", "PARTIALLY_PAID"])
+        search = (request.query_params.get("q") or "").strip()
+        if search:  # S19: cari invoice saat jumlahnya melebihi satu halaman pilihan
+            qs = qs.filter(Q(invoice_number__icontains=search) | Q(booking__code__icontains=search) | Q(snapshot_json__buyer_name__icontains=search))
+        return list_response(request, qs.order_by("-issue_at", "invoice_number"), invoice_payload)
 
 
 class InvoiceCandidatesView(APIView):
@@ -115,7 +130,7 @@ class PaymentListCreateView(APIView):
             if request.query_params["status"] not in {"DRAFT", "SUBMITTED", "VERIFIED", "REJECTED", "REVERSED"}:
                 raise ValidationError({"status": "Status pembayaran tidak dikenal."})
             qs = qs.filter(status=request.query_params["status"])
-        return Response({"results": [payment_payload(row) for row in qs[:200]]})
+        return list_response(request, qs.order_by("-received_at", "id"), payment_payload)
 
     @extend_schema(request=PaymentCreateSerializer, responses={201: OpenApiTypes.OBJECT}, parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)])
     @transaction.atomic

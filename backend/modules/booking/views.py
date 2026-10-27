@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.api import list_response
 from modules.audit.services import log_event
 from modules.booking.models import Booking
 from modules.booking.serializers import (
@@ -74,9 +75,9 @@ class BookingListCreateView(APIView):
         rows = (
             qs.select_related("departure", "departure__package", "created_by", "canceled_by")
             .prefetch_related("participants__pilgrim", "price_lines")
-            .order_by("-booked_at", "code")[:200]
+            .order_by("-booked_at", "code")
         )
-        return Response({"results": [booking_payload(b) for b in rows]})
+        return list_response(request, rows, booking_payload)
 
     @extend_schema(request=BookingCreateSerializer, responses={201: OpenApiTypes.OBJECT})
     def post(self, request):

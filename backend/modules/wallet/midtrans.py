@@ -19,6 +19,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 TIMEOUT_SECONDS = 15
 ORDER_PREFIX = "TOP-"
+ALLOWED_PREFIXES = ("https://app.midtrans.com/", "https://app.sandbox.midtrans.com/", "https://api.midtrans.com/", "https://api.sandbox.midtrans.com/")
 
 
 class GatewayError(Exception):
@@ -39,9 +40,11 @@ def _api_base():
 
 def _request(method, url, payload=None):
     """Returns (status_code, parsed JSON). Separate function so tests can stub it."""
+    if not url.startswith(ALLOWED_PREFIXES):  # S19 SAST: hanya host HTTPS Midtrans (cegah SSRF/skema lain)
+        raise GatewayError("Tujuan gateway tidak diizinkan.")
     auth = base64.b64encode(f"{settings.MIDTRANS_SERVER_KEY.strip()}:".encode()).decode()
     data = json.dumps(payload).encode() if payload is not None else None
-    request = urllib.request.Request(url, data=data, method=method, headers={
+    request = urllib.request.Request(url, data=data, method=method, headers={  # noqa: S310 - dibatasi ALLOWED_PREFIXES
         "Accept": "application/json", "Content-Type": "application/json", "Authorization": f"Basic {auth}",
     })
     try:
