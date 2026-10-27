@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "modules.billing",
     "modules.portal",
     "modules.notifications",
+    "modules.reports",
     "modules.audit",
     "modules.documents",
 ]

@@ -283,6 +283,7 @@ def test_notification_role_migration_only_upgrades_untouched_defaults(tenant_a, 
     for _ in range(2):
         with connection.schema_editor() as editor:
             migration.upgrade(apps, editor)
+            import_module("modules.tenants.migrations.0009_report_role_defaults").upgrade(apps, editor)  # S17 lanjutan
     for name, role in defaults.items():
         role.refresh_from_db()
         assert set(role.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS[name])

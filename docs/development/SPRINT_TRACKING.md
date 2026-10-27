@@ -512,6 +512,31 @@ tenant lulus otomatis.
 preferensi pesan non-transaksional; antrean ekspor manifest asinkron pindah ke
 backlog (ekspor tetap sinkron).
 
+## Sprint S17 — Laporan siap pakai: operasional, keuangan, SaaS (F08)
+
+**Status:** DONE (27 Oktober 2026), branch `sprint/s17-reports`.
+Keputusan: [ADR-0013](../adr/0013-ready-reports.md). Bukti:
+[verifikasi S17](SPRINT_S17_VERIFICATION.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S17-01 | Modul `reports`: laporan dihitung langsung dari catatan sumber dengan `as_of`, filter periode/paket/keberangkatan/status | DONE | `GET /reports/{kind}` |
+| S17-02 | RPT-01 operasional: okupansi, booking, jamaah, DP, konfirmasi, dokumen, checklist, versi manifest per keberangkatan dan per paket | DONE | test operasional |
+| S17-03 | RPT-02/04 keuangan: invoice, penerimaan & reversal, piutang & aging, kas/bank per rekening (saldo awal–akhir), pengeluaran, margin estimasi + rekonsiliasi | DONE | RPT01 |
+| S17-04 | RPT-05 SaaS Wallet: statement ledger, top-up, biaya per booking-jamaah, tertunda, refund — terpisah dari kas travel | DONE | RPT02 |
+| S17-05 | RPT-03/06 ekspor PDF/XLSX/CSV dari payload yang sama, beraudit, aman formula, prefiks DEMO | DONE | test ekspor |
+| S17-06 | Register pengeluaran travel (RLS, tanpa edit/hapus, batal beralasan) + API | DONE | test pengeluaran |
+| S17-07 | Grant `reports.finance`, `expenses.*`, `reports.read` (Operations) + migrasi role default | DONE | `tenants.0009` |
+| S17-08 | UI Laporan (tab, preset periode, KPI, rekonsiliasi, tabel bertotal, unduh) dan halaman Pengeluaran | DONE | Playwright |
+
+**Exit gate S17 (Reconciliation vs primary records):** total laporan keuangan
+dan SaaS dibandingkan otomatis dengan agregat langsung dari tabel invoice,
+pembayaran, pengeluaran dan wallet ledger; cek rekonsiliasi tampil di setiap
+laporan dan lulus.
+
+**Batas tahap:** buku besar/neraca/laba rugi formal (P1), impor mutasi bank,
+cabang, laporan platform (pendapatan platform, funnel trial) → S18.
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -531,7 +556,8 @@ backlog (ekspor tetap sinkron).
 | S14 | 14 | Portal jamaah, autentikasi, profil & unggah dokumen | DONE |
 | S15 | 15 | Operasional keberangkatan, manifest & ekspor PDF | DONE |
 | S16 | 16 | Notifikasi email, retry & template | DONE |
-| S17–S19 | 17–19 | mengikuti Roadmap §3 | TODO |
+| S17 | 17 | Laporan siap pakai: operasional, keuangan, SaaS | DONE |
+| S18–S19 | 18–19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 

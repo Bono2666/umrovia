@@ -190,6 +190,20 @@ export type WalletLedger = {
   description: string; created_at: string;
 };
 export type Paginated<T> = {count: number; next: string | null; previous: string | null; results: T[]};
+export type ReportColumn = {key: string; label: string; type: "text" | "money" | "int" | "percent" | "date"};
+export type ReportSection = {key: string; title: string; description: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[]; totals: Record<string, string | number | null> | null; truncated: boolean};
+export type Report = {
+  report: "operational" | "finance" | "saas"; title: string; travel: string; environment: string; as_of: string; timezone: string;
+  period: {from: string; to: string}; filters: {package: string; departure: string; status: string}; note?: string;
+  kpis: {key: string; label: string; value: number | null; type: ReportColumn["type"]; hint: string}[];
+  sections: ReportSection[]; checks: {label: string; ok: boolean; detail: string}[];
+};
+export type TravelExpense = {
+  id: string; environment: string; spent_on: string; category: string; category_label: string; amount_idr: number;
+  departure: {id: string; code: string; package_name: string} | null; bank_account: {id: string; label: string} | null;
+  description: string; reference: string; status: "RECORDED" | "VOIDED"; void_reason: string; voided_at: string | null;
+  created_by_name: string | null; created_at: string;
+};
 export type NotificationStatus = "PENDING" | "SENT" | "FAILED" | "DEAD";
 export type NotificationDelivery = {
   id: string; created_at: string; event_type: string; template_key: string; template_label: string; template_version: number;

@@ -5,18 +5,26 @@ Keamanan: endpoint HANYA menerima `account_number` (write-only) dan menyimpan
 kembali; audit memakai nilai masked. Role: Finance/Owner (matriks §3);
 Admin/Sales tanpa akses rekening.
 """
+from datetime import date
+from uuid import UUID
+
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Sum
+from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.departures.models import Departure
+from modules.payments.dates import tenant_today
 from modules.payments.models import TravelPayment
+from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import require_permission
-from modules.travel_finance.models import TravelBankAccount, mask_account_number
+from modules.travel_finance.models import ExpenseCategory, TravelBankAccount, TravelExpense, mask_account_number
 
 
 def _payload(account: TravelBankAccount) -> dict:
@@ -141,3 +149,120 @@ class BankAccountDetailView(APIView):
         log_event(action="bank_accounts.deleted", request=request, object_type="travel_bank_account", object_id=account.id, changes={"bank_name": account.bank_name, "account_masked": account.account_masked})
         account.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ------------------------------------------------------------ pengeluaran --
+
+
+class ExpensePagination(PageNumberPagination):
+    page_size = 50
+
+
+class ExpenseSerializer(serializers.Serializer):
+    spent_on = serializers.DateField()
+    category = serializers.ChoiceField(choices=ExpenseCategory.choices)
+    amount_idr = serializers.IntegerField(min_value=1, max_value=100_000_000_000)
+    departure = serializers.UUIDField(required=False, allow_null=True)
+    bank_account = serializers.UUIDField(required=False, allow_null=True)
+    description = serializers.CharField(max_length=240)
+    reference = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+
+
+class VoidExpenseSerializer(serializers.Serializer):
+    reason = serializers.CharField(min_length=5, max_length=240)
+
+
+def expense_payload(expense: TravelExpense) -> dict:
+    account = expense.bank_account
+    departure = expense.departure
+    return {
+        "id": str(expense.pk), "environment": expense.environment, "spent_on": expense.spent_on.isoformat(),
+        "category": expense.category, "category_label": expense.get_category_display(), "amount_idr": expense.amount_idr,
+        "departure": {"id": str(departure.pk), "code": departure.code, "package_name": departure.package.name} if departure else None,
+        "bank_account": {"id": str(account.pk), "label": f"{account.bank_name} {account.account_masked}"} if account else None,
+        "description": expense.description, "reference": expense.reference,
+        "status": "VOIDED" if expense.voided_at else "RECORDED", "void_reason": expense.void_reason,
+        "voided_at": expense.voided_at.isoformat() if expense.voided_at else None,
+        "created_by_name": (expense.created_by.full_name or expense.created_by.email) if expense.created_by else None,
+        "created_at": expense.created_at.isoformat(),
+    }
+
+
+class ExpenseListCreateView(APIView):
+    """GET/POST /expenses — pengeluaran travel (RPT-02); koreksi lewat pembatalan."""
+
+    def get_permissions(self):
+        grant = "expenses.write" if self.request.method == "POST" else "expenses.read"
+        return [IsAuthenticated(), require_permission(grant)()]
+
+    def get(self, request):
+        qs = TravelExpense.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("departure__package", "bank_account", "created_by")
+        params = request.query_params
+        try:
+            if params.get("from"):
+                qs = qs.filter(spent_on__gte=date.fromisoformat(params["from"]))
+            if params.get("to"):
+                qs = qs.filter(spent_on__lte=date.fromisoformat(params["to"]))
+            if params.get("departure"):
+                qs = qs.filter(departure_id=UUID(params["departure"]))
+        except ValueError:
+            raise ValidationError({"filter": "Tanggal (YYYY-MM-DD) atau keberangkatan tidak valid."}) from None
+        if params.get("category"):
+            if params["category"] not in ExpenseCategory.values:
+                raise ValidationError({"category": "Kategori tidak dikenal."})
+            qs = qs.filter(category=params["category"])
+        status_filter = params.get("status", "")
+        if status_filter not in {"", "RECORDED", "VOIDED"}:
+            raise ValidationError({"status": "Status tidak dikenal."})
+        if status_filter:
+            qs = qs.filter(voided_at__isnull=status_filter == "RECORDED")
+        paginator = ExpensePagination()
+        rows = paginator.paginate_queryset(qs.order_by("-spent_on", "-created_at", "id"), request)
+        response = paginator.get_paginated_response([expense_payload(row) for row in rows])
+        response.data["total_idr"] = qs.filter(voided_at__isnull=True).aggregate(total=Sum("amount_idr"))["total"] or 0
+        return response
+
+    @transaction.atomic
+    def post(self, request):
+        environment = resolve_active_environment(request.tenant)
+        assert_environment_writable(request.tenant, environment)
+        serializer = ExpenseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if data["spent_on"] > tenant_today(request.tenant):
+            raise ValidationError({"spent_on": "Tanggal pengeluaran tidak boleh di masa depan."})
+        departure = None
+        if data.get("departure"):
+            departure = Departure.objects.filter(pk=data["departure"], environment=environment).select_related("package").first()
+            if departure is None:
+                raise ValidationError({"departure": "Keberangkatan tidak ditemukan."})
+        account = None
+        if data.get("bank_account"):
+            account = TravelBankAccount.objects.filter(pk=data["bank_account"], active=True).first()
+            if account is None:
+                raise ValidationError({"bank_account": "Rekening tidak ditemukan atau nonaktif."})
+        expense = TravelExpense.objects.create(
+            tenant=request.tenant, environment=environment, spent_on=data["spent_on"], category=data["category"],
+            amount_idr=data["amount_idr"], departure=departure, bank_account=account,
+            description=data["description"].strip(), reference=data.get("reference", "").strip(), created_by=request.user,
+        )
+        log_event(action="expenses.recorded", request=request, object_type="travel_expense", object_id=expense.pk, changes={"category": expense.category, "amount_idr": expense.amount_idr, "departure": departure.code if departure else None})
+        return Response(expense_payload(expense), status=status.HTTP_201_CREATED)
+
+
+class ExpenseVoidView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("expenses.write")]
+
+    @transaction.atomic
+    def post(self, request, expense_id):
+        expense = TravelExpense.objects.select_for_update(of=("self",)).select_related("departure__package", "bank_account", "created_by").filter(pk=expense_id).first()
+        if expense is None:
+            raise NotFound("Pengeluaran tidak ditemukan.")
+        assert_environment_writable(request.tenant, expense.environment)
+        serializer = VoidExpenseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if expense.voided_at is None:
+            expense.voided_at, expense.void_reason, expense.voided_by = timezone.now(), serializer.validated_data["reason"].strip(), request.user
+            expense.save(update_fields=["voided_at", "void_reason", "voided_by", "updated_at"])
+            log_event(action="expenses.voided", request=request, object_type="travel_expense", object_id=expense.pk, changes={"amount_idr": expense.amount_idr, "reason": expense.void_reason})
+        return Response(expense_payload(expense))
