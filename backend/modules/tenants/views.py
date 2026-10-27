@@ -423,3 +423,53 @@ class RoleDetailView(APIView):
             changes={"name": name},
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MembershipSecurityView(APIView):
+    """AUTH-05: Owner menangguhkan/mengaktifkan kembali anggota, memicu reset sandi,
+    mengakhiri sesinya, dan melihat riwayat masuknya (`memberships.manage`)."""
+
+    permission_classes = [IsAuthenticated, require_permission("memberships.manage")]
+    action = "logins"
+
+    def _get(self, membership_id):
+        membership = TenantMembership.objects.filter(pk=membership_id).select_related("user", "role", "branch").first()
+        if membership is None:
+            raise NotFound("Anggota tidak ditemukan di workspace ini.")
+        return membership
+
+    def get(self, request, membership_id):
+        from modules.identity.services import login_history
+
+        return Response({"results": login_history(self._get(membership_id).user)})
+
+    def post(self, request, membership_id):
+        from modules.identity import services as identity
+        from modules.identity.models import AuthTokenKind
+
+        membership = self._get(membership_id)
+        user = membership.user
+        if user.pk == request.user.pk and self.action in {"suspend", "revoke-sessions"}:
+            raise ValidationError({"membership": "Gunakan menu profil untuk akun Anda sendiri."})
+        if self.action == "suspend":
+            if membership.status != MembershipStatus.ACTIVE:
+                raise ValidationError({"membership": "Hanya anggota aktif yang dapat ditangguhkan."})
+            if membership.role and membership.role.name == "Owner" and services._active_owner_count(request.tenant, exclude_pk=membership.pk) == 0:
+                raise ValidationError({"membership": "Owner terakhir tidak bisa ditangguhkan."})
+            membership.status = MembershipStatus.SUSPENDED
+            membership.save(update_fields=["status", "updated_at"])
+            log_event(action="memberships.suspended", request=request, object_type="membership", object_id=membership.pk, changes={"email": user.email})
+        elif self.action == "reactivate":
+            if membership.status != MembershipStatus.SUSPENDED:
+                raise ValidationError({"membership": "Hanya anggota yang ditangguhkan yang dapat diaktifkan kembali."})
+            membership.status = MembershipStatus.ACTIVE
+            membership.save(update_fields=["status", "updated_at"])
+            log_event(action="memberships.reactivated", request=request, object_type="membership", object_id=membership.pk, changes={"email": user.email})
+        elif self.action == "revoke-sessions":
+            identity.revoke_sessions(user)
+            log_event(action="auth.sessions_revoked_by_admin", request=request, object_type="user", object_id=user.pk, changes={"tenant": request.tenant.slug})
+        elif self.action == "reset-password":
+            raw = identity.issue_token(user, AuthTokenKind.PASSWORD_RESET, identity.PASSWORD_RESET_TTL)
+            identity.send_password_reset_email(user, raw)
+            log_event(action="auth.reset_requested_by_admin", request=request, object_type="user", object_id=user.pk, changes={"tenant": request.tenant.slug})
+        return Response({"membership": _membership_row(membership)}, status=status.HTTP_200_OK)

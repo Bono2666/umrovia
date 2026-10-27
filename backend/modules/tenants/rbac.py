@@ -116,6 +116,10 @@ DEFAULT_ROLE_PERMISSIONS["Finance"] += ["agents.read", "commissions.read", "comm
 for _name in ("Admin", "Sales", "Finance", "Operations"):
     DEFAULT_ROLE_PERMISSIONS[_name] += ["branches.read"]
 DEFAULT_ROLE_PERMISSIONS["Admin"] += ["branches.manage"]
+# Tahap C: pengumuman portal (Admin/Operations) dan ekspor daftar jamaah termask (Admin;
+# NIK/paspor lengkap tetap butuh reports.export_pii = Owner).
+DEFAULT_ROLE_PERMISSIONS["Admin"] += ["announcements.manage", "pilgrims.export"]
+DEFAULT_ROLE_PERMISSIONS["Operations"] += ["announcements.manage"]
 
 
 def permission_list(role) -> list[str]:

@@ -161,7 +161,10 @@ def test_rejection_requires_reason_and_never_credits(wallet_setup):
     assert settle(s, t).status_code == 409
 
 
-def test_expired_instructions_and_pending_evidence_policy(wallet_setup):
+def test_expired_instructions_and_pending_evidence_policy(wallet_setup, settings):
+    # Jam dimundurkan 2 hari secara global: sesi yang tersimpan saat itu harus tetap
+    # berlaku setelah jam kembali, jadi batas idle sesi dilonggarkan untuk test ini.
+    settings.SESSION_COOKIE_AGE = 14 * 24 * 3600
     s = wallet_setup
     yesterday = timezone.now() - timedelta(days=2)
     with patch("modules.wallet.services.timezone.now", return_value=yesterday):
@@ -311,6 +314,7 @@ def test_role_migration_preserves_custom_grants(wallet_setup):
         import_module("modules.tenants.migrations.0009_report_role_defaults").upgrade(apps, editor)  # S17 grants
         import_module("modules.tenants.migrations.0012_agent_commission_role_defaults").upgrade(apps, editor)  # agen & komisi
         import_module("modules.tenants.migrations.0014_branch_role_defaults").upgrade(apps, editor)  # cabang
+        import_module("modules.tenants.migrations.0015_portal_data_role_defaults").upgrade(apps, editor)  # portal & data
     normal.refresh_from_db()
     custom.refresh_from_db()
     assert set(normal.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS["Finance"])

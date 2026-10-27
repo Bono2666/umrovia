@@ -125,6 +125,8 @@ class BookingListCreateView(APIView):
                 adjustments=serializer.validated_data.get("adjustments"),
                 can_discount=_can_discount(request),
                 branch=resolve_branch(serializer.validated_data.get("branch")) if "branch" in request.data else default_branch(request),
+                price_categories=serializer.validated_data.get("price_categories"),
+                addons=serializer.validated_data.get("addons"),
             )
         except DjangoValidationError as exc:
             # service memakai DjangoValidationError (domain) → petakan ke DRF 400
@@ -181,6 +183,8 @@ class BookingDetailView(APIView):
                 can_discount=_can_discount(request),
                 actor=request.user,
                 branch=resolve_branch(validated["branch"]) if "branch" in validated else UNSET,
+                price_categories=validated.get("price_categories"),
+                addons=validated.get("addons"),
             )
         except DjangoValidationError as exc:
             raise ValidationError(

@@ -31,6 +31,20 @@ class PilgrimStatus(models.TextChoices):
     ARCHIVED = "ARCHIVED", "Diarsipkan"
 
 
+class FamilyGroup(TenantScopedModel, BaseAppModel):
+    """Kelompok keluarga jamaah (MOD-04): untuk booking bersama, kamar dan mahram."""
+
+    environment = models.CharField(max_length=16, choices=[("demo", "Demo"), ("production", "Produksi")])
+    name = models.CharField(max_length=160)
+    notes = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Pilgrim(TenantScopedModel, BaseAppModel):
     """Master jamaah per tenant+environment (MOD-04, tanpa global-unique PII)."""
 
@@ -49,7 +63,9 @@ class Pilgrim(TenantScopedModel, BaseAppModel):
     emergency_contact_phone = models.CharField(max_length=32, blank=True, default="")
     guardian_name = models.CharField(max_length=160, blank=True, default="")  # wali/mahram bila relevan
     guardian_relation = models.CharField(max_length=64, blank=True, default="")
-    special_needs = models.TextField(blank=True, default="")  # catatan kebutuhan khusus (akses terbatas)
+    special_needs = models.TextField(blank=True, default="")
+    family = models.ForeignKey(FamilyGroup, null=True, blank=True, on_delete=models.SET_NULL, related_name="members")
+    family_relation = models.CharField(max_length=40, blank=True, default="")  # mis. Kepala keluarga, Istri, Anak  # catatan kebutuhan khusus (akses terbatas)
 
     # --- PII sensitif: terenkripsi di rest, hanya masked yang keluar API (§10.1)
     identity_encrypted = models.TextField(blank=True, default="")  # NIK/KTP
@@ -116,6 +132,9 @@ class PilgrimDocument(TenantScopedModel, BaseAppModel):
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     reason = models.TextField(blank=True, default="")  # wajib saat REJECTED (UI-11)
+    # MOD-08: masa berlaku dokumen (diisi petugas saat review / unggah).
+    valid_from = models.DateField(null=True, blank=True)
+    expires_at = models.DateField(null=True, blank=True)
 
     class Meta:
         verbose_name = "dokumen jamaah"

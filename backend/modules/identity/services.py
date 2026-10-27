@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from modules.identity.models import AuthToken, User, UserStatus
@@ -158,3 +158,22 @@ def user_payload(user: User) -> dict:
         # S18: staf platform diarahkan ke konsol /platform (otorisasi tetap di server).
         "is_platform_staff": bool(user.is_staff and user.is_active),
     }
+
+
+LOGIN_ACTIONS = ["auth.login", "auth.login_failed", "auth.logout", "auth.logout_all", "auth.password_reset", "auth.sessions_revoked_by_admin", "auth.reset_requested_by_admin"]
+LOGIN_LABELS = {"auth.login": "Masuk", "auth.login_failed": "Gagal masuk", "auth.logout": "Keluar", "auth.logout_all": "Keluar dari semua perangkat",
+                "auth.password_reset": "Sandi direset", "auth.sessions_revoked_by_admin": "Sesi diakhiri admin", "auth.reset_requested_by_admin": "Reset sandi dikirim admin"}
+
+
+def revoke_sessions(user: User) -> None:
+    """AUTH-03: naikkan versi sesi → semua sesi aktif ditolak pada request berikutnya."""
+    User.objects.filter(pk=user.pk).update(session_version=models.F("session_version") + 1)
+    user.refresh_from_db(fields=["session_version"])
+
+
+def login_history(user: User, limit: int = 20) -> list[dict]:
+    from modules.audit.models import AuditEvent
+
+    rows = AuditEvent.objects.filter(object_type="user", object_id=str(user.pk), action__in=LOGIN_ACTIONS).order_by("-occurred_at")[:limit]
+    return [{"action": e.action, "label": LOGIN_LABELS.get(e.action, e.action), "occurred_at": e.occurred_at.isoformat(), "ip": e.ip,
+             "user_agent": (e.changes_json or {}).get("user_agent", ""), "reason": (e.changes_json or {}).get("reason", "")} for e in rows]

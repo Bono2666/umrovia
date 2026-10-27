@@ -94,12 +94,17 @@ def _invoice_lines(booking, participants):
     for participant in participants:
         price = participant.pricing_snapshot_json
         unit, discount, extra = price.get("unit_price_idr"), price.get("discount_idr", 0), price.get("extra_idr", 0)
-        if any(type(value) is not int or value < 0 for value in (unit, discount, extra)) or unit - discount + extra < 0:
+        addons = price.get("addons_idr", 0)
+        if any(type(value) is not int or value < 0 for value in (unit, discount, extra, addons)) or unit - discount + extra < 0:
             raise ValidationError({"pricing": "Snapshot harga peserta tidak valid."})
         room = price.get("room_type", "")
         description = f"{participant.pilgrim.name} · {price.get('package_name', booking.departure.package.name)}"
         if room:
             description += f" · {room}"
+        elif price.get("price_category", "ADULT") != "ADULT":
+            description += " · " + {"CHILD_NO_BED": "Anak tanpa kasur", "INFANT": "Bayi"}.get(price["price_category"], "")
+        if addons:
+            description += " · + " + ", ".join(a["name"] for a in price.get("addons", []))
         if discount:
             description += f" · diskon {format_idr(discount)}"
         if extra:
@@ -108,7 +113,7 @@ def _invoice_lines(booking, participants):
             description += f" ({price.get('adjustment_note', '')})"
         lines.append({
             "participant_id": str(participant.pk), "pilgrim_name": participant.pilgrim.name, "description": description,
-            "amount_idr": unit - discount + extra, "room_type": room, "gross_idr": unit, "discount_idr": discount, "extra_idr": extra,
+            "amount_idr": unit - discount + extra + addons, "room_type": room, "gross_idr": unit + addons, "discount_idr": discount, "extra_idr": extra,
         })
     return lines
 

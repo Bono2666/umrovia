@@ -6,6 +6,8 @@ ditandai `possible_duplicate_of` — tidak pernah digabung otomatis (MOD-04).
 Environment write di-resolve server-side (trial → demo; pasca-konversi →
 production; demo READ_ONLY ditolak — §2.2).
 """
+from uuid import UUID
+
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
@@ -108,6 +110,12 @@ class PilgrimListCreateView(APIView):
         status_filter = request.query_params.get("status", "").strip()
         if status_filter:
             qs = qs.filter(status=status_filter)
+        family_filter = request.query_params.get("family", "").strip()
+        if family_filter:
+            try:
+                qs = qs.filter(family_id=UUID(family_filter))
+            except ValueError:
+                raise ValidationError({"family": "ID tidak valid."}) from None
         q = request.query_params.get("q", "").strip()
         if q:
             from django.db.models import Q
@@ -117,7 +125,7 @@ class PilgrimListCreateView(APIView):
             if len(digits) == 16:
                 lookup |= Q(identity_hash=identity_hash(request.tenant.pk, digits))
             qs = qs.filter(lookup)
-        rows = qs.order_by("name", "code")[:200]
+        rows = qs.select_related("family").order_by("name", "code")[:200]
         return Response({"results": [pilgrim_payload(p, include_restricted=False) for p in rows]})
 
     def post(self, request):
@@ -261,6 +269,8 @@ class PilgrimDocumentReviewView(APIView):
         serializer.is_valid(raise_exception=True)
         doc.status = serializer.validated_data["status"]
         doc.reason = serializer.validated_data.get("reason", doc.reason)
+        doc.valid_from = serializer.validated_data.get("valid_from", doc.valid_from)
+        doc.expires_at = serializer.validated_data.get("expires_at", doc.expires_at)
         doc.reviewed_by = request.user
         doc.reviewed_at = timezone.now()
         doc.save()
@@ -270,6 +280,6 @@ class PilgrimDocumentReviewView(APIView):
             request=request,
             object_type="pilgrim_document",
             object_id=doc.pk,
-            changes={"kind": doc.kind, "version": doc.version, "status": doc.status},
+            changes={"kind": doc.kind, "version": doc.version, "status": doc.status, "expires_at": doc.expires_at.isoformat() if doc.expires_at else None},
         )
         return Response(document_payload(doc))

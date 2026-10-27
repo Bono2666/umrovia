@@ -51,6 +51,11 @@ class TravelPackage(TenantScopedModel, BaseAppModel):
     exclusions_json = models.JSONField(default=list, blank=True)  # non-fasilitas
     cancellation_policy = models.TextField(blank=True, default="")
     payment_terms = models.TextField(blank=True, default="")
+    # MOD-05 varian harga: anak tanpa kasur & bayi (kosong = tidak ditawarkan), layanan tambahan, estimasi biaya.
+    child_no_bed_price_idr = models.PositiveBigIntegerField(null=True, blank=True)
+    infant_price_idr = models.PositiveBigIntegerField(null=True, blank=True)
+    addons_json = models.JSONField(default=list, blank=True)  # [{code, name, price_idr}]
+    estimated_costs_json = models.JSONField(default=list, blank=True)  # [{category, description, amount_idr}] per jamaah
     status = models.CharField(max_length=16, choices=PackageStatus.choices, default=PackageStatus.DRAFT)
     published = models.BooleanField(default=False)  # kolom esensial §5.2
 

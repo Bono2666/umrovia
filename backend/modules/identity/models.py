@@ -52,6 +52,8 @@ class User(BaseAppModel, AbstractBaseUser, PermissionsMixin):
     email_verified_at = models.DateTimeField(null=True, blank=True)
     terms_accepted_at = models.DateTimeField(null=True, blank=True)  # persetujuan T&C saat signup (§7.1)
     mfa_enabled = models.BooleanField(default=False)
+    # AUTH-03: dinaikkan saat "keluar dari semua perangkat"/reset sandi → sesi lama ditolak middleware.
+    session_version = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=24, choices=UserStatus.choices, default=UserStatus.PENDING_VERIFICATION)
     is_staff = models.BooleanField(default=False)  # akses Django admin platform (operasional)
     is_active = models.BooleanField(default=True)

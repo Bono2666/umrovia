@@ -50,3 +50,48 @@ class PortalInvite(TenantScopedModel, BaseAppModel):
         from django.utils import timezone
 
         return self.used_at is None and self.revoked_at is None and self.expires_at > timezone.now()
+
+
+class Announcement(TenantScopedModel, BaseAppModel):
+    """POR-05: pengumuman travel di portal jamaah — semua jamaah atau satu keberangkatan."""
+
+    environment = models.CharField(max_length=16)
+    title = models.CharField(max_length=160)
+    body = models.TextField()
+    departure = models.ForeignKey("departures.Departure", null=True, blank=True, on_delete=models.CASCADE, related_name="announcements")
+    published_at = models.DateTimeField(null=True, blank=True)  # kosong = draf
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey("identity.User", null=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        ordering = ["-published_at", "-created_at"]
+
+
+class ChangeRequestStatus(models.TextChoices):
+    PENDING = "PENDING", "Menunggu verifikasi"
+    APPROVED = "APPROVED", "Disetujui"
+    REJECTED = "REJECTED", "Ditolak"
+
+
+class ProfileChangeRequest(TenantScopedModel, BaseAppModel):
+    """POR-06: permintaan koreksi identitas dari portal, diverifikasi admin travel.
+
+    Nilai baru (bisa memuat NIK/paspor) disimpan terenkripsi; tampilan memakai
+    `preview_json` yang sudah dimask. Diterapkan ke data jamaah hanya saat disetujui.
+    """
+
+    environment = models.CharField(max_length=16)
+    pilgrim = models.ForeignKey("pilgrims.Pilgrim", on_delete=models.CASCADE, related_name="change_requests")
+    requested_by = models.ForeignKey("identity.User", null=True, on_delete=models.SET_NULL, related_name="+")
+    fields = models.JSONField(default=list)
+    payload_encrypted = models.TextField()
+    preview_json = models.JSONField(default=dict)
+    reason = models.CharField(max_length=500)
+    status = models.CharField(max_length=16, choices=ChangeRequestStatus.choices, default=ChangeRequestStatus.PENDING)
+    decided_by = models.ForeignKey("identity.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.CharField(max_length=500, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["pilgrim"], condition=models.Q(status="PENDING"), name="uq_change_request_pending")]
