@@ -407,6 +407,8 @@ export type ManifestRow = {
 
 /** Envelope GET /departures/{id}/manifest (S10; UI-11 checklist + UI-12 roster). */
 export type ManifestEnvelope = {
+  /** TBD-08: false = roster dibatasi cakupan cabang staf. */
+  full_scope?: boolean;
   departure: {
     id: string;
     code: string;
@@ -454,6 +456,8 @@ export type MembershipRow = {
   status: string;
   permissions: string[];
   branch?: {id: string; code: string; name: string} | null;
+  branches?: {id: string; code: string; name: string}[];
+  branch_scope?: "ALL" | "OWN";
 };
 
 /** Baris GET /roles (S05). */
@@ -462,6 +466,8 @@ export type RoleRow = {
   name: string;
   is_system: boolean;
   permissions: string[];
+  /** TBD-08 opsi C: ALL = semua cabang, OWN = cabang yang ditugaskan + data tanpa cabang. */
+  branch_scope?: "ALL" | "OWN";
 };
 
 /** Payload GET/PATCH /tenant/settings (§5.1 — tiga bagian JSON bebas). */

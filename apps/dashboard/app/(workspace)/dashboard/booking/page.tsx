@@ -140,6 +140,7 @@ export default function BookingPage() {
   const [agentId, setAgentId] = useState("");
   const [branchId, setBranchId] = useState<string | null>(null);  // null = cabang default staf
   const [branches, setBranches] = useState<{id: string; code: string; name: string}[]>([]);
+  const [branchScope, setBranchScope] = useState<"ALL" | "OWN">("ALL");
   const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>({});
   const [categories, setCategories] = useState<Record<string, string>>({});
   const [addonChoices, setAddonChoices] = useState<Record<string, string[]>>({});
@@ -189,7 +190,7 @@ export default function BookingPage() {
   const canBranches = can("branches.read");
   useEffect(() => {
     if (!canBranches) return;
-    void apiFetch<{results: {id: string; code: string; name: string}[]}>("/branches?active=1").then((result) => {if (result.ok) setBranches(result.data.results);});
+    void apiFetch<{scope: "ALL" | "OWN"; branches: {id: string; code: string; name: string}[]}>("/branches/mine").then((result) => {if (result.ok) {setBranches(result.data.branches); setBranchScope(result.data.scope);}});
   }, [canBranches]);
 
   const selectedPackageId = departures.find((dep) => dep.id === departureId)?.package_id ?? "";
@@ -662,7 +663,7 @@ export default function BookingPage() {
               hint="Tercetak sebagai pelanggan di invoice. Kosongkan untuk memakai nama peserta pertama." />
             {branches.length > 0 ? <FormSelect label="Cabang" htmlFor="booking-branch" value={branchId ?? "__default"} onChange={(event) => setBranchId(event.target.value === "__default" ? null : event.target.value)} hint="Cabang yang mencatat penjualan; dipakai pada laporan per cabang.">
               {!editing ? <option value="__default">Cabang default saya</option> : null}
-              <option value="">Tanpa cabang</option>
+              {branchScope === "ALL" ? <option value="">Tanpa cabang</option> : null}
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
             </FormSelect> : null}
             {canAgents ? <FormSelect label="Agen (opsional)" htmlFor="booking-agent" value={agentId} onChange={(event) => setAgentId(event.target.value)} hint="Agen yang mendapat kredit penjualan dan komisi.">

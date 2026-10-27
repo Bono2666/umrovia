@@ -82,7 +82,7 @@ export default function ReportsPage() {
   const canAccounts = can("bank_accounts.read");
   const canBranches = can("branches.read");
   useEffect(() => {
-    if (canBranches) void apiFetch<{results: {id: string; code: string; name: string}[]}>("/branches").then((result) => {if (result.ok) setBranches(result.data.results);});
+    if (canBranches) void apiFetch<{branches: {id: string; code: string; name: string}[]}>("/branches/mine").then((result) => {if (result.ok) setBranches(result.data.branches);});
   }, [canBranches]);
   useEffect(() => {
     if (canAgents) void apiFetch<{results: Agent[]}>("/agents?page=1&page_size=100").then((result) => {if (result.ok) setAgents(result.data.results);});
