@@ -537,6 +537,29 @@ laporan dan lulus.
 **Batas tahap:** buku besar/neraca/laba rugi formal (P1), impor mutasi bank,
 cabang, laporan platform (pendapatan platform, funnel trial) → S18.
 
+## Sprint S18 — Konsol platform, lifecycle tenant & dukungan (F08)
+
+**Status:** DONE (27 Oktober 2026), branch `sprint/s18-platform-console`.
+Keputusan: [ADR-0014](../adr/0014-platform-control-plane.md). Bukti:
+[verifikasi S18](SPRINT_S18_VERIFICATION.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S18-01 | Peran platform (Super Admin, Billing, Support) sebagai grup izin; role tenant tidak memberi akses | DONE | `platform.0003`, test peran |
+| S18-02 | MFA TOTP wajib (RFC 6238, anti-replay, kode pemulihan, TTL sesi, throttle, audit) untuk semua `/platform/*` termasuk settle/refund lama | DONE | vektor RFC + test MFA |
+| S18-03 | Konsol: ringkasan agregat, tenant (metadata + hitungan, email tersamar), detail beraudit, trial, tarif, audit teredaksi, antrean billing lintas tenant | DONE | test tanpa PII |
+| S18-04 | Lifecycle: suspend/aktifkan kembali beralasan, terminate dua orang; penegakan di API tenant dan portal; konversi trial tidak mencabut suspend | DONE | test lifecycle |
+| S18-05 | Tiket dukungan travel ↔ platform: catatan internal, diagnosis tanpa PII, email balasan | DONE | test tiket |
+| S18-06 | Perintah `create_platform_staff` dan `reset_platform_mfa` (beraudit) | DONE | test perintah |
+| S18-07 | UI `/platform` (gerbang MFA + 7 halaman), Bantuan travel, panel workspace ditangguhkan | DONE | Playwright |
+
+**Exit gate S18 (Admin MFA/audit, no PII leakage):** seluruh endpoint
+platform menolak sesi tanpa MFA segar; aksi admin tercatat di audit; delapan
+respons konsol diuji bebas data pribadi jamaah dan email lengkap.
+
+**Batas tahap:** elevasi akses support beraudit, passkey/WebAuthn, MFA role
+keuangan tenant, host admin terpisah saat deploy (S19).
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -557,7 +580,8 @@ cabang, laporan platform (pendapatan platform, funnel trial) → S18.
 | S15 | 15 | Operasional keberangkatan, manifest & ekspor PDF | DONE |
 | S16 | 16 | Notifikasi email, retry & template | DONE |
 | S17 | 17 | Laporan siap pakai: operasional, keuangan, SaaS | DONE |
-| S18–S19 | 18–19 | mengikuti Roadmap §3 | TODO |
+| S18 | 18 | Konsol platform, lifecycle tenant & dukungan | DONE |
+| S19 | 19 | mengikuti Roadmap §3 | TODO |
 
 ## Keputusan & catatan S01
 
