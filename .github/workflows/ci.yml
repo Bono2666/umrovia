@@ -36,8 +36,21 @@ jobs:
       - name: Ruff lint
         run: ruff check backend
         working-directory: .
+      - name: SAST (ruff flake8-bandit, kode aplikasi)
+        run: ruff check --select S backend/modules backend/config backend/common
+        working-directory: .
+      - name: Audit kerentanan dependensi Python
+        run: pip-audit -r backend/requirements.lock
+        working-directory: .
       - name: Django system check
         run: python manage.py check
+        working-directory: backend
+      - name: Deploy check dengan setting produksi
+        run: |
+          export DJANGO_SETTINGS_MODULE=config.settings.production ALLOWED_HOSTS=api.umrovia.com
+          export SECRET_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(50))')"
+          export PII_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')"
+          python manage.py check --deploy --fail-level ERROR
         working-directory: backend
       - name: Migrasi reproducible (tanpa perubahan tersimpan)
         run: python manage.py makemigrations --check --dry-run
@@ -70,5 +83,7 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Audit kerentanan dependensi produksi
+        run: npm audit --omit=dev --audit-level=high
       - name: Typecheck + build
         run: npm run build

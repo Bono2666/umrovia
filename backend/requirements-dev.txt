@@ -1,6 +1,7 @@
 # Development / CI tooling
 -r requirements.txt
-pytest>=8.3,<9
+pytest>=9.0.3,<10
 pytest-django>=4.9,<5
 ruff>=0.9,<1
 pre-commit>=4.0,<5
+pip-audit>=2.7,<3  # S19: audit kerentanan dependensi di CI

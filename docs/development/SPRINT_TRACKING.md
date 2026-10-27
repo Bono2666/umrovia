@@ -560,6 +560,28 @@ respons konsol diuji bebas data pribadi jamaah dan email lengkap.
 **Batas tahap:** elevasi akses support beraudit, passkey/WebAuthn, MFA role
 keuangan tenant, host admin terpisah saat deploy (S19).
 
+## Sprint S19 — Keamanan, beban, UAT, backup & restore, staging (F08)
+
+**Status:** IN_REVIEW (27 Oktober 2026), branch `sprint/s19-release-readiness`.
+Pekerjaan rekayasa selesai; gate "MVP release gates signed" menunggu
+penutupan butir infrastruktur/bisnis dan tanda tangan di
+[GO_LIVE_CHECKLIST](../release/GO_LIVE_CHECKLIST.md). Bukti:
+[verifikasi S19](SPRINT_S19_VERIFICATION.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| S19-01 | Audit dependensi: 14 kerentanan diperbaiki (cryptography, DRF, pytest); npm bersih | DONE | pip-audit bersih |
+| S19-02 | SAST (ruff S) + penjaga host Midtrans; gate CI: SAST, pip-audit, npm audit, `check --deploy` produksi | DONE | `ci.yml` |
+| S19-03 | Test keamanan rilis: setting produksi fail-fast, host/CSRF/CORS, header, log tanpa PII | DONE | `test_release_security.py` |
+| S19-04 | `verify_integrity` read-only (RLS, ledger, invoice, checksum PDF, kursi, antrean) + job harian worker | DONE | test integritas |
+| S19-05 | Backup terenkripsi + drill restore otomatis, dijalankan | DONE | drill 7.812 baris sama persis |
+| S19-06 | Health readiness (cache, heartbeat worker, antrean email) | DONE | `/api/v1/health/` |
+| S19-07 | Uji beban & konkurensi; perbaikan N+1 payments/invoices, paginasi daftar, pencarian invoice | DONE | p95 328 ms @10 pengguna |
+| S19-08 | Staging: compose setting produksi + Caddy TLS 3 host + smoke test; login lintas host diuji | DONE | smoke 15/15 |
+| S19-09 | E2E alur MVP §14.3 + matriks UAT 33 skenario + penjaga keterlacakan | DONE | `test_e2e_mvp.py` |
+| S19-10 | Runbook operasional + checklist go-live | DONE | `docs/runbooks`, `docs/release` |
+| S19-11 | Tanda tangan rilis & penutupan butir ⛔ | TODO | butuh infrastruktur & keputusan bisnis |
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |
@@ -581,7 +603,7 @@ keuangan tenant, host admin terpisah saat deploy (S19).
 | S16 | 16 | Notifikasi email, retry & template | DONE |
 | S17 | 17 | Laporan siap pakai: operasional, keuangan, SaaS | DONE |
 | S18 | 18 | Konsol platform, lifecycle tenant & dukungan | DONE |
-| S19 | 19 | mengikuti Roadmap §3 | TODO |
+| S19 | 19 | Keamanan, beban, UAT, backup/restore, staging | IN_REVIEW (gate rilis menunggu tanda tangan) |
 
 ## Keputusan & catatan S01
 

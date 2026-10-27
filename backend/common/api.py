@@ -2,6 +2,8 @@
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import APIException, Throttled, ValidationError
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from common.request_context import get_request_id
@@ -53,3 +55,19 @@ def exception_handler(exc, context):
     payload = _problem_payload(exc, request)
     response.data = payload
     return response
+
+
+class ListPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+def list_response(request, qs, payload, *, cap=200):
+    """Daftar besar (S19 uji beban): `?page=` → 50 baris + count/next/previous;
+    tanpa `?page=` → perilaku lama (maks. `cap` baris) agar klien lama tetap jalan."""
+    if "page" in request.query_params:
+        paginator = ListPagination()
+        rows = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response([payload(row) for row in rows])
+    return Response({"results": [payload(row) for row in qs[:cap]]})

@@ -289,3 +289,19 @@ def test_notification_role_migration_only_upgrades_untouched_defaults(tenant_a, 
         assert set(role.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS[name])
     custom.refresh_from_db()
     assert custom.permissions_json == ["pilgrims.read"]
+
+
+def test_worker_runs_every_scheduled_job_on_start(monkeypatch):
+    """Regresi S19: job harian (mis. verify_integrity) harus berjalan saat start walau uptime mesin < interval."""
+    from modules.notifications.management.commands import run_worker
+
+    ran = []
+    command = run_worker.Command()
+    monkeypatch.setattr(run_worker, "call_command", lambda name, **kwargs: ran.append(name))
+    monkeypatch.setattr(run_worker, "process_queue", lambda: {})
+    monkeypatch.setattr(run_worker.time, "monotonic", lambda: 120.0)  # mesin baru menyala 2 menit
+    monkeypatch.setattr(run_worker.time, "sleep", lambda _: (_ for _ in ()).throw(KeyboardInterrupt))
+    monkeypatch.setattr(run_worker, "close_old_connections", lambda: None)
+    with pytest.raises(KeyboardInterrupt):
+        command.handle()
+    assert ran == [name for name, _ in run_worker.SCHEDULE]
