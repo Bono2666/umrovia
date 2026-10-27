@@ -7,7 +7,8 @@
 # Pemakaian:
 #   BACKUP_PASSPHRASE=... DATABASE_URL=postgres://... MEDIA_DIR=/path BACKUP_DIR=/srv/backups ./backup.sh
 #   BACKUP_SOURCE=compose BACKUP_PASSPHRASE=... BACKUP_DIR=... ./backup.sh   # stack docker compose lokal
-# Variabel opsional: RETENTION_DAYS (bawaan 14), COMPOSE_FILE.
+# Variabel opsional: RETENTION_DAYS (bawaan 14), COMPOSE_FILE, COMPOSE_PROJECT_NAME, COMPOSE_ENV_FILES
+# (VPS produksi: lihat docs/runbooks/FIRST_DEPLOY_VPS.md).
 set -euo pipefail
 
 : "${BACKUP_PASSPHRASE:?Set BACKUP_PASSPHRASE (simpan di secret manager, bukan di repo)}"
@@ -36,7 +37,13 @@ else
   fi
 fi
 
-pg_restore --list "$WORK/db.dump" > /dev/null  # dump harus terbaca sebelum disimpan
+# Dump harus terbaca sebelum disimpan. Mode compose memakai pg_restore di container db,
+# karena host VPS tidak memasang klien Postgres (versinya juga harus sama dengan server).
+if [ "$SOURCE" = "compose" ]; then
+  docker compose exec -T db pg_restore --list < "$WORK/db.dump" > /dev/null
+else
+  pg_restore --list "$WORK/db.dump" > /dev/null
+fi
 ( cd "$WORK" && shasum -a 256 db.dump media.tgz > SHA256SUMS && printf 'created_at=%s\nsource=%s\n' "$STAMP" "$SOURCE" > MANIFEST )
 
 OUT="$BACKUP_DIR/umrovia-$STAMP.tar.enc"
