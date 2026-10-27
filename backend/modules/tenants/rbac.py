@@ -106,6 +106,11 @@ DEFAULT_ROLE_PERMISSIONS["Operations"] += ["reports.read"]
 DEFAULT_ROLE_PERMISSIONS["Finance"] += ["reports.finance", "expenses.read", "expenses.write"]
 # CRM (MOD-19): Admin ikut mengelola lead; Sales sudah memiliki leads.manage.
 DEFAULT_ROLE_PERMISSIONS["Admin"] += ["leads.manage"]
+# MOD-10 Agen & Komisi + diskon booking (MOD-07): Finance mengelola kebijakan,
+# menyetujui & membayar komisi; Admin mengelola master agen dan memberi diskon.
+DEFAULT_ROLE_PERMISSIONS["Admin"] += ["bookings.discount", "agents.read", "agents.manage", "commissions.read"]
+DEFAULT_ROLE_PERMISSIONS["Sales"] += ["agents.read"]
+DEFAULT_ROLE_PERMISSIONS["Finance"] += ["agents.read", "commissions.read", "commissions.policies", "commissions.approve", "commissions.pay"]
 
 
 def permission_list(role) -> list[str]:

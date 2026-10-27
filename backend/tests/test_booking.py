@@ -347,7 +347,7 @@ def test_status_chain_end_to_end(auth_client, tenant_a, settle_demo_dp):
     assert _dep(tenant_a, dep.pk).seats_taken == 2
     assert ok.json()["available_seats"] == 8
     statuses = {p["pilgrim_name"]: p["participant_status"] for p in ok.json()["participants"]}
-    assert set(statuses.values()) == {ParticipantStatus.REGISTERED}
+    assert set(statuses.values()) == {ParticipantStatus.AWAITING_DP}  # INV-01: invoice otomatis terbit
 
     settle_demo_dp(auth_client, bid)
     ok = _transition(auth_client, bid, BookingStatus.CONFIRMED)

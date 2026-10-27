@@ -58,6 +58,8 @@ def booking_payload(booking: Booking) -> dict:
         "deletable": booking.status == "DRAFT",
         "booked_at": booking.booked_at.isoformat(),
         "notes": booking.notes,
+        "payer_name": booking.payer_name,
+        "agent": {"id": str(booking.agent_id), "code": booking.agent.code, "name": booking.agent.name} if booking.agent_id else None,
         "cancel_reason": booking.cancel_reason,
         "canceled_by_name": (
             (booking.canceled_by.full_name or booking.canceled_by.email) if booking.canceled_by_id else None
@@ -72,6 +74,14 @@ def booking_payload(booking: Booking) -> dict:
     }
 
 
+class AdjustmentSerializer(serializers.Serializer):
+    """Penyesuaian harga per peserta (MOD-07): diskon & biaya tambahan + alasan."""
+
+    discount_idr = serializers.IntegerField(min_value=0, max_value=10_000_000_000, required=False, default=0)
+    extra_idr = serializers.IntegerField(min_value=0, max_value=10_000_000_000, required=False, default=0)
+    note = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+
+
 class BookingCreateSerializer(serializers.Serializer):
     """POST /bookings — pilih keberangkatan + daftar jamaah (UI-07, UAT-03)."""
 
@@ -82,6 +92,9 @@ class BookingCreateSerializer(serializers.Serializer):
     room_types = serializers.DictField(child=serializers.ChoiceField(choices=RoomType.choices), required=False)
     notes = serializers.CharField(required=False, allow_blank=True, default="")
     allow_duplicate = serializers.BooleanField(required=False, default=False)
+    payer_name = serializers.CharField(required=False, allow_blank=True, max_length=160, default="")
+    agent = serializers.UUIDField(required=False, allow_null=True, default=None)
+    adjustments = serializers.DictField(child=AdjustmentSerializer(), required=False)
 
     def validate_participants(self, value):
         if len(set(value)) != len(value):
@@ -97,6 +110,9 @@ class BookingUpdateSerializer(serializers.Serializer):
     room_types = serializers.DictField(child=serializers.ChoiceField(choices=RoomType.choices), required=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     allow_duplicate = serializers.BooleanField(required=False, default=False)
+    payer_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    agent = serializers.UUIDField(required=False, allow_null=True)
+    adjustments = serializers.DictField(child=AdjustmentSerializer(), required=False)
 
     def validate_participants(self, value):
         if len(set(value)) != len(value):

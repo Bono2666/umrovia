@@ -63,12 +63,17 @@ def test_room_prices_mixed_booking_and_frozen_invoice(scenario):
     assert s["booking"]["total_amount"] == 88_000_000
     assert len(s["booking"]["price_lines"]) == 3
     ok(patch(s["client"], f"/api/v1/packages/{s['package']['id']}", {"room_prices": [{"room_type": "QUAD", "price_idr": 40_000_000}]}))
-    invoice = ok(post(s["client"], f"/api/v1/bookings/{s['booking']['id']}/issue-invoice", {"buyer_name": "Keluarga Contoh"}))
-    assert invoice["total_idr"] == 88_000_000
-    assert invoice["buyer_name"] == "Keluarga Contoh"
+    # INV-01: invoice sudah terbit otomatis saat reservasi; tombol terbitkan idempoten.
+    invoice = ok(post(s["client"], f"/api/v1/bookings/{s['booking']['id']}/issue-invoice"))
+    assert invoice["total_idr"] == 88_000_000 and invoice["version"] == 1
+    assert invoice["buyer_name"] == "Jamaah 0"
+    assert post(s["client"], f"/api/v1/bookings/{s['booking']['id']}/issue-invoice", {"buyer_name": "Keluarga Contoh"}).status_code == 409
+    invoice = ok(post(s["client"], f"/api/v1/invoices/{invoice['id']}/revise", {"buyer_name": "Keluarga Contoh", "reason": "Pembayar keluarga"}))
+    assert invoice["buyer_name"] == "Keluarga Contoh" and invoice["version"] == 2 and invoice["total_idr"] == 88_000_000
+    assert [r["version"] for r in invoice["revisions"]] == [1]
     assert {line["room_type"] for line in invoice["lines"]} == {"QUAD", "TRIPLE", "DOUBLE"}
     again = ok(post(s["client"], f"/api/v1/bookings/{s['booking']['id']}/issue-invoice"))
-    assert again == invoice
+    assert again == {key: value for key, value in invoice.items() if key not in {"revisions", "revisable"}}
     pdf = s["client"].get(f"/api/v1/invoices/{invoice['id']}/pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
     assert hashlib.sha256(pdf.content).hexdigest() == invoice["checksum"]

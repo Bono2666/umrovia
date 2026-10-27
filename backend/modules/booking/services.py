@@ -49,6 +49,8 @@ from modules.pilgrims.models import Pilgrim
 from modules.trial.exceptions import TrialQuotaExceeded
 from modules.trial.models import TenantTrial
 
+UNSET = object()
+
 # Graf transisi header (PRD MOD-07). Terminal: COMPLETED, CANCELED, EXPIRED.
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     BookingStatus.DRAFT: {
@@ -285,20 +287,91 @@ def _snapshot_unit_price(departure: Departure, room_type: str = "") -> dict:
     }
 
 
-def _create_price_line(*, booking: Booking, qty: int) -> None:
-    """Baris harga snapshot (§5.2, UAT-04) — dibuat ulang selama DRAFT;
-    setelah RESERVED baris dibekukan (PATCH hanya DRAFT)."""
+ADJUSTMENT_KEYS = ("discount_idr", "extra_idr", "adjustment_note")
+MAX_ADJUSTMENT_IDR = 10_000_000_000
+
+
+def participant_net(snapshot: dict) -> int:
+    """Harga bersih peserta = harga paket − diskon + biaya tambahan (MOD-07 §5.2)."""
+    return int(snapshot["unit_price_idr"]) - int(snapshot.get("discount_idr") or 0) + int(snapshot.get("extra_idr") or 0)
+
+
+def _with_adjustment(snapshot: dict, adjustment: dict, *, label: str) -> dict:
+    discount, extra = adjustment.get("discount_idr", 0) or 0, adjustment.get("extra_idr", 0) or 0
+    note = str(adjustment.get("note", "") or "").strip()
+    for value in (discount, extra):
+        if type(value) is not int or not 0 <= value <= MAX_ADJUSTMENT_IDR:
+            raise ValidationError({"adjustments": f"{label}: diskon/biaya tambahan harus Rp0–Rp10 miliar."})
+    if (discount or extra) and not note:
+        raise ValidationError({"adjustments": f"{label}: alasan diskon/biaya tambahan wajib diisi."})
+    if len(note) > 200:
+        raise ValidationError({"adjustments": f"{label}: alasan maksimal 200 karakter."})
+    result = {key: value for key, value in snapshot.items() if key not in ADJUSTMENT_KEYS}
+    if discount or extra:
+        result.update({"discount_idr": discount, "extra_idr": extra, "adjustment_note": note})
+    if participant_net(result) < 1:
+        raise ValidationError({"adjustments": f"{label}: diskon tidak boleh menghabiskan seluruh harga (minimal Rp1 agar DP dapat dicatat)."})
+    return result
+
+
+def _carry_adjustment(old: dict, new: dict) -> dict:
+    """Penyesuaian tetap melekat saat harga di-snapshot ulang (ganti kamar/keberangkatan)."""
+    if not old.get("discount_idr") and not old.get("extra_idr"):
+        return new
+    return _with_adjustment(new, {"discount_idr": old.get("discount_idr", 0), "extra_idr": old.get("extra_idr", 0), "note": old.get("adjustment_note", "")}, label="Penyesuaian")
+
+
+def apply_adjustments(*, rows, adjustments, can_discount: bool, key=lambda row: str(row.pilgrim_id)) -> bool:
+    """Terapkan `{pilgrim_id: {discount_idr, extra_idr, note}}` ke snapshot peserta.
+
+    Mengubah nilai diskon memerlukan `bookings.discount`; menyimpan ulang nilai
+    yang sama tidak. Mengembalikan True bila ada snapshot yang berubah.
+    """
+    from rest_framework.exceptions import PermissionDenied
+
+    choices = {str(k): v for k, v in (adjustments or {}).items()}
+    by_key = {key(row): row for row in rows}
+    if set(choices) - set(by_key):
+        raise ValidationError({"adjustments": "Penyesuaian harus mengacu pada peserta booking."})
+    changed = False
+    for ident, adjustment in choices.items():
+        row = by_key[ident]
+        updated = _with_adjustment(row.pricing_snapshot_json, adjustment, label=row.pilgrim.name)
+        if int(updated.get("discount_idr") or 0) != int(row.pricing_snapshot_json.get("discount_idr") or 0) and not can_discount:
+            raise PermissionDenied("Memberi atau mengubah diskon memerlukan izin 'bookings.discount'.")
+        if updated != row.pricing_snapshot_json:
+            row.pricing_snapshot_json = updated
+            row.save(update_fields=["pricing_snapshot_json", "updated_at"])
+            changed = True
+    return changed
+
+
+def _create_price_line(*, booking: Booking, qty: int | None = None) -> None:
+    """Baris harga snapshot (§5.2, UAT-04) — dibuat ulang selama DRAFT dan saat
+    revisi invoice berotorisasi. Paket per kelompok kamar (gross) + baris
+    `adjustment` per peserta untuk diskon (negatif) dan biaya tambahan."""
     booking.price_lines.all().delete()
     groups = {}
-    for participant in booking.participants.all():
+    adjustments = []
+    for participant in booking.participants.select_related("pilgrim").order_by("created_at", "id"):
         snapshot = participant.pricing_snapshot_json
         key = (snapshot.get("package_name", booking.departure.package.name), snapshot.get("room_type", ""), int(snapshot["unit_price_idr"]))
         groups[key] = groups.get(key, 0) + 1
+        note = snapshot.get("adjustment_note", "")
+        if snapshot.get("discount_idr"):
+            adjustments.append((f"Diskon · {participant.pilgrim.name} ({note})", -int(snapshot["discount_idr"])))
+        if snapshot.get("extra_idr"):
+            adjustments.append((f"Biaya tambahan · {participant.pilgrim.name} ({note})", int(snapshot["extra_idr"])))
     for (name, room, unit), count in sorted(groups.items()):
         BookingPriceLine.objects.create(
             tenant=booking.tenant, environment=booking.environment, booking=booking,
             item_type="package", description=f"{name} · {room}" if room else name,
             qty=count, unit_price=Decimal(unit), amount=Decimal(unit * count),
+        )
+    for description, amount in adjustments:
+        BookingPriceLine.objects.create(
+            tenant=booking.tenant, environment=booking.environment, booking=booking,
+            item_type="adjustment", description=description[:200], qty=1, unit_price=Decimal(amount), amount=Decimal(amount),
         )
 
 
@@ -320,6 +393,10 @@ def create_booking(
     allow_duplicate: bool = False,
     actor=None,
     room_types=None,
+    payer_name: str = "",
+    agent_id=None,
+    adjustments=None,
+    can_discount: bool = False,
 ) -> Booking:
     """Buat booking DRAFT dengan peserta & snapshot harga (UI-07, UAT-03/04).
 
@@ -347,6 +424,7 @@ def create_booking(
         environment=environment,
         departure=departure,
         notes=(notes or "").strip(),
+        payer_name=(payer_name or "").strip(),
         created_by=actor if getattr(actor, "is_authenticated", False) else None,
     )
     for _attempt in range(3):
@@ -372,6 +450,12 @@ def create_booking(
             saas_charge_state=SaasChargeState.NOT_ELIGIBLE,
             pricing_snapshot_json=snapshot,
         )
+    if adjustments:
+        apply_adjustments(rows=list(booking.participants.select_related("pilgrim")), adjustments=adjustments, can_discount=can_discount)
+    if agent_id:
+        from modules.agents.services import assign_agent
+
+        assign_agent(booking=booking, agent_id=agent_id, actor=actor, reason="Booking dibuat")
     _create_price_line(booking=booking, qty=len(pilgrims))
     return booking
 
@@ -386,6 +470,11 @@ def update_draft_booking(
     notes: str | None = None,
     allow_duplicate: bool = False,
     room_types=None,
+    payer_name: str | None = None,
+    agent_id=UNSET,
+    adjustments=None,
+    can_discount: bool = False,
+    actor=None,
 ) -> Booking:
     """Update booking DRAFT saja (§8.3 "Detail/update draft").
 
@@ -450,12 +539,22 @@ def update_draft_booking(
     for row in current_rows:
         requested = choices.get(str(row.pilgrim_id), row.pricing_snapshot_json.get("room_type", ""))
         if departure_changed or (str(row.pilgrim_id) in choices and requested != row.pricing_snapshot_json.get("room_type", "")):
-            row.pricing_snapshot_json = _snapshot_unit_price(departure, requested)
+            row.pricing_snapshot_json = _carry_adjustment(row.pricing_snapshot_json, _snapshot_unit_price(departure, requested))
             row.save(update_fields=["pricing_snapshot_json", "updated_at"])
             participants_changed = True
 
+    if adjustments:
+        rows = list(booking.participants.select_related("pilgrim"))
+        participants_changed = apply_adjustments(rows=rows, adjustments=adjustments, can_discount=can_discount) or participants_changed
+
     if notes is not None:
         booking.notes = notes.strip()
+    if payer_name is not None:
+        booking.payer_name = payer_name.strip()
+    if agent_id is not UNSET:
+        from modules.agents.services import assign_agent
+
+        assign_agent(booking=booking, agent_id=agent_id, actor=actor, reason="Diubah saat draf")
 
     if participants_changed or departure_changed:
         _create_price_line(booking=booking, qty=booking.participants.count())
@@ -612,6 +711,9 @@ def transition_booking(
         from modules.notifications.services import booking_reserved
 
         booking_reserved(booking)  # NTF-01 "booking berhasil": kursi sudah diamankan
+        from modules.payments.services import auto_issue_invoice
+
+        auto_issue_invoice(booking, actor)  # INV-01: invoice otomatis saat booking sah
     if target in (BookingStatus.CANCELED, BookingStatus.EXPIRED):
         from modules.billing.services import void_pending_for_booking
         from modules.payments.services import cancel_booking_invoice
@@ -620,4 +722,8 @@ def transition_booking(
         if booking.environment == "production":
             # Charge POSTED tidak direfund otomatis (PAY09); hanya PENDING di-VOID.
             void_pending_for_booking(booking, reason or "Booking kedaluwarsa")
+    if booking.agent_id or target in (BookingStatus.CANCELED, BookingStatus.EXPIRED):
+        from modules.agents.services import sync_commission
+
+        sync_commission(booking, reason=reason or "Booking kedaluwarsa")
     return booking

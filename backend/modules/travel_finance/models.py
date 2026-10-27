@@ -51,6 +51,7 @@ class ExpenseCategory(models.TextChoices):
     GUIDE = "GUIDE", "Muthawif & tour leader"
     EQUIPMENT = "EQUIPMENT", "Perlengkapan jamaah"
     MARKETING = "MARKETING", "Pemasaran"
+    COMMISSION = "COMMISSION", "Komisi agen"
     OFFICE = "OFFICE", "Operasional kantor"
     OTHER = "OTHER", "Lainnya"
 

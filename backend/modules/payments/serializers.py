@@ -18,6 +18,20 @@ class IssueInvoiceSerializer(StrictSerializer):
     buyer_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
 
 
+class RevisionAdjustmentSerializer(StrictSerializer):
+    participant_id = serializers.UUIDField()
+    discount_idr = serializers.IntegerField(min_value=0, max_value=10_000_000_000, required=False, default=0)
+    extra_idr = serializers.IntegerField(min_value=0, max_value=10_000_000_000, required=False, default=0)
+    note = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+
+
+class InvoiceReviseSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=500)
+    buyer_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    due_at = serializers.DateField(required=False)
+    adjustments = RevisionAdjustmentSerializer(many=True, required=False)
+
+
 class AllocationSerializer(StrictSerializer):
     booking_participant_id = serializers.UUIDField()
     amount_idr = serializers.IntegerField(min_value=1, max_value=10_000_000_000_000)
@@ -71,7 +85,21 @@ def invoice_payload(invoice):
         "overdue": invoice.due_at < tenant_today(invoice.tenant) and invoice.balance_idr > 0 and invoice.status != "VOIDED",
         "checksum": invoice.checksum, "lines": invoice.snapshot_json["lines"],
         "buyer_name": invoice.snapshot_json["buyer_name"], "dp_policy": invoice.snapshot_json["dp_policy"],
+        "version": invoice.version, "gross_idr": invoice.snapshot_json.get("gross_idr", invoice.total_idr),
+        "discount_idr": invoice.snapshot_json.get("discount_idr", 0), "extra_idr": invoice.snapshot_json.get("extra_idr", 0),
+        "revision_reason": (invoice.snapshot_json.get("revision") or {}).get("reason", ""),
     }
+
+
+def invoice_detail_payload(invoice):
+    data = invoice_payload(invoice)
+    data["revisions"] = [
+        {"version": r.version, "total_idr": r.total_idr, "reason": r.reason, "revised_at": r.created_at.isoformat(),
+         "revised_by": (r.revised_by.full_name or r.revised_by.email) if r.revised_by_id else None}
+        for r in invoice.revisions.select_related("revised_by").defer("pdf_data")
+    ]
+    data["revisable"] = invoice.status in {"ISSUED", "PAID"} and not invoice.payments.filter(status__in=["DRAFT", "SUBMITTED", "VERIFIED"]).exists()
+    return data
 
 
 def payment_payload(payment):

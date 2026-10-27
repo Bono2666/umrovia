@@ -13,6 +13,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 
+from modules.agents.services import sync_commission
 from modules.audit.services import log_event
 from modules.billing.services import charge_verified_booking, lock_wallet, void_pending_for_booking
 from modules.booking.models import Booking, BookingParticipant
@@ -25,6 +26,7 @@ from modules.payments.models import (
     PaymentEvent,
     PaymentOperation,
     TravelInvoice,
+    TravelInvoiceRevision,
     TravelPayment,
     TravelReceipt,
 )
@@ -85,6 +87,77 @@ def idempotent_operation(*, request, action, booking, target, factory):
     return result
 
 
+def _invoice_lines(booking, participants):
+    from modules.documents.render import format_idr
+
+    lines = []
+    for participant in participants:
+        price = participant.pricing_snapshot_json
+        unit, discount, extra = price.get("unit_price_idr"), price.get("discount_idr", 0), price.get("extra_idr", 0)
+        if any(type(value) is not int or value < 0 for value in (unit, discount, extra)) or unit - discount + extra < 0:
+            raise ValidationError({"pricing": "Snapshot harga peserta tidak valid."})
+        room = price.get("room_type", "")
+        description = f"{participant.pilgrim.name} · {price.get('package_name', booking.departure.package.name)}"
+        if room:
+            description += f" · {room}"
+        if discount:
+            description += f" · diskon {format_idr(discount)}"
+        if extra:
+            description += f" · tambahan {format_idr(extra)}"
+        if discount or extra:
+            description += f" ({price.get('adjustment_note', '')})"
+        lines.append({
+            "participant_id": str(participant.pk), "pilgrim_name": participant.pilgrim.name, "description": description,
+            "amount_idr": unit - discount + extra, "room_type": room, "gross_idr": unit, "discount_idr": discount, "extra_idr": extra,
+        })
+    return lines
+
+
+def _invoice_config(tenant):
+    settings = TenantSettings.objects.filter(tenant=tenant).first()
+    config = settings.invoice_config_json if settings else {}
+    if any(config.get(key) not in (None, 0, "", False) for key in ("tax_idr", "tax_percent", "discount_idr", "discount_percent", "pajak")):
+        raise ValidationError({"invoice_config": "Pajak/diskon otomatis belum didukung; jangan menerbitkan tagihan yang mengabaikan penyesuaian tersebut."})
+    return config
+
+
+def _invoice_document(*, booking, participants, number, due_at, buyer_name, policy, config, version=1, revision=None):
+    lines = _invoice_lines(booking, participants)
+    total = sum(line["amount_idr"] for line in lines)
+    line_total = booking.price_lines.aggregate(total=Sum("amount"))["total"]
+    if line_total is None or line_total != total:
+        raise ValidationError({"pricing": "Baris harga booking tidak cocok dengan snapshot peserta."})
+    snapshot = {
+        "number": number, "environment": booking.environment, "issued_at": timezone.now().isoformat(), "timezone": booking.tenant.timezone,
+        "due_at": due_at.isoformat(), "issuer": issuer_snapshot(booking.tenant),
+        "booking_code": booking.code, "buyer_name": buyer_name.strip() or booking.payer_name or participants[0].pilgrim.name,
+        "lines": lines, "gross_idr": sum(line["gross_idr"] for line in lines), "discount_idr": sum(line["discount_idr"] for line in lines),
+        "extra_idr": sum(line["extra_idr"] for line in lines), "total_idr": total, "paid_idr": 0, "outstanding_idr": total,
+        "dp_policy": policy, "notes": str(config.get("notes") or ""), "version": version,
+        "bank_accounts": list(TravelBankAccount.objects.filter(active=True).values("bank_name", "account_name", "account_masked")),
+    }
+    if revision:
+        snapshot["revision"] = revision
+    pdf = render_financial_pdf(snapshot)
+    return snapshot, pdf, lines, total
+
+
+def _create_invoice_lines(invoice, participants, lines):
+    for participant, line in zip(participants, lines, strict=True):
+        InvoiceLine.objects.create(
+            tenant=invoice.tenant, environment=invoice.environment, invoice=invoice,
+            participant=participant, description=line["description"], amount_idr=line["amount_idr"],
+        )
+
+
+def _locked_participants(booking):
+    participants = list(booking.participants.select_for_update().select_related("pilgrim").order_by("id"))
+    if not participants:
+        raise ValidationError({"participants": "Booking tidak memiliki peserta."})
+    participants.sort(key=lambda row: (row.created_at, str(row.pk)))
+    return participants
+
+
 @transaction.atomic
 def issue_invoice(*, booking_id, actor, due_at=None, buyer_name=""):
     booking = Booking.objects.select_for_update().select_related("tenant", "departure__package").get(pk=booking_id)
@@ -97,29 +170,8 @@ def issue_invoice(*, booking_id, actor, due_at=None, buyer_name=""):
             raise Conflict("Invoice sudah terbit dengan nama pelanggan berbeda.")
         return existing
     policy = eligibility_policy(booking.tenant)
-    participants = list(booking.participants.select_for_update().select_related("pilgrim").order_by("id"))
-    if not participants:
-        raise ValidationError({"participants": "Booking tidak memiliki peserta."})
-    participants.sort(key=lambda row: (row.created_at, str(row.pk)))
-    lines = []
-    for participant in participants:
-        price = participant.pricing_snapshot_json
-        unit = price.get("unit_price_idr")
-        if type(unit) is not int or unit < 0:
-            raise ValidationError({"pricing": "Snapshot harga peserta tidak valid."})
-        room = price.get("room_type", "")
-        description = f"{participant.pilgrim.name} · {price.get('package_name', booking.departure.package.name)}"
-        if room:
-            description += f" · {room}"
-        lines.append({"participant_id": str(participant.pk), "pilgrim_name": participant.pilgrim.name, "description": description, "amount_idr": unit, "room_type": room})
-    total = sum(line["amount_idr"] for line in lines)
-    line_total = booking.price_lines.aggregate(total=Sum("amount"))["total"]
-    if line_total is None or line_total != total:
-        raise ValidationError({"pricing": "Baris harga booking tidak cocok dengan snapshot peserta."})
-    settings = TenantSettings.objects.filter(tenant=booking.tenant).first()
-    config = settings.invoice_config_json if settings else {}
-    if any(config.get(key) not in (None, 0, "", False) for key in ("tax_idr", "tax_percent", "discount_idr", "discount_percent", "pajak")):
-        raise ValidationError({"invoice_config": "Pajak/diskon otomatis belum didukung; jangan menerbitkan tagihan yang mengabaikan penyesuaian tersebut."})
+    participants = _locked_participants(booking)
+    config = _invoice_config(booking.tenant)
     today = tenant_today(booking.tenant)
     if due_at is None:
         due_days = config.get("due_days", 7)
@@ -129,31 +181,89 @@ def issue_invoice(*, booking_id, actor, due_at=None, buyer_name=""):
     if due_at < today:
         raise ValidationError({"due_at": "Jatuh tempo tidak boleh sebelum tanggal terbit."})
     number = document_number(booking.tenant, booking.environment, "INV")
-    now = timezone.now()
-    snapshot = {
-        "number": number, "environment": booking.environment, "issued_at": now.isoformat(), "timezone": booking.tenant.timezone,
-        "due_at": due_at.isoformat(), "issuer": issuer_snapshot(booking.tenant),
-        "booking_code": booking.code, "buyer_name": buyer_name.strip() or participants[0].pilgrim.name,
-        "lines": lines, "total_idr": total, "paid_idr": 0, "outstanding_idr": total, "dp_policy": policy, "notes": str(config.get("notes") or ""),
-        "bank_accounts": list(TravelBankAccount.objects.filter(active=True).values("bank_name", "account_name", "account_masked")),
-    }
-    pdf = render_financial_pdf(snapshot)
+    snapshot, pdf, lines, total = _invoice_document(booking=booking, participants=participants, number=number, due_at=due_at, buyer_name=buyer_name, policy=policy, config=config)
     invoice = TravelInvoice.objects.create(
         tenant=booking.tenant, environment=booking.environment, booking=booking,
-        invoice_number=number, issue_at=now, due_at=due_at, total_idr=total, balance_idr=total,
+        invoice_number=number, issue_at=timezone.now(), due_at=due_at, total_idr=total, balance_idr=total,
         status="PAID" if total == 0 else "ISSUED", snapshot_json=snapshot,
         pdf_data=pdf, checksum=hashlib.sha256(pdf).hexdigest(), issued_by=actor,
     )
-    for participant, line in zip(participants, lines, strict=True):
-        InvoiceLine.objects.create(
-            tenant=booking.tenant, environment=booking.environment, invoice=invoice,
-            participant=participant, description=line["description"], amount_idr=line["amount_idr"],
-        )
+    _create_invoice_lines(invoice, participants, lines)
+    for participant in participants:
         if participant.participant_status == "REGISTERED":
             participant.participant_status = "AWAITING_DP"
             participant.save(update_fields=["participant_status", "updated_at"])
     invoice_issued(invoice)
     log_event(action="invoice.issued", tenant=booking.tenant, actor=actor, object_type="invoice", object_id=invoice.pk, changes={"number": number, "total_idr": total})
+    return invoice
+
+
+def auto_issue_invoice(booking, actor):
+    """INV-01: terbitkan invoice saat booking sah (RESERVED). Kegagalan (mis.
+    konfigurasi pajak belum didukung) tidak membatalkan reservasi kursi —
+    dicatat di audit dan invoice tetap dapat diterbitkan manual."""
+    try:
+        with transaction.atomic():
+            return issue_invoice(booking_id=booking.pk, actor=actor if getattr(actor, "is_authenticated", False) else None)
+    except APIException as exc:
+        log_event(action="invoice.auto_issue_failed", tenant=booking.tenant, actor=actor if getattr(actor, "is_authenticated", False) else None, object_type="booking", object_id=booking.pk, changes={"detail": exc.detail if isinstance(exc.detail, (dict, list)) else str(exc.detail)})
+        return None
+
+
+ACTIVE_PAYMENT_STATUSES = ["DRAFT", "SUBMITTED", "VERIFIED"]
+
+
+@transaction.atomic
+def revise_invoice(*, invoice_id, actor, reason, buyer_name=None, due_at=None, adjustments=None, can_discount=False):
+    """INV-03: revisi berversi. Hanya untuk invoice tanpa pembayaran aktif
+    (DRAFT/SUBMITTED/VERIFIED); versi lama (snapshot + PDF) diarsipkan utuh
+    di `TravelInvoiceRevision`, nomor invoice tetap dan versi naik."""
+    from modules.booking.services import _create_price_line, apply_adjustments
+
+    initial = TravelInvoice.objects.get(pk=invoice_id)
+    booking = Booking.objects.select_for_update().select_related("tenant", "departure__package").get(pk=initial.booking_id)
+    invoice = TravelInvoice.objects.select_for_update().get(pk=invoice_id)
+    assert_booking_payable(booking)
+    if invoice.status == "VOIDED":
+        raise ValidationError({"invoice": "Invoice dibatalkan tidak dapat direvisi."})
+    if invoice.payments.filter(status__in=ACTIVE_PAYMENT_STATUSES).exists():
+        raise ValidationError({"invoice": "Invoice sudah memiliki pembayaran tercatat/terverifikasi. Tolak atau reversal pembayaran terlebih dahulu sebelum merevisi."})
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError({"reason": "Alasan revisi wajib diisi."})
+    if not adjustments and buyer_name is None and due_at is None:
+        raise ValidationError({"detail": "Tidak ada perubahan untuk direvisi."})
+    participants = _locked_participants(booking)
+    if adjustments:
+        apply_adjustments(rows=participants, adjustments=adjustments, can_discount=can_discount, key=lambda row: str(row.pk))
+        _create_price_line(booking=booking)
+    if buyer_name is not None:
+        booking.payer_name = buyer_name.strip()
+        booking.save(update_fields=["payer_name", "updated_at"])
+    if due_at is not None and due_at < tenant_today(booking.tenant):
+        raise ValidationError({"due_at": "Jatuh tempo tidak boleh sebelum hari ini."})
+    TravelInvoiceRevision.objects.create(
+        tenant=invoice.tenant, environment=invoice.environment, invoice=invoice, version=invoice.version,
+        invoice_number=invoice.invoice_number, total_idr=invoice.total_idr, snapshot_json=invoice.snapshot_json,
+        pdf_data=bytes(invoice.pdf_data), checksum=invoice.checksum, reason=reason, revised_by=actor,
+    )
+    version = invoice.version + 1
+    snapshot, pdf, lines, total = _invoice_document(
+        booking=booking, participants=participants, number=invoice.invoice_number, due_at=due_at or invoice.due_at,
+        buyer_name=buyer_name if buyer_name is not None else invoice.snapshot_json["buyer_name"],
+        policy=eligibility_policy(booking.tenant), config=_invoice_config(booking.tenant), version=version,
+        revision={"version": version, "reason": reason, "previous_total_idr": invoice.total_idr},
+    )
+    InvoiceLine.objects.filter(invoice=invoice).delete()  # versi lama utuh di arsip revisi
+    TravelInvoice.objects.filter(pk=invoice.pk).update(
+        version=version, total_idr=total, balance_idr=total, status="PAID" if total == 0 else "ISSUED",
+        due_at=due_at or invoice.due_at, snapshot_json=snapshot, pdf_data=pdf, checksum=hashlib.sha256(pdf).hexdigest(), updated_at=timezone.now(),
+    )
+    invoice.refresh_from_db()
+    _create_invoice_lines(invoice, participants, lines)
+    sync_commission(booking)
+    invoice_issued(invoice)
+    log_event(action="invoice.revised", tenant=booking.tenant, actor=actor, object_type="invoice", object_id=invoice.pk, changes={"number": invoice.invoice_number, "version": version, "reason": reason, "previous_total_idr": snapshot["revision"]["previous_total_idr"], "total_idr": total})
     return invoice
 
 
@@ -329,6 +439,7 @@ def verify_payment(*, payment_id, actor, note=""):
     payment.save(update_fields=["status", "verified_at", "verified_by", "verification_note", "eligibility_policy_json", "updated_at"])
     _refresh_invoice(invoice)
     eligible = _refresh_eligibility(invoice)
+    sync_commission(booking)
     if payment.environment == "production":
         charge_verified_booking(booking=booking, payment=payment, actor=actor)
     receipt = _receipt(payment, actor)
@@ -376,6 +487,7 @@ def reverse_payment(*, payment_id, actor, reason):
     invoice = TravelInvoice.objects.select_for_update().get(pk=payment.invoice_id)
     _refresh_invoice(invoice)
     _refresh_eligibility(invoice, reversal=True)
+    sync_commission(booking)
     if payment.environment == "production":
         void_pending_for_booking(booking, f"DP direversal: {reason.strip()}")
     if booking.status in {"CANCELED", "EXPIRED"}:

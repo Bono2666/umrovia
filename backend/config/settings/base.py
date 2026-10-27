@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "modules.notifications",
     "modules.reports",
     "modules.crm",
+    "modules.agents",
     "modules.audit",
     "modules.documents",
 ]
