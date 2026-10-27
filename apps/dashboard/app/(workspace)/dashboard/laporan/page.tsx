@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
-import { apiFetch, downloadFromApi, problemMessage, type Departure, type Report, type ReportColumn, type ReportSection, type TravelPackage } from "@/lib/api";
+import { apiFetch, downloadFromApi, problemMessage, type Agent, type Departure, type Report, type ReportColumn, type ReportSection, type TravelPackage } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -11,6 +11,9 @@ type Kind = Report["report"];
 const TABS: {kind: Kind; label: string; grant: string; hint: string}[] = [
   {kind: "operational", label: "Operasional", grant: "reports.read", hint: "Okupansi, booking, DP, dokumen dan kesiapan per keberangkatan."},
   {kind: "finance", label: "Keuangan", grant: "reports.finance", hint: "Invoice, penerimaan, piutang, kas/bank, pengeluaran dan margin estimasi milik travel."},
+  {kind: "sales", label: "Booking & Penjualan", grant: "reports.read", hint: "Booking per tanggal pemesanan dengan gross, diskon dan net per paket dan agen."},
+  {kind: "payments", label: "Pembayaran", grant: "reports.finance", hint: "Penerimaan terverifikasi per rekening dan per petugas verifikasi."},
+  {kind: "commissions", label: "Komisi Agen", grant: "commissions.read", hint: "Komisi estimasi, earned, disetujui dan dibayar per agen."},
   {kind: "saas", label: "SaaS Wallet", grant: "wallet.read", hint: "Saldo prabayar dan biaya layanan Umrovia — terpisah dari kas travel."},
 ];
 const STATUS = [["", "Semua"], ["DRAFT", "Draft"], ["OPEN", "Pendaftaran dibuka"], ["READY", "Siap berangkat"], ["DEPARTED", "Sudah berangkat"], ["COMPLETED", "Selesai"], ["CANCELED", "Dibatalkan"]];
@@ -46,7 +49,9 @@ export default function ReportsPage() {
   const active = kind && tabs.some((tab) => tab.kind === kind) ? kind : tabs[0]?.kind ?? null;
   const [preset, setPreset] = useState("upcoming");
   const [range, setRange] = useState(() => presetRange("upcoming"));
-  const [filters, setFilters] = useState({package: "", departure: "", status: ""});
+  const [filters, setFilters] = useState({package: "", departure: "", status: "", agent: "", account: ""});
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [accounts, setAccounts] = useState<{id: string; bank_name: string; account_masked: string}[]>([]);
   const [packages, setPackages] = useState<TravelPackage[]>([]);
   const [departures, setDepartures] = useState<Departure[]>([]);
   const [report, setReport] = useState<Report | null>(null);
@@ -55,7 +60,8 @@ export default function ReportsPage() {
 
   const [reloads, setReloads] = useState(0);
   const params = new URLSearchParams({from: range.from, to: range.to});
-  if (active !== "saas") for (const [key, value] of Object.entries(filters)) if (value && (key !== "status" || active === "operational")) params.set(key, value);
+  const allowed: Record<string, Kind[]> = {status: ["operational"], agent: ["sales", "commissions"], account: ["payments"]};
+  if (active !== "saas") for (const [key, value] of Object.entries(filters)) if (value && (!allowed[key] || (active && allowed[key].includes(active)))) params.set(key, value);
   const query = params.toString();
 
   useEffect(() => {
@@ -70,6 +76,12 @@ export default function ReportsPage() {
     void apiFetch<{results: TravelPackage[]}>("/packages").then((result) => {if (result.ok) setPackages(result.data.results);});
     void apiFetch<{results: Departure[]}>("/departures").then((result) => {if (result.ok) setDepartures(result.data.results);});
   }, []);
+  const canAgents = can("agents.read");
+  const canAccounts = can("bank_accounts.read");
+  useEffect(() => {
+    if (canAgents) void apiFetch<{results: Agent[]}>("/agents?page=1&page_size=100").then((result) => {if (result.ok) setAgents(result.data.results);});
+    if (canAccounts) void apiFetch<{results: {id: string; bank_name: string; account_masked: string}[]}>("/bank-accounts").then((result) => {if (result.ok) setAccounts(result.data.results);});
+  }, [canAgents, canAccounts]);
 
   function choose(next: Kind) {
     setKind(next); setReport(null);
@@ -91,7 +103,7 @@ export default function ReportsPage() {
     <p className="mt-3 text-sm text-muted">{tab.hint}</p>
 
     <section className="card mt-5 p-6">
-      <div className={`report-filters grid items-end gap-x-4 gap-y-8 md:grid-cols-3 ${active === "operational" ? "xl:grid-cols-6" : active === "finance" ? "xl:grid-cols-5" : "xl:grid-cols-3"}`}>
+      <div className={`report-filters grid items-end gap-x-4 gap-y-8 md:grid-cols-3 ${active === "finance" ? "xl:grid-cols-5" : active === "saas" ? "xl:grid-cols-3" : "xl:grid-cols-6"}`}>
         <FormSelect label="Periode" htmlFor="report-preset" value={preset} onChange={(event) => {setPreset(event.target.value); if (event.target.value !== "custom") setRange(presetRange(event.target.value));}}>
           {PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </FormSelect>
@@ -110,9 +122,19 @@ export default function ReportsPage() {
         {active === "operational" ? <FormSelect label="Status keberangkatan" htmlFor="report-status" value={filters.status} onChange={(event) => setFilters({...filters, status: event.target.value})}>
           {STATUS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </FormSelect> : null}
+        {(active === "sales" || active === "commissions") && canAgents ? <FormSelect label="Agen" htmlFor="report-agent" value={filters.agent} onChange={(event) => setFilters({...filters, agent: event.target.value})}>
+          <option value="">Semua agen</option>
+          {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+        </FormSelect> : null}
+        {active === "payments" ? <FormSelect label="Rekening" htmlFor="report-account" value={filters.account} onChange={(event) => setFilters({...filters, account: event.target.value})}>
+          <option value="">Semua rekening</option><option value="CASH">Tunai</option>
+          {accounts.map((account) => <option key={account.id} value={account.id}>{account.bank_name} {account.account_masked}</option>)}
+        </FormSelect> : null}
       </div>
       {active === "operational" ? <p className="mt-4 text-xs text-muted">Periode menyaring keberangkatan berdasarkan tanggal berangkat.</p>
-        : active === "finance" ? <p className="mt-4 text-xs text-muted">Pembayaran diakui saat diverifikasi; piutang dihitung per saat laporan dibuka.</p> : null}
+        : active === "finance" ? <p className="mt-4 text-xs text-muted">Pembayaran diakui saat diverifikasi; piutang dihitung per saat laporan dibuka.</p>
+        : active === "sales" ? <p className="mt-4 text-xs text-muted">Periode menyaring booking berdasarkan tanggal booking dibuat.</p>
+        : active === "payments" ? <p className="mt-4 text-xs text-muted">Periode menyaring pembayaran berdasarkan tanggal verifikasi.</p> : null}
     </section>
 
     {error ? <div className="mt-4"><ErrorState message={error} onRetry={() => setReloads((value) => value + 1)} /></div> : null}
