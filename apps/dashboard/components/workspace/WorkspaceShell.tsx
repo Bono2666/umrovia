@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
-import { UmroviaMark } from "@/components/UmroviaMark";
+import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { WorkspaceReveal } from "@/components/workspace/WorkspaceReveal";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
@@ -299,12 +299,8 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
           >
             <CollapseArrow collapsed={collapsed} animate={arrowReady} />
           </Btn>
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink"
-          >
-            <UmroviaMark className="h-7 w-7 shrink-0" />
-            Umrovia<span className="text-primary">.</span>
+          <Link href="/dashboard" aria-label="Umrovia — dashboard">
+            <UmroviaLogo />
           </Link>
           <div className="hidden min-w-0 items-center gap-2 border-l border-border pl-3 sm:flex">
             <span className="max-w-48 truncate text-sm font-semibold" title={active.tenant.display_name}>

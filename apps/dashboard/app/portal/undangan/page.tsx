@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { UmroviaMark } from "@/components/UmroviaMark";
+import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { LogoutButton } from "@/components/LogoutButton";
 import { Btn, BtnLink, FormField, LoadingState } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type PortalInviteInfo, type UserPayload } from "@/lib/api";
@@ -66,10 +66,8 @@ export default function PortalInvitePage() {
   return (
     <main className="workspace-shell flex flex-1 items-center justify-center p-6">
       <div className="card w-full max-w-md p-8">
-        <p className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-ink">
-          <UmroviaMark className="h-8 w-8 shrink-0" />
-          Portal Jamaah
-        </p>
+        <UmroviaLogo />
+        <p className="mt-4 text-2xl font-bold tracking-tight text-ink">Portal Jamaah</p>
         {info === null ? (
           <div className="mt-6"><LoadingState label="Memeriksa undangan…" /></div>
         ) : !info.valid ? (

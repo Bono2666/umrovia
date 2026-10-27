@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, type UserPayload } from "@/lib/api";
-import { UmroviaMark } from "@/components/UmroviaMark";
+import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { BtnLink } from "@/components/workspace/ui";
 
 /**
@@ -124,13 +124,10 @@ export function MarketingHeader() {
       <div className="mkt-container flex h-full items-center justify-between gap-3">
         <Link
           href="/"
-          className="marketing-header__brand flex shrink-0 items-center gap-2.5"
+          className="marketing-header__brand flex shrink-0 items-center"
           aria-label="Umrovia — beranda"
         >
-          <UmroviaMark className="h-7 w-7" />
-          <span className="text-lg font-semibold tracking-[-0.04em]">
-            Umrovia
-          </span>
+          <UmroviaLogo className="" />
         </Link>
 
         <nav
