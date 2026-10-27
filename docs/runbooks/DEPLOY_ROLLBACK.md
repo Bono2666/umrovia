@@ -10,6 +10,9 @@
 
 ## Deploy staging/produksi
 
+Pemasangan pertama di VPS (bootstrap server, sertifikat, akun pertama, backup
+terjadwal): [FIRST_DEPLOY_VPS.md](FIRST_DEPLOY_VPS.md).
+
 1. CI hijau (lint, SAST, pip-audit, npm audit, deploy check, test, build).
 2. Backup sebelum deploy: `infra/backup/backup.sh`.
 3. `docker compose -f docker-compose.staging.yml --env-file .env.<env> up -d --build`
