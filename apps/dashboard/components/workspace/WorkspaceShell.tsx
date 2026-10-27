@@ -89,7 +89,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Operasional",
     items: [
-      { href: "/dashboard/leads", label: "Leads", soon: "P1", icon: Target },
+      { href: "/dashboard/leads", label: "Leads", permission: "leads.manage", icon: Target },
       { href: "/dashboard/jamaah", label: "Jamaah", permission: "pilgrims.read", icon: Users },
       { href: "/dashboard/paket", label: "Paket", permission: "packages.read", icon: Package },
       {

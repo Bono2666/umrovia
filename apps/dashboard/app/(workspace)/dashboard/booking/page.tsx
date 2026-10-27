@@ -143,7 +143,16 @@ export default function BookingPage() {
     // Keberangkatan OPEN saja yang menerima pendaftaran (MOD-06) — bila gagal
     // (mis. tanpa departures.read) form menampilkan petunjuk, server otoritas.
     apiFetch<{ results: Departure[] }>("/departures?status=OPEN").then((result) => {
-      if (result.ok) setDepartures(result.data.results);
+      if (!result.ok) return;
+      setDepartures(result.data.results);
+      // Dari CRM Leads: ?departure= (keberangkatan diminati) dan ?pilgrim= (jamaah hasil konversi).
+      const params = new URLSearchParams(window.location.search);
+      const wanted = params.get("departure");
+      if (wanted && result.data.results.some((dep) => dep.id === wanted)) setDepartureId(wanted);
+    });
+    const pilgrimId = new URLSearchParams(window.location.search).get("pilgrim");
+    if (pilgrimId) apiFetch<Pilgrim>(`/pilgrims/${pilgrimId}`).then((result) => {
+      if (result.ok) setPicked((prev) => (prev.some((p) => p.id === result.data.id) ? prev : [...prev, {id: result.data.id, name: result.data.name, code: result.data.code}]));
     });
   }, []);
 

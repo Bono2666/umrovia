@@ -209,6 +209,20 @@ export type SupportTicket = {
   created_at: string; last_message_at: string; resolved_at: string | null; opened_by: string | null;
   tenant?: {id: string; slug: string; display_name: string; state: string}; assigned_to?: string | null; messages?: SupportMessage[]; diagnosis?: PlatformTenant;
 };
+export type LeadStage = "NEW" | "CONTACTED" | "QUALIFIED" | "QUOTED" | "WON" | "LOST";
+export type LeadActivity = {id: string; kind: string; kind_label: string; body: string; actor: string | null; created_at: string};
+export type Lead = {
+  id: string; code: string; environment: string; name: string; phone: string; email: string; city: string; source: string; source_label: string;
+  pax: number; notes: string; interest_package: {id: string; name: string} | null; interest_departure: {id: string; code: string; start_at: string} | null;
+  stage: LeadStage; stage_label: string; stage_changed_at: string; lost_reason: string; owner: {id: string; name: string | null} | null;
+  next_follow_up_at: string | null; follow_up_overdue: boolean; converted_pilgrim: {id: string; code: string; name: string} | null;
+  converted_at: string | null; created_at: string; deletable: boolean;
+  activities?: LeadActivity[]; duplicates?: {leads: {id: string; code: string; name: string; stage: string}[]; pilgrims: {id: string; code: string; name: string}[]};
+};
+export type LeadSummary = {
+  stages: {stage: LeadStage; label: string; count: number}[]; total: number; open: number; conversion_rate: number | null;
+  follow_up_overdue: number; follow_up_today: number; sources: {source: string; label: string; count: number; won: number}[];
+};
 export type ReportColumn = {key: string; label: string; type: "text" | "money" | "int" | "percent" | "date"};
 export type ReportSection = {key: string; title: string; description: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[]; totals: Record<string, string | number | null> | null; truncated: boolean};
 export type Report = {
