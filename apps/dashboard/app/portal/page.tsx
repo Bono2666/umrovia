@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
-import { UmroviaMark } from "@/components/UmroviaMark";
+import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import {
   API_BASE, apiFetch, apiUpload, downloadFromApi, problemMessage,
@@ -55,7 +55,7 @@ export default function PortalPage() {
   return (
     <div className="workspace-shell min-h-screen">
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
-        <span className="flex items-center gap-2 font-semibold"><UmroviaMark className="h-7 w-7" />Portal Jamaah</span>
+        <span className="flex items-center gap-3"><UmroviaLogo /><span className="border-l border-border pl-3 text-sm font-semibold text-ink">Portal Jamaah</span></span>
         <span className="flex items-center gap-3 text-sm text-muted">
           <span className="hidden truncate sm:inline">{me?.email}</span>
           <LogoutButton />

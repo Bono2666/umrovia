@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
 import { UmroviaMark } from "@/components/UmroviaMark";
+import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { Btn, ErrorState, FormField, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type PlatformSession, type UserPayload } from "@/lib/api";
@@ -65,7 +66,7 @@ export function PlatformShell({children}: {children: React.ReactNode}) {
     <div className="workspace-shell min-h-screen">
       <header className="sticky top-0 z-30 border-b border-border bg-surface">
         <div className="flex h-14 items-center gap-3 px-4">
-          <Link href="/platform" className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink"><UmroviaMark className="h-7 w-7 shrink-0" />Umrovia<span className="text-primary">.</span></Link>
+          <Link href="/platform" aria-label="Umrovia — konsol platform"><UmroviaLogo /></Link>
           <StatusBadge tone="danger">Konsol platform</StatusBadge>
           <div className="ml-auto flex items-center gap-3">
             <ThemeToggle />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UmroviaMark } from "@/components/UmroviaMark";
+import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { BtnLink } from "@/components/workspace/ui";
 
 const FOOTER_LINKS: Array<{ href: string; label: string }> = [
@@ -33,13 +33,10 @@ export function MarketingFooter() {
         <div className="flex flex-col items-start gap-10 md:grid md:grid-cols-12 md:items-start">
           <Link
             href="/"
-            className="flex shrink-0 items-center gap-2.5 text-primary md:col-span-3"
+            className="flex shrink-0 items-center md:col-span-3"
             aria-label="Umrovia — beranda"
           >
-            <UmroviaMark className="h-7 w-7" />
-            <span className="text-lg font-semibold tracking-[-0.04em]">
-              Umrovia
-            </span>
+            <UmroviaLogo />
           </Link>
 
           <nav
