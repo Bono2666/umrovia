@@ -105,3 +105,15 @@ Status per 27 Oktober 2026: semua test di bawah lulus pada suite penuh
 | CASH02 | Maker-checker pengeluaran & lampiran | Pengeluaran menunggu persetujuan staf lain; bukti PDF/JPG/PNG tersimpan privat | `tests/test_operations_b.py::test_expense_maker_checker_and_evidence` | Finance catat pengeluaran → Owner setujui |
 | DSH01 | Dashboard KPI | KPI, pengingat dan grafik sesuai izin role | `tests/test_operations_b.py::test_dashboard_summary_respects_permissions` | Buka Ringkasan sebagai Owner dan Operations |
 
+## Keamanan sesi, portal & data jamaah (AUTH, POR, MOD-04/05/08, ADR-0018)
+
+| ID | Skenario | Hasil yang diharapkan | Bukti otomatis | Uji manual |
+|---|---|---|---|---|
+| AUTH02 | Login sukses/gagal, keluar dari semua perangkat, batas sesi | Semua tercatat; sesi perangkat lain & sesi melewati batas absolut berakhir | `tests/test_portal_data_c.py::test_login_audit_logout_all_and_absolute_timeout`, `tests/test_portal_data_c.py::test_password_reset_ends_existing_sessions` | Akun Saya → Keluar dari semua perangkat |
+| AUTH05 | Owner menangguhkan, reset sandi, akhiri sesi anggota | Akses ditolak saat ditangguhkan; email reset terkirim; riwayat tercatat | `tests/test_portal_data_c.py::test_owner_suspends_resets_and_revokes_member_sessions` | Pengguna & Role → Keamanan |
+| POR05 | Pengumuman per keberangkatan | Hanya jamaah rombongan terkait yang melihat; draf tidak tampil | `tests/test_portal_data_c.py::test_announcements_targeting_and_portal_visibility` | Pengumuman Portal → buka portal jamaah |
+| POR06 | Koreksi identitas dari portal | Nilai terenkripsi, diterapkan hanya setelah disetujui staf | `tests/test_portal_data_c.py::test_identity_change_request_encrypted_and_verified_by_staff` | Portal → Koreksi data identitas → Jamaah → Setujui |
+| PIL01 | Keluarga, riwayat, ekspor jamaah | Satu kepala keluarga; ekspor termask kecuali Owner; diaudit | `tests/test_portal_data_c.py::test_family_history_and_authorized_export` | Jamaah → detail → Keluarga; Ekspor Excel |
+| PKG01 | Harga anak/bayi & layanan tambahan | Usia divalidasi; invoice memuat kategori & layanan tambahan | `tests/test_portal_data_c.py::test_price_variants_addons_flow_to_invoice` | Paket → varian; Booking → kategori & layanan |
+| DOC01 | Masa berlaku dokumen & laporan Jamaah | Dokumen kedaluwarsa tidak bisa disetujui; ditandai bila habis sebelum berangkat | `tests/test_portal_data_c.py::test_document_validity_metadata_and_pilgrim_report` | Review dokumen dengan tanggal berlaku → Laporan Jamaah |
+
