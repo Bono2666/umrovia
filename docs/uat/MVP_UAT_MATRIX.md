@@ -94,3 +94,14 @@ Status per 27 Oktober 2026: semua test di bawah lulus pada suite penuh
 | UAT-10 | Booking dibatalkan / agen diganti | Komisi belum dibayar REVERSED; histori agen tercatat | `tests/test_agents.py::test_cancel_and_agent_change_reverse_commission`, `tests/test_agents.py::test_manual_reversal_is_not_recreated_and_no_policy_means_no_commission` | Batalkan booking beragen |
 | AGT01 | Izin & isolasi agen | Sales baca saja; Operations 403; travel lain 404; RLS | `tests/test_agents.py::test_agent_permissions_and_isolation` | Login Sales → menu Agen |
 | RPT07 | Laporan booking/penjualan, pembayaran, komisi | Gross − diskon + tambahan = net; per rekening/petugas; komisi dibayar = pengeluaran komisi | `tests/test_agents.py::test_sales_payments_and_commission_reports` | Laporan → tab baru, unduh XLSX |
+
+## Operasional & kas (MOD-02/03/06/11, ADR-0017)
+
+| ID | Skenario | Hasil yang diharapkan | Bukti otomatis | Uji manual |
+|---|---|---|---|---|
+| BR01 | Cabang & cabang default staf | Booking baru terisi cabang default; cabang nonaktif ditolak; laporan per cabang | `tests/test_operations_b.py::test_branches_master_default_and_booking_filter` | Cabang → atur default staf → buat booking |
+| WL01 | Keberangkatan penuh | Daftar tunggu hanya saat penuh, FIFO, menjadi booking draf saat kursi kosong | `tests/test_operations_b.py::test_waitlist_only_when_full_and_fifo_booking` | Batalkan booking pada keberangkatan penuh → Daftar Tunggu → Buat booking |
+| CASH01 | Saldo awal, transfer, koreksi berotorisasi | Transfer tidak mengubah total kas; koreksi saldo awal disetujui staf lain | `tests/test_operations_b.py::test_opening_balance_transfers_and_cash_book` | Kas & Bank → Saldo awal → Transfer |
+| CASH02 | Maker-checker pengeluaran & lampiran | Pengeluaran menunggu persetujuan staf lain; bukti PDF/JPG/PNG tersimpan privat | `tests/test_operations_b.py::test_expense_maker_checker_and_evidence` | Finance catat pengeluaran → Owner setujui |
+| DSH01 | Dashboard KPI | KPI, pengingat dan grafik sesuai izin role | `tests/test_operations_b.py::test_dashboard_summary_respects_permissions` | Buka Ringkasan sebagai Owner dan Operations |
+

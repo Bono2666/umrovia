@@ -136,6 +136,8 @@ export default function BookingPage() {
   const [busy, setBusy] = useState(false);
   const [payerName, setPayerName] = useState("");
   const [agentId, setAgentId] = useState("");
+  const [branchId, setBranchId] = useState<string | null>(null);  // null = cabang default staf
+  const [branches, setBranches] = useState<{id: string; code: string; name: string}[]>([]);
   const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentEdit, setAgentEdit] = useState<{bookingId: string; agent: string; reason: string} | null>(null);
@@ -166,6 +168,10 @@ export default function BookingPage() {
       setDepartures(result.data.results);
       // Dari CRM Leads: ?departure= (keberangkatan diminati) dan ?pilgrim= (jamaah hasil konversi).
       const params = new URLSearchParams(window.location.search);
+      const status = params.get("status");  // drill-down dari Ringkasan
+      if (status && status in STATUS_LABEL) setStatusFilter(status);
+      const q = params.get("q");  // tautan dari daftar tunggu / ringkasan
+      if (q) setQuery(q);
       const wanted = params.get("departure");
       if (wanted && result.data.results.some((dep) => dep.id === wanted)) setDepartureId(wanted);
     });
@@ -174,6 +180,12 @@ export default function BookingPage() {
       if (result.ok) setPicked((prev) => (prev.some((p) => p.id === result.data.id) ? prev : [...prev, {id: result.data.id, name: result.data.name, code: result.data.code}]));
     });
   }, []);
+
+  const canBranches = can("branches.read");
+  useEffect(() => {
+    if (!canBranches) return;
+    void apiFetch<{results: {id: string; code: string; name: string}[]}>("/branches?active=1").then((result) => {if (result.ok) setBranches(result.data.results);});
+  }, [canBranches]);
 
   useEffect(() => {
     if (!canAgents) return;
@@ -262,9 +274,10 @@ export default function BookingPage() {
         notes: notes.trim(),
         payer_name: payerName.trim(),
         agent: agentId || null,
+        ...(branchId !== null ? {branch: branchId || null} : {}),
         adjustments: Object.fromEntries(adjusted.map((p) => [p.id, adjustmentPayload(adjustments[p.id])])),
       };
-    const original = editing ? {departure:editing.departure_id, notes:editing.notes, payer_name:editing.payer_name, agent:editing.agent?.id ?? null,
+    const original = editing ? {departure:editing.departure_id, notes:editing.notes, payer_name:editing.payer_name, agent:editing.agent?.id ?? null, branch:editing.branch?.id ?? null,
       participants:editing.participants.map((p) => p.pilgrim_id),
       room_types:Object.fromEntries(editing.participants.filter((p) => p.pricing_snapshot.room_type).map((p) => [p.pilgrim_id, p.pricing_snapshot.room_type])),
       adjustments:Object.fromEntries(editing.participants.filter((p) => p.pricing_snapshot.discount_idr || p.pricing_snapshot.extra_idr).map((p) => [p.pilgrim_id, adjustmentPayload(adjustmentFrom(p.pricing_snapshot))]))} : {};
@@ -282,7 +295,7 @@ export default function BookingPage() {
   }
 
   function resetForm() {
-    setEditing(null); setDepartureId(""); setNotes(""); setPicked([]); setRoomTypes({}); setPayerName(""); setAgentId(""); setAdjustments({});
+    setEditing(null); setDepartureId(""); setNotes(""); setPicked([]); setRoomTypes({}); setPayerName(""); setAgentId(""); setAdjustments({}); setBranchId(null);
     setPilgrimQuery(""); setPilgrimResults([]); setFormErrors({});
   }
 
@@ -302,7 +315,7 @@ export default function BookingPage() {
     if (!result.ok) {setBusy(false); setError(problemMessage(result.error)); return;}
     const booking = result.data;
     if (booking.status !== "DRAFT") {setBusy(false); setError("Hanya booking draf yang dapat dikoreksi. Perbarui daftar untuk melihat status terbaru."); load(query); return;}
-    resetForm(); setEditing(booking); setDepartureId(booking.departure_id); setNotes(booking.notes); setPayerName(booking.payer_name); setAgentId(booking.agent?.id ?? "");
+    resetForm(); setEditing(booking); setDepartureId(booking.departure_id); setNotes(booking.notes); setPayerName(booking.payer_name); setAgentId(booking.agent?.id ?? ""); setBranchId(booking.branch?.id ?? "");
     setAdjustments(Object.fromEntries(booking.participants.filter((p) => p.pricing_snapshot.discount_idr || p.pricing_snapshot.extra_idr).map((p) => [p.pilgrim_id, adjustmentFrom(p.pricing_snapshot)])));
     setPicked(booking.participants.map((p) => ({id:p.pilgrim_id, name:p.pilgrim_name, code:p.pilgrim_code})));
     setRoomTypes(Object.fromEntries(booking.participants.filter((p) => p.pricing_snapshot.room_type).map((p) => [p.pilgrim_id, p.pricing_snapshot.room_type as RoomType])));
@@ -414,8 +427,8 @@ export default function BookingPage() {
                       <p className="text-xs text-muted">
                         {booking.package_name} · {booking.departure_code} · {formatDate(booking.departure_start_at)}
                       </p>
-                      {booking.agent || booking.payer_name ? <p className="text-xs text-muted">
-                        {booking.agent ? `Agen ${booking.agent.name}` : ""}{booking.agent && booking.payer_name ? " · " : ""}{booking.payer_name ? `Pembayar ${booking.payer_name}` : ""}
+                      {booking.agent || booking.payer_name || booking.branch ? <p className="text-xs text-muted">
+                        {[booking.branch ? `Cabang ${booking.branch.code}` : "", booking.agent ? `Agen ${booking.agent.name}` : "", booking.payer_name ? `Pembayar ${booking.payer_name}` : ""].filter(Boolean).join(" · ")}
                       </p> : null}
                     </div>
                     <p className="text-xs text-muted sm:text-right">
@@ -606,6 +619,11 @@ export default function BookingPage() {
 
             <FormField label="Nama pembayar (opsional)" htmlFor="booking-payer" maxLength={160} value={payerName} onChange={(event) => setPayerName(event.target.value)}
               hint="Tercetak sebagai pelanggan di invoice. Kosongkan untuk memakai nama peserta pertama." />
+            {branches.length > 0 ? <FormSelect label="Cabang" htmlFor="booking-branch" value={branchId ?? "__default"} onChange={(event) => setBranchId(event.target.value === "__default" ? null : event.target.value)} hint="Cabang yang mencatat penjualan; dipakai pada laporan per cabang.">
+              {!editing ? <option value="__default">Cabang default saya</option> : null}
+              <option value="">Tanpa cabang</option>
+              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
+            </FormSelect> : null}
             {canAgents ? <FormSelect label="Agen (opsional)" htmlFor="booking-agent" value={agentId} onChange={(event) => setAgentId(event.target.value)} hint="Agen yang mendapat kredit penjualan dan komisi.">
               <option value="">Tanpa agen (penjualan langsung)</option>
               {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} ({agent.code})</option>)}

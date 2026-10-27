@@ -34,6 +34,7 @@ class Agent(TenantScopedModel, BaseAppModel):
     bank_account_name = models.CharField(max_length=160, blank=True, default="")
     bank_account_masked = models.CharField(max_length=32, blank=True, default="")
     area = models.CharField(max_length=120, blank=True, default="")
+    branch = models.ForeignKey("tenants.Branch", null=True, blank=True, on_delete=models.PROTECT, related_name="agents")
     level = models.CharField(max_length=40, blank=True, default="")
     active = models.BooleanField(default=True)
     notes = models.TextField(blank=True, default="")

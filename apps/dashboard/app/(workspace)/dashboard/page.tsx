@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/workspace/ui";
+import { DashboardKpis } from "@/components/workspace/DashboardKpis";
 import { apiFetch, type BankAccount, type MembershipRow, type RoleRow, type SettingsPayload, type TrialStatus, type SaasWallet } from "@/lib/api";
 import { formatDate, formatIdr, formatRemaining } from "@/lib/format";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -75,8 +76,10 @@ export default function DashboardPage() {
     <div className="workspace-page">
       <RevealText as="h1" variant="title" className="text-2xl font-bold">Ringkasan</RevealText>
       <p className="mt-1 text-sm text-muted">
-        Status workspace dan langkah menyiapkan travel Anda{demo ? " (data demo tidak pernah menjadi tagihan)" : ""}.
+        Kinerja travel, hal yang perlu ditindaklanjuti dan langkah menyiapkan workspace{demo ? " (data demo tidak pernah menjadi tagihan)" : ""}.
       </p>
+
+      <div className="mt-6"><DashboardKpis /></div>
 
       <div className="workspace-columns mt-6">
       {hasSummary ? <div className="space-y-4">

@@ -49,7 +49,8 @@ export default function ReportsPage() {
   const active = kind && tabs.some((tab) => tab.kind === kind) ? kind : tabs[0]?.kind ?? null;
   const [preset, setPreset] = useState("upcoming");
   const [range, setRange] = useState(() => presetRange("upcoming"));
-  const [filters, setFilters] = useState({package: "", departure: "", status: "", agent: "", account: ""});
+  const [filters, setFilters] = useState({package: "", departure: "", status: "", agent: "", account: "", branch: ""});
+  const [branches, setBranches] = useState<{id: string; code: string; name: string}[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [accounts, setAccounts] = useState<{id: string; bank_name: string; account_masked: string}[]>([]);
   const [packages, setPackages] = useState<TravelPackage[]>([]);
@@ -60,7 +61,7 @@ export default function ReportsPage() {
 
   const [reloads, setReloads] = useState(0);
   const params = new URLSearchParams({from: range.from, to: range.to});
-  const allowed: Record<string, Kind[]> = {status: ["operational"], agent: ["sales", "commissions"], account: ["payments"]};
+  const allowed: Record<string, Kind[]> = {status: ["operational"], agent: ["sales", "commissions"], account: ["payments"], branch: ["finance", "sales", "payments", "commissions"]};
   if (active !== "saas") for (const [key, value] of Object.entries(filters)) if (value && (!allowed[key] || (active && allowed[key].includes(active)))) params.set(key, value);
   const query = params.toString();
 
@@ -78,6 +79,10 @@ export default function ReportsPage() {
   }, []);
   const canAgents = can("agents.read");
   const canAccounts = can("bank_accounts.read");
+  const canBranches = can("branches.read");
+  useEffect(() => {
+    if (canBranches) void apiFetch<{results: {id: string; code: string; name: string}[]}>("/branches").then((result) => {if (result.ok) setBranches(result.data.results);});
+  }, [canBranches]);
   useEffect(() => {
     if (canAgents) void apiFetch<{results: Agent[]}>("/agents?page=1&page_size=100").then((result) => {if (result.ok) setAgents(result.data.results);});
     if (canAccounts) void apiFetch<{results: {id: string; bank_name: string; account_masked: string}[]}>("/bank-accounts").then((result) => {if (result.ok) setAccounts(result.data.results);});
@@ -125,6 +130,10 @@ export default function ReportsPage() {
         {(active === "sales" || active === "commissions") && canAgents ? <FormSelect label="Agen" htmlFor="report-agent" value={filters.agent} onChange={(event) => setFilters({...filters, agent: event.target.value})}>
           <option value="">Semua agen</option>
           {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+        </FormSelect> : null}
+        {branches.length > 0 && active !== "operational" && active !== "saas" ? <FormSelect label="Cabang" htmlFor="report-branch" value={filters.branch} onChange={(event) => setFilters({...filters, branch: event.target.value})}>
+          <option value="">Semua cabang</option>
+          {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
         </FormSelect> : null}
         {active === "payments" ? <FormSelect label="Rekening" htmlFor="report-account" value={filters.account} onChange={(event) => setFilters({...filters, account: event.target.value})}>
           <option value="">Semua rekening</option><option value="CASH">Tunai</option>

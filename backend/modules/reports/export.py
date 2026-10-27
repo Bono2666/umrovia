@@ -37,7 +37,7 @@ def period_text(report):
 
 def header_lines(report, labels):
     lines = [f"{report['travel']} · Periode {period_text(report)}", f"Per {document_date(report['as_of'], report['timezone'], with_time=True)}"]
-    active = [f"{name}: {labels[key]}" for key, name in (("package", "Paket"), ("departure", "Keberangkatan"), ("status", "Status"), ("agent", "Agen"), ("account", "Rekening")) if report["filters"].get(key)]
+    active = [f"{name}: {labels[key]}" for key, name in (("package", "Paket"), ("departure", "Keberangkatan"), ("status", "Status"), ("agent", "Agen"), ("account", "Rekening"), ("branch", "Cabang")) if report["filters"].get(key)]
     if active:
         lines.append("Filter — " + " · ".join(active))
     if report.get("note"):

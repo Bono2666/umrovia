@@ -26,7 +26,8 @@ from modules.documents.render import format_idr
 from modules.manifest.models import ManifestVersion
 from modules.manifest.services import readiness
 from modules.payments.models import InvoiceLine, PaymentAllocation, PaymentEvent, TravelInvoice, TravelPayment
-from modules.travel_finance.models import ExpenseCategory, TravelBankAccount, TravelExpense
+from modules.travel_finance.models import ExpenseCategory, OpeningBalance, TravelExpense
+from modules.travel_finance.services import ledger as cash_ledger
 from modules.wallet.models import Wallet, WalletLedger, WalletTopup
 
 MAX_RANGE_DAYS = 731
@@ -74,7 +75,7 @@ def parse_filters(params, tenant):
         "from": start, "to": end, "zone": zone, "today": today,
         "start_dt": datetime.combine(start, time.min, zone), "end_dt": datetime.combine(end + timedelta(days=1), time.min, zone),
         "package": _uuid(params.get("package"), "package"), "departure": _uuid(params.get("departure"), "departure"), "status": status,
-        "agent": _uuid(params.get("agent"), "agent"), "account": account if account == "CASH" else _uuid(account, "account"),
+        "agent": _uuid(params.get("agent"), "agent"), "branch": _uuid(params.get("branch"), "branch"), "account": account if account == "CASH" else _uuid(account, "account"),
     }
 
 
@@ -83,7 +84,7 @@ def _envelope(kind, title, tenant, environment, f, **extra):
         "report": kind, "title": title, "travel": tenant.display_name, "environment": environment,
         "as_of": timezone.now().isoformat(), "timezone": str(f["zone"]),
         "period": {"from": f["from"].isoformat(), "to": f["to"].isoformat()},
-        "filters": {key: str(f[key]) if f.get(key) else "" for key in ("package", "departure", "status", "agent", "account")},
+        "filters": {key: str(f[key]) if f.get(key) else "" for key in ("package", "departure", "status", "agent", "account", "branch")},
         **extra,
     }
 
@@ -146,6 +147,9 @@ def operational(tenant, environment, f):
     )
     versions = {row["departure_id"]: row["latest"] for row in ManifestVersion.objects.filter(departure_id__in=ids).values("departure_id").annotate(latest=Max("version_no"))}
     status_label = dict(DepartureStatus.choices)
+    from modules.booking.models import WaitlistEntry
+
+    waitlist = dict(WaitlistEntry.objects.filter(departure__in=deps, status="WAITING").values_list("departure_id").annotate(n=Count("id")))
     rows = []
     for dep in deps:
         ready = readiness(dep)
@@ -153,13 +157,13 @@ def operational(tenant, environment, f):
             "departure_id": str(dep.pk), "code": dep.code, "package": dep.package.name, "package_id": str(dep.package_id),
             "start_at": _local_date(dep.start_at, f["zone"]), "status": status_label.get(dep.status, dep.status),
             "capacity": dep.seat_capacity, "seats_taken": dep.seats_taken, "available": dep.available_seats,
-            "occupancy": _pct(dep.seats_taken, dep.seat_capacity), "bookings": bookings.get(dep.pk, 0),
+            "occupancy": _pct(dep.seats_taken, dep.seat_capacity), "waitlist": waitlist.get(dep.pk, 0), "bookings": bookings.get(dep.pk, 0),
             "participants": ready["participants"], "dp_received": ready["dp_received"], "confirmed": ready["confirmed"],
             "departed": departed.get(dep.pk, 0), "docs_complete": ready["docs_complete"],
             "readiness": "Lengkap" if ready["checklist_ready"] else f"Kurang {ready['gap_count']}",
             "gap_count": ready["gap_count"], "manifest": f"v{versions[dep.pk]}" if dep.pk in versions else "Belum",
         })
-    counts = ("capacity", "seats_taken", "available", "bookings", "participants", "dp_received", "confirmed", "departed", "docs_complete", "gap_count")
+    counts = ("capacity", "seats_taken", "available", "waitlist", "bookings", "participants", "dp_received", "confirmed", "departed", "docs_complete", "gap_count")
     totals = _sum(rows, *counts)
     totals["occupancy"] = _pct(totals["seats_taken"], totals["capacity"])
     by_package = {}
@@ -186,7 +190,7 @@ def operational(tenant, environment, f):
         sections=[
             _section("departures", "Kesiapan per keberangkatan", [
                 _col("code", "Keberangkatan"), _col("package", "Paket"), _col("start_at", "Berangkat", "date"), _col("status", "Status"),
-                *count_cols, _col("bookings", "Booking", "int"), _col("participants", "Jamaah", "int"), _col("dp_received", "DP diterima", "int"),
+                *count_cols, _col("waitlist", "Daftar tunggu", "int"), _col("bookings", "Booking", "int"), _col("participants", "Jamaah", "int"), _col("dp_received", "DP diterima", "int"),
                 _col("confirmed", "Terkonfirmasi", "int"), _col("docs_complete", "Dokumen lengkap", "int"), _col("readiness", "Checklist"), _col("manifest", "Manifest"),
             ], rows, totals={**totals, "code": "Total"}, truncated=truncated),
             _section("packages", "Jamaah per paket", [
@@ -204,19 +208,16 @@ def operational(tenant, environment, f):
 # ----------------------------------------------------------------- finance --
 
 
-def _account_key(payment_or_expense, method=None):
-    if payment_or_expense.bank_account_id:
-        return str(payment_or_expense.bank_account_id)
-    return "CASH" if method in (None, "CASH") else "UNASSIGNED"
-
-
 def finance(tenant, environment, f):
     """RPT-02/04: invoice, penerimaan, reversal, piutang & aging, kas/bank, pengeluaran, margin estimasi."""
     zone, start, end = f["zone"], f["start_dt"], f["end_dt"]
     invoices = _scope_departures(TravelInvoice.objects.filter(environment=environment), f, "booking__departure__")
     payments = _scope_departures(TravelPayment.objects.filter(environment=environment, status__in=["VERIFIED", "REVERSED"], verified_at__isnull=False), f, "booking__departure__")
     reversals = _scope_departures(PaymentEvent.objects.filter(environment=environment, kind="payment.reversed"), f, "payment__booking__departure__").select_related("payment")
-    expenses = TravelExpense.objects.filter(environment=environment, voided_at__isnull=True)
+    expenses = TravelExpense.objects.filter(environment=environment, voided_at__isnull=True, approval_status="APPROVED")
+    if f.get("branch"):
+        invoices, payments = invoices.filter(booking__branch_id=f["branch"]), payments.filter(booking__branch_id=f["branch"])
+        reversals, expenses = reversals.filter(payment__booking__branch_id=f["branch"]), expenses.filter(branch_id=f["branch"])
     if f["departure"] or f["package"]:
         expenses = _scope_departures(expenses.filter(departure__isnull=False), f, "departure__")
 
@@ -255,29 +256,9 @@ def finance(tenant, environment, f):
         })
     outstanding = invoices.filter(status__in=OPEN_INVOICES).aggregate(total=Sum("balance_idr"))["total"] or 0
 
-    # Kas/bank: saldo awal (sebelum periode) + masuk − reversal − pengeluaran = saldo akhir.
-    accounts = {str(a.pk): f"{a.bank_name} {a.account_masked}" for a in TravelBankAccount.objects.all()}
-    accounts.update({"CASH": "Tunai", "UNASSIGNED": "Transfer (rekening tidak dicatat)"})
-    ledger = defaultdict(lambda: {"opening_idr": 0, "inflow_idr": 0, "reversal_idr": 0, "expense_idr": 0})
-    for payment in payments.filter(verified_at__lt=end).only("amount_idr", "bank_account_id", "method", "verified_at"):
-        bucket = ledger[_account_key(payment, payment.method)]
-        bucket["inflow_idr" if payment.verified_at >= start else "opening_idr"] += payment.amount_idr
-    for event in reversals.filter(created_at__lt=end):
-        bucket = ledger[_account_key(event.payment, event.payment.method)]
-        if event.created_at >= start:
-            bucket["reversal_idr"] += event.payment.amount_idr
-        else:
-            bucket["opening_idr"] -= event.payment.amount_idr
-    for expense in expenses.filter(spent_on__lte=f["to"]).only("amount_idr", "bank_account_id", "spent_on"):
-        bucket = ledger[_account_key(expense)]
-        if expense.spent_on >= f["from"]:
-            bucket["expense_idr"] += expense.amount_idr
-        else:
-            bucket["opening_idr"] -= expense.amount_idr
-    cash_rows = []
-    for key, values in sorted(ledger.items(), key=lambda item: accounts.get(item[0], item[0])):
-        closing = values["opening_idr"] + values["inflow_idr"] - values["reversal_idr"] - values["expense_idr"]
-        cash_rows.append({"account": accounts.get(key, "Rekening lain"), **values, "closing_idr": closing})
+    # Kas/bank (MOD-11): saldo awal berotorisasi + masuk − reversal − pengeluaran ± transfer = saldo akhir.
+    # Buku kas selalu per seluruh travel (atau per cabang); filter paket/keberangkatan tidak berlaku.
+    cash_rows = [{k: v for k, v in row.items() if k not in ("key", "opening_as_of")} for row in cash_ledger(tenant, environment, f["from"], f["to"], branch=f.get("branch_obj"))]
 
     category_label = dict(ExpenseCategory.choices)
     by_category = defaultdict(lambda: {"count": 0, "amount_idr": 0})
@@ -299,7 +280,7 @@ def finance(tenant, environment, f):
     dep_ids = [d.pk for d in deps]
     sales = dict(InvoiceLine.objects.filter(invoice__booking__departure_id__in=dep_ids).exclude(invoice__status="VOIDED").values_list("invoice__booking__departure_id").annotate(t=Sum("amount_idr")))
     received = dict(PaymentAllocation.objects.filter(invoice__booking__departure_id__in=dep_ids, payment__status="VERIFIED").values_list("invoice__booking__departure_id").annotate(t=Sum("amount_idr")))
-    costs = dict(TravelExpense.objects.filter(departure_id__in=dep_ids, voided_at__isnull=True).values_list("departure_id").annotate(t=Sum("amount_idr")))
+    costs = dict(TravelExpense.objects.filter(departure_id__in=dep_ids, voided_at__isnull=True, approval_status="APPROVED").values_list("departure_id").annotate(t=Sum("amount_idr")))
     margin_rows = []
     for dep in deps:
         sale, cost = sales.get(dep.pk, 0), costs.get(dep.pk, 0)
@@ -316,12 +297,16 @@ def finance(tenant, environment, f):
     allocated_period = PaymentAllocation.objects.filter(payment__in=[p.pk for p in period_payments]).aggregate(t=Sum("amount_idr"))["t"] or 0
     net = gross - reversed_total
     cash_net = sum(row["inflow_idr"] - row["reversal_idr"] - row["expense_idr"] for row in cash_rows)
+    transfers_balanced = sum(row["transfer_in_idr"] for row in cash_rows) == sum(row["transfer_out_idr"] for row in cash_rows)
+    anchored = OpeningBalance.objects.filter(environment=environment, status="APPROVED", as_of__gt=f["from"], as_of__lte=f["to"]).exists()
     checks = [
         {"label": "Piutang = total invoice − pembayaran terverifikasi teralokasi", "ok": (invoice_totals["total"] or 0) - allocated == (invoice_totals["balance"] or 0),
          "detail": f"Invoice aktif {_rp(invoice_totals['total'])} − alokasi {_rp(allocated)} = saldo {_rp(invoice_totals['balance'])}"},
         {"label": "Penerimaan periode = alokasi per jamaah", "ok": gross == allocated_period, "detail": f"Penerimaan {_rp(gross)} · alokasi {_rp(allocated_period)}"},
-        {"label": "Mutasi kas/bank = penerimaan bersih − pengeluaran", "ok": cash_net == net - spent, "detail": f"Mutasi {_rp(cash_net)} · bersih {_rp(net)} − pengeluaran {_rp(spent)}"},
+        {"label": "Transfer antarrekening berpasangan (masuk = keluar)", "ok": transfers_balanced, "detail": "Total kas travel tidak berubah oleh transfer"},
     ]
+    if not (f["package"] or f["departure"] or anchored):
+        checks.append({"label": "Mutasi kas/bank = penerimaan bersih − pengeluaran", "ok": cash_net == net - spent, "detail": f"Mutasi {_rp(cash_net)} · bersih {_rp(net)} − pengeluaran {_rp(spent)}"})
     money = "money"
     return _envelope(
         "finance", "Laporan keuangan travel", tenant, environment, f,
@@ -337,9 +322,10 @@ def finance(tenant, environment, f):
             _section("receipts", "Penerimaan pembayaran", [_col("kind", "Jenis"), _col("count", "Transaksi", "int"), _col("amount_idr", "Nominal", money)], receipts_rows,
                      totals={"kind": "Bersih", "count": len(period_payments), "amount_idr": net}, description="Diakui saat diverifikasi; reversal mengurangi pada tanggal reversal."),
             _section("cash", "Kas & bank per rekening", [_col("account", "Rekening"), _col("opening_idr", "Saldo awal", money), _col("inflow_idr", "Masuk", money),
-                     _col("reversal_idr", "Reversal", money), _col("expense_idr", "Pengeluaran", money), _col("closing_idr", "Saldo akhir", money)], cash_rows,
-                     totals={"account": "Total", **_sum(cash_rows, "opening_idr", "inflow_idr", "reversal_idr", "expense_idr", "closing_idr")},
-                     description="Saldo dihitung dari pembayaran terverifikasi dan pengeluaran yang dicatat di Umrovia (bukan mutasi rekening bank)."),
+                     _col("reversal_idr", "Reversal", money), _col("expense_idr", "Pengeluaran", money), _col("transfer_in_idr", "Transfer masuk", money),
+                     _col("transfer_out_idr", "Transfer keluar", money), _col("closing_idr", "Saldo akhir", money)], cash_rows,
+                     totals={"account": "Total", **_sum(cash_rows, "opening_idr", "inflow_idr", "reversal_idr", "expense_idr", "transfer_in_idr", "transfer_out_idr", "closing_idr")},
+                     description="Saldo awal berotorisasi ditambah pembayaran terverifikasi, pengeluaran disetujui dan transfer yang dicatat di Umrovia (bukan mutasi rekening bank). Tidak terpengaruh filter paket/keberangkatan."),
             _section("aging", "Umur piutang", [_col("bucket", "Umur"), _col("amount_idr", "Sisa tagihan", money)],
                      [{"bucket": label, "amount_idr": aging_totals[key]} for key, label, *_ in AGING], totals={"bucket": "Total", "amount_idr": sum(aging_totals.values())}),
             _section("receivables", "Rincian piutang", [_col("invoice_number", "Invoice"), _col("booking_code", "Booking"), _col("buyer", "Pelanggan"), _col("due_at", "Jatuh tempo", "date"),
@@ -421,6 +407,8 @@ def _booking_scope(qs, f, prefix=""):
     qs = _scope_departures(qs, f, f"{prefix}departure__")
     if f.get("agent"):
         qs = qs.filter(**{f"{prefix}agent_id": f["agent"]})
+    if f.get("branch"):
+        qs = qs.filter(**{f"{prefix}branch_id": f["branch"]})
     return qs
 
 
@@ -573,10 +561,10 @@ def commissions_report(tenant, environment, f):
     agent_totals = _sum(agent_rows, "estimated_idr", "earned_idr", "approved_idr", "paid_idr", "reversed_idr")
     paid_period = Commission.objects.filter(environment=environment, status=CommissionStatus.PAID, paid_on__gte=f["from"], paid_on__lte=f["to"])
     paid_period = _booking_scope(paid_period, f, "booking__").aggregate(n=Count("id"), t=Sum("amount_idr"))
-    expense_total = TravelExpense.objects.filter(environment=environment, category="COMMISSION", voided_at__isnull=True, spent_on__gte=f["from"], spent_on__lte=f["to"])
+    expense_total = TravelExpense.objects.filter(environment=environment, category="COMMISSION", voided_at__isnull=True, approval_status="APPROVED", spent_on__gte=f["from"], spent_on__lte=f["to"])
     expense_total = expense_total.aggregate(t=Sum("amount_idr"))["t"] or 0
     money = "money"
-    scoped = bool(f["package"] or f["departure"] or f.get("agent"))
+    scoped = bool(f["package"] or f["departure"] or f.get("agent") or f.get("branch"))
     return _envelope(
         "commissions", "Laporan Komisi Agen", tenant, environment, f,
         note="Komisi dikelompokkan menurut tanggal dibuat (booking direservasi). Earned = layak dibayar + disetujui + dibayar.",

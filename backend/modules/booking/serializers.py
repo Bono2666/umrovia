@@ -59,6 +59,7 @@ def booking_payload(booking: Booking) -> dict:
         "booked_at": booking.booked_at.isoformat(),
         "notes": booking.notes,
         "payer_name": booking.payer_name,
+        "branch": {"id": str(booking.branch_id), "code": booking.branch.code, "name": booking.branch.name} if booking.branch_id else None,
         "agent": {"id": str(booking.agent_id), "code": booking.agent.code, "name": booking.agent.name} if booking.agent_id else None,
         "cancel_reason": booking.cancel_reason,
         "canceled_by_name": (
@@ -93,6 +94,7 @@ class BookingCreateSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True, default="")
     allow_duplicate = serializers.BooleanField(required=False, default=False)
     payer_name = serializers.CharField(required=False, allow_blank=True, max_length=160, default="")
+    branch = serializers.UUIDField(required=False, allow_null=True, default=None)
     agent = serializers.UUIDField(required=False, allow_null=True, default=None)
     adjustments = serializers.DictField(child=AdjustmentSerializer(), required=False)
 
@@ -111,6 +113,7 @@ class BookingUpdateSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     allow_duplicate = serializers.BooleanField(required=False, default=False)
     payer_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
+    branch = serializers.UUIDField(required=False, allow_null=True)
     agent = serializers.UUIDField(required=False, allow_null=True)
     adjustments = serializers.DictField(child=AdjustmentSerializer(), required=False)
 

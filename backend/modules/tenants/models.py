@@ -90,8 +90,31 @@ class MembershipStatus(models.TextChoices):
     REVOKED = "REVOKED", "Dicabut"
 
 
+class Branch(TenantScopedModel, BaseAppModel):
+    """Cabang/unit kerja travel (MOD-03): kode, penanggung jawab, kontak.
+
+    Transaksi (booking, pengeluaran, transfer kas) dan laporan dapat ditandai
+    per cabang. Cakupan izin per cabang belum diterapkan (Spec TBD-08): semua
+    staf melihat seluruh cabang sesuai role-nya.
+    """
+
+    code = models.CharField(max_length=16)
+    name = models.CharField(max_length=120)
+    manager_name = models.CharField(max_length=160, blank=True, default="")
+    phone = models.CharField(max_length=32, blank=True, default="")
+    address = models.TextField(blank=True, default="")
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-active", "code"]
+        constraints = [models.UniqueConstraint(fields=["tenant", "code"], name="uq_branch_code")]
+
+    def __str__(self) -> str:
+        return f"{self.code} {self.name}"
+
+
 class TenantMembership(TenantScopedModel, BaseAppModel):
-    """Keanggotaan user di sebuah travel. branch_id menyusul di F04 (multi-cabang).
+    """Keanggotaan user di sebuah travel; `branch` = cabang default staf (prefill transaksi).
 
     Catatan: provisioning signup membuat membership TANPA context tenant —
     service provisioning memakai `objects.without_tenant_guard()`.
@@ -100,6 +123,7 @@ class TenantMembership(TenantScopedModel, BaseAppModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="memberships")
     role = models.ForeignKey(Role, null=True, blank=True, on_delete=models.SET_NULL, related_name="memberships")
     status = models.CharField(max_length=16, choices=MembershipStatus.choices, default=MembershipStatus.INVITED)
+    branch = models.ForeignKey(Branch, null=True, blank=True, on_delete=models.SET_NULL, related_name="members")
 
     class Meta:
         verbose_name = "membership"

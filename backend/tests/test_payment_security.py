@@ -234,6 +234,7 @@ def test_payment_role_migration_preserves_custom_roles(tenant_a, tenant_b):
         import_module("modules.tenants.migrations.0009_report_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
         import_module("modules.tenants.migrations.0011_lead_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))
         import_module("modules.tenants.migrations.0012_agent_commission_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))  # agen & komisi
+        import_module("modules.tenants.migrations.0014_branch_role_defaults").upgrade(apps, SimpleNamespace(connection=connection))  # cabang
     for role in Role.objects.filter(tenant=tenant_a):
         assert set(role.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS[role.name])
     assert "payments.verify" not in DEFAULT_ROLE_PERMISSIONS["Admin"]

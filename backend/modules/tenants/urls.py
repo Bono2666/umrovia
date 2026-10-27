@@ -1,7 +1,7 @@
 """Tenant API — Spec §8.1: /workspaces/switch, /memberships, /tenant/settings, /roles."""
 from django.urls import path
 
-from modules.tenants import views
+from modules.tenants import branches, views
 
 app_name = "tenants"
 
@@ -13,6 +13,9 @@ urlpatterns = [
         views.MembershipDetailView.as_view(),
         name="memberships-detail",
     ),
+    path("branches", branches.BranchListCreateView.as_view(), name="branches"),
+    path("branches/<uuid:branch_id>", branches.BranchDetailView.as_view(), name="branch-detail"),
+    path("memberships/<uuid:membership_id>/branch", branches.MembershipBranchView.as_view(), name="membership-branch"),
     path("tenant/settings", views.TenantSettingsView.as_view(), name="tenant-settings"),
     path("roles", views.ListCreateRolesView.as_view(), name="roles-list-create"),
     path("roles/<uuid:role_id>", views.RoleDetailView.as_view(), name="roles-detail"),
