@@ -136,6 +136,7 @@ def _invoice_document(*, booking, participants, number, due_at, buyer_name, poli
         "number": number, "environment": booking.environment, "issued_at": timezone.now().isoformat(), "timezone": booking.tenant.timezone,
         "due_at": due_at.isoformat(), "issuer": issuer_snapshot(booking.tenant),
         "booking_code": booking.code, "buyer_name": buyer_name.strip() or booking.payer_name or participants[0].pilgrim.name,
+        "branch": f"{booking.branch.code} · {booking.branch.name}" if booking.branch_id else "",
         "lines": lines, "gross_idr": sum(line["gross_idr"] for line in lines), "discount_idr": sum(line["discount_idr"] for line in lines),
         "extra_idr": sum(line["extra_idr"] for line in lines), "total_idr": total, "paid_idr": 0, "outstanding_idr": total,
         "dp_policy": policy, "notes": str(config.get("notes") or ""), "version": version,

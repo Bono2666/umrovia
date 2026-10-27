@@ -35,7 +35,7 @@ from modules.booking.services import (
     update_draft_booking,
 )
 from modules.catalog.models import RoomType
-from modules.tenants.branches import default_branch, resolve_branch
+from modules.tenants.branches import assert_branch_allowed, default_branch, resolve_branch, scope_filter
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import has_permission, permission_list, require_permission
 
@@ -53,9 +53,9 @@ def _can_discount(request) -> bool:
     return has_permission(permission_list(request.membership.role), "bookings.discount")
 
 
-def _get_booking(booking_id) -> Booking:
+def _get_booking(booking_id, request) -> Booking:
     try:
-        return Booking.objects.select_related("departure", "departure__package", "agent", "branch").get(pk=booking_id)
+        return scope_filter(Booking.objects, request).select_related("departure", "departure__package", "agent", "branch").get(pk=booking_id)
     except (Booking.DoesNotExist, ValueError, DjangoValidationError):
         raise NotFound("Booking tidak ditemukan.") from None
 
@@ -70,7 +70,7 @@ class BookingListCreateView(APIView):
 
     @extend_schema(operation_id="bookings_list", responses=OpenApiTypes.OBJECT)
     def get(self, request):
-        qs = Booking.objects.all()
+        qs = scope_filter(Booking.objects.all(), request)
         env = request.query_params.get("environment", "").strip()
         if env:
             from modules.tenants.models import Environment
@@ -124,7 +124,7 @@ class BookingListCreateView(APIView):
                 agent_id=serializer.validated_data.get("agent"),
                 adjustments=serializer.validated_data.get("adjustments"),
                 can_discount=_can_discount(request),
-                branch=resolve_branch(serializer.validated_data.get("branch")) if "branch" in request.data else default_branch(request),
+                branch=assert_branch_allowed(request, resolve_branch(serializer.validated_data.get("branch"))) if "branch" in request.data else default_branch(request),
                 price_categories=serializer.validated_data.get("price_categories"),
                 addons=serializer.validated_data.get("addons"),
             )
@@ -158,12 +158,12 @@ class BookingDetailView(APIView):
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request, booking_id):
-        booking = _get_booking(booking_id)
+        booking = _get_booking(booking_id, request)
         return Response(booking_payload(booking))
 
     @extend_schema(request=BookingUpdateSerializer, responses=OpenApiTypes.OBJECT)
     def patch(self, request, booking_id):
-        booking = _get_booking(booking_id)
+        booking = _get_booking(booking_id, request)
         assert_environment_writable(request.tenant, booking.environment)
         serializer = BookingUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -182,7 +182,7 @@ class BookingDetailView(APIView):
                 adjustments=validated.get("adjustments"),
                 can_discount=_can_discount(request),
                 actor=request.user,
-                branch=resolve_branch(validated["branch"]) if "branch" in validated else UNSET,
+                branch=assert_branch_allowed(request, resolve_branch(validated["branch"])) if "branch" in validated else UNSET,
                 price_categories=validated.get("price_categories"),
                 addons=validated.get("addons"),
             )
@@ -198,12 +198,12 @@ class BookingDetailView(APIView):
             object_id=booking.pk,
             changes={"code": booking.code, "fields": sorted(set(request.data.keys()))},
         )
-        booking = _get_booking(booking.pk)
+        booking = _get_booking(booking.pk, request)
         return Response(booking_payload(booking))
 
     @extend_schema(responses={204: None}, description="Hapus booking DRAF (belum menahan kursi, belum ada invoice). Kuota trial yang terpakai tidak dikembalikan (TR03).")
     def delete(self, request, booking_id):
-        booking = _get_booking(booking_id)
+        booking = _get_booking(booking_id, request)
         assert_environment_writable(request.tenant, booking.environment)
         try:
             code = delete_draft_booking(booking_id=booking.pk)
@@ -220,7 +220,7 @@ class BookingTransitionView(APIView):
 
     @extend_schema(request=BookingTransitionSerializer, responses=OpenApiTypes.OBJECT)
     def post(self, request, booking_id):
-        booking = _get_booking(booking_id)
+        booking = _get_booking(booking_id, request)
         assert_environment_writable(request.tenant, booking.environment)
         serializer = BookingTransitionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -249,7 +249,7 @@ class BookingTransitionView(APIView):
             object_id=booking.pk,
             changes=changes,
         )
-        booking = _get_booking(booking.pk)
+        booking = _get_booking(booking.pk, request)
         return Response(booking_payload(booking))
 
 

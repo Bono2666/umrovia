@@ -44,6 +44,8 @@ def render_financial_pdf(snapshot, *, receipt=False):
     version = snapshot.get("version", 1)
     story = [text(f"{title} {number}" + (f" · Revisi {version}" if not receipt and version > 1 else ""), heading), text(snapshot["issuer"]["legal_name"]), text(snapshot["issuer"].get("address", "-"), small)]
     zone = snapshot.get("timezone", "Asia/Jakarta")
+    if snapshot.get("branch"):
+        story.append(text(f"Cabang: {snapshot['branch']}", small))
     story.extend([Spacer(1, 12), text(f"Booking: {snapshot['booking_code']}"), text(f"Pelanggan: {snapshot['buyer_name']}"), text(f"{'Tanggal verifikasi' if receipt else 'Tanggal terbit'}: {document_date(snapshot['issued_at'], zone, with_time=True)}")])
     if receipt:
         method = {"CASH": "Tunai", "TRANSFER": "Transfer bank"}.get(snapshot["method"], snapshot["method"])

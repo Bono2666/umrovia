@@ -132,10 +132,10 @@ def local_day_end(tenant):
     return datetime.combine(today + timedelta(days=1), time.min, zone)
 
 
-def summary(tenant, environment) -> dict:
+def summary(tenant, environment, queryset=None) -> dict:
     """Funnel per tahap, konversi, follow-up jatuh tempo (hari lokal travel), dan sumber (MOD-19)."""
     now = timezone.now()
-    qs = Lead.objects.filter(environment=environment)
+    qs = (queryset if queryset is not None else Lead.objects).filter(environment=environment)
     stages = dict(qs.order_by().values_list("stage").annotate(n=Count("id")))
     won, lost = stages.get(LeadStage.WON, 0), stages.get(LeadStage.LOST, 0)
     by_source = dict(qs.order_by().values_list("source").annotate(n=Count("id")))

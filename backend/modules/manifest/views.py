@@ -46,6 +46,7 @@ from modules.manifest.services import (
 )
 from modules.payments.services import issuer_snapshot
 from modules.pilgrims.crypto import PIIDecryptionError, decrypt_pii
+from modules.tenants.branches import has_full_scope, require_full_scope
 from modules.tenants.environment import (
     assert_environment_writable,
     resolve_active_environment,
@@ -136,7 +137,7 @@ class ManifestView(APIView):
     def get(self, request, departure_id):
         dep = _get_departure(departure_id)
         filters = _filters(request.query_params)
-        rows = manifest_rows(dep, pii=False, **filters)
+        rows = _scoped_rows(request, dep, manifest_rows(dep, pii=False, **filters))
         versions = list(ManifestVersion.objects.filter(departure=dep)[:20])
         payload = manifest_payload(
             departure=dep,
@@ -147,7 +148,8 @@ class ManifestView(APIView):
         if (request.query_params.get("checklist_gaps") or "").strip() in ("1", "true", "yes"):
             payload["checklist_gaps"] = checklist_gaps(dep, stage="before_ready")
         # Ringkasan kesiapan selalu atas seluruh roster, bukan hasil filter.
-        payload["readiness"] = readiness(dep, None if any(filters.values()) else rows)
+        payload["readiness"] = readiness(dep, None if any(filters.values()) or not has_full_scope(request) else rows)
+        payload["full_scope"] = has_full_scope(request)
         return Response(payload)
 
 
@@ -157,6 +159,7 @@ class ManifestPublishView(APIView):
     permission_classes = [IsAuthenticated, require_permission("manifest.publish")]
 
     def post(self, request, departure_id):
+        require_full_scope(request, "Penerbitan manifest resmi")
         dep = _get_departure(departure_id)
         assert_environment_writable(request.tenant, dep.environment)
         version = publish_manifest(departure=dep, actor=request.user)
@@ -198,7 +201,7 @@ class ManifestExportView(APIView):
             body, row_count = export_csv(dep, pii=pii, **filters)
             response = _file_response(body, "text/csv; charset=utf-8", f"{name}.csv")
         else:
-            rows = manifest_rows(dep, pii=pii, **filters)
+            rows = _scoped_rows(request, dep, manifest_rows(dep, pii=pii, **filters))
             row_count = len(rows)
             meta = printing.print_meta(title="Manifest jamaah", travel=request.tenant.display_name, environment=dep.environment, actor=request.user, zone=request.tenant.timezone)
             if kind == "xlsx":
@@ -222,6 +225,7 @@ class ManifestVersionPdfView(APIView):
     permission_classes = [IsAuthenticated, require_permission("manifest.export")]
 
     def get(self, request, departure_id, version_no):
+        require_full_scope(request, "Manifest resmi")
         dep = _get_departure(departure_id)
         version = ManifestVersion.objects.filter(departure=dep, version_no=version_no).select_related("published_by").first()
         if version is None:
@@ -247,10 +251,27 @@ class ManifestVersionPdfView(APIView):
 PRINT_KINDS = {"registration-forms": "Formulir pendaftaran", "labels": "Label jamaah", "envelopes": "Amplop jamaah"}
 
 
-def _people(dep, *, booking="", pii=False):
+def _allowed_bookings(request, dep):
+    """TBD-08 opsi C: booking keberangkatan dalam cakupan cabang staf (None = semua)."""
+    from modules.booking.models import Booking
+    from modules.tenants.branches import branch_scope, scope_filter
+
+    if branch_scope(request) is None:
+        return None
+    return {str(pk) for pk in scope_filter(Booking.objects.filter(departure=dep), request).values_list("pk", flat=True)}
+
+
+def _scoped_rows(request, dep, rows):
+    allowed = _allowed_bookings(request, dep)
+    return rows if allowed is None else [row for row in rows if row["booking_id"] in allowed]
+
+
+def _people(dep, *, booking="", pii=False, allowed=None):
     people = []
     for row in active_participants(dep):
         if booking and str(row.booking_id) != booking:
+            continue
+        if allowed is not None and str(row.booking_id) not in allowed:
             continue
         p = row.pilgrim
         person = {
@@ -288,7 +309,7 @@ class DeparturePrintView(APIView):
         pii = kind == "registration-forms" and _flag(request.query_params, "pii")
         if pii:
             _require_pii(request, dep, action="manifest.print_denied", changes={"kind": kind})
-        people = _people(dep, booking=booking, pii=pii)
+        people = _people(dep, booking=booking, pii=pii, allowed=_allowed_bookings(request, dep))
         meta = printing.print_meta(title=PRINT_KINDS[kind], travel=request.tenant.display_name, environment=dep.environment, actor=request.user, zone=request.tenant.timezone)
         departure = _departure_meta(dep)
         if kind == "registration-forms":

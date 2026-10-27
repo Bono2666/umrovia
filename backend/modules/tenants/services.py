@@ -24,7 +24,7 @@ from modules.tenants.models import (
     TenantSettings,
     TenantState,
 )
-from modules.tenants.rbac import DEFAULT_ROLE_PERMISSIONS
+from modules.tenants.rbac import DEFAULT_ROLE_BRANCH_SCOPE, DEFAULT_ROLE_PERMISSIONS
 
 
 class ProvisioningError(Exception):
@@ -58,7 +58,7 @@ def provision_workspace(owner, slug: str) -> Tenant:
             if role_name == "Owner":
                 continue
             Role.objects.get_or_create(
-                tenant=tenant, name=role_name, defaults={"permissions_json": grants, "is_system": False}
+                tenant=tenant, name=role_name, defaults={"permissions_json": grants, "is_system": False, "branch_scope": DEFAULT_ROLE_BRANCH_SCOPE.get(role_name, "ALL")}
             )
         assert_internal_user_quota(tenant)
         TenantMembership.objects.without_tenant_guard().create(

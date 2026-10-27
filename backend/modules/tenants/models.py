@@ -66,6 +66,8 @@ class Role(BaseAppModel):
     name = models.CharField(max_length=64)
     permissions_json = models.JSONField(default=dict, blank=True)
     is_system = models.BooleanField(default=False)
+    # TBD-08 opsi C: ALL = semua cabang; OWN = hanya cabang yang ditugaskan + data tanpa cabang.
+    branch_scope = models.CharField(max_length=8, choices=[("ALL", "Semua cabang"), ("OWN", "Cabang sendiri")], default="ALL")
 
     class Meta:
         verbose_name = "role"
@@ -135,6 +137,16 @@ class TenantMembership(TenantScopedModel, BaseAppModel):
 
     def __str__(self) -> str:
         return f"{self.user.email} @ {self.tenant.slug} ({self.status})"
+
+
+class MembershipBranch(TenantScopedModel, BaseAppModel):
+    """Cabang yang ditugaskan ke staf (bisa lebih dari satu) — dasar cakupan role `OWN`."""
+
+    membership = models.ForeignKey(TenantMembership, on_delete=models.CASCADE, related_name="branch_assignments")
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="assignments")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["membership", "branch"], name="uq_membership_branch")]
 
 
 class Environment(models.TextChoices):
