@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch, hasPermission, type UserPayload } from "./api";
 
 export function useWorkspacePermissions() {
@@ -19,5 +19,9 @@ export function useWorkspacePermissions() {
     });
     return () => { cancelled = true; };
   }, []);
-  return { loading: permissions === null, can: (grant: string) => permissions !== null && hasPermission(permissions, grant), canEditEnvironment: (environment: string) => writableEnvironments.includes(environment), writableEnvironments };
+  // Referensi stabil: halaman memakai `can` sebagai dependensi efek pemuatan data;
+  // fungsi baru tiap render memicu efek → setState → render tanpa henti.
+  const can = useCallback((grant: string) => permissions !== null && hasPermission(permissions, grant), [permissions]);
+  const canEditEnvironment = useCallback((environment: string) => writableEnvironments.includes(environment), [writableEnvironments]);
+  return { loading: permissions === null, can, canEditEnvironment, writableEnvironments };
 }
