@@ -104,6 +104,8 @@ DEFAULT_ROLE_PERMISSIONS["Admin"] += ["notifications.manage"]
 # (Spec §8.5: /reports/finance dan /reports/saas-usage = Owner/Finance).
 DEFAULT_ROLE_PERMISSIONS["Operations"] += ["reports.read"]
 DEFAULT_ROLE_PERMISSIONS["Finance"] += ["reports.finance", "expenses.read", "expenses.write"]
+# CRM (MOD-19): Admin ikut mengelola lead; Sales sudah memiliki leads.manage.
+DEFAULT_ROLE_PERMISSIONS["Admin"] += ["leads.manage"]
 
 
 def permission_list(role) -> list[str]:

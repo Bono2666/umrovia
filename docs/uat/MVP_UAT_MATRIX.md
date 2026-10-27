@@ -73,3 +73,12 @@ Status per 27 Oktober 2026: semua test di bawah lulus pada suite penuh
 | E2E | signup → 20 dummy → konversi → top-up → booking → DP → charge → kuitansi → unggah dokumen → manifest → berangkat → laporan | Semua langkah berhasil; laporan cocok; integritas utuh | `tests/test_e2e_mvp.py::test_mvp_end_to_end_flow` | Ulangi alur di staging dengan akun uji |
 | OPS-BKP | Backup terenkripsi & restore | Restore lengkap, integritas OK, hitungan sama | `tests/test_release_security.py::test_integrity_check_passes_and_detects_tampering` + drill `infra/backup/restore_drill.sh` | Drill bulanan (runbook restore) |
 | PERF | Daftar besar tanpa N+1 | Query konstan, paginasi | `tests/test_performance.py::test_list_query_count_does_not_grow_per_row`, `tests/test_performance.py::test_list_endpoints_paginate_on_request` | `infra/load/load_test.py` di staging |
+
+## Pasca-MVP: CRM & Lead (MOD-19, ADR-0015)
+
+| ID | Skenario | Hasil yang diharapkan | Bukti otomatis | Uji manual |
+|---|---|---|---|---|
+| CRM01 | Lead dengan telepon yang sudah ada | Peringatan duplikat (lead/jamaah), bisa tetap disimpan | `tests/test_crm.py::test_create_lead_normalizes_and_detects_duplicates` | Tambah lead dengan nomor jamaah lama |
+| CRM02 | Tahap, alasan tidak jadi, follow-up terlambat | LOST wajib alasan; WON hanya lewat konversi; follow-up terlambat terhitung | `tests/test_crm.py::test_stage_rules_activities_and_follow_up` | Catat WA dengan follow-up kemarin |
+| CRM03 | Konversi lead → jamaah → booking | Jamaah dibuat/ditautkan sekali; halaman Booking terisi | `tests/test_crm.py::test_convert_to_new_or_existing_pilgrim` | "Jadikan jamaah" → "Buat booking" |
+| CRM04 | Izin & isolasi | Finance/Operations 403; travel lain 404; RLS | `tests/test_crm.py::test_permissions_and_owner_choices`, `tests/test_crm.py::test_tenant_isolation_and_rls` | Login Finance → menu Leads tidak tampil |

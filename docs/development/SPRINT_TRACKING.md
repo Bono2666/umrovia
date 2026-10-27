@@ -582,6 +582,20 @@ penutupan butir infrastruktur/bisnis dan tanda tangan di
 | S19-10 | Runbook operasional + checklist go-live | DONE | `docs/runbooks`, `docs/release` |
 | S19-11 | Tanda tangan rilis & penutupan butir ⛔ | TODO | butuh infrastruktur & keputusan bisnis |
 
+## Pasca-MVP — CRM & Lead (MOD-19)
+
+**Status:** DONE (27 Oktober 2026), branch `feature/crm-leads`, atas
+permintaan pemilik produk (P2 dibangun lebih awal). Keputusan:
+[ADR-0015](../adr/0015-crm-leads.md).
+
+| ID | Task | Status | Bukti |
+|---|---|---|---|
+| CRM-01 | Model Lead & aktivitas (RLS), tahap, follow-up, deduplikasi | DONE | `tests/test_crm.py` |
+| CRM-02 | Konversi lead → jamaah (baru/ada), prefill booking | DONE | test + Playwright |
+| CRM-03 | API daftar berpaginasi + ringkasan funnel + pemilik | DONE | `/api/v1/leads*` |
+| CRM-04 | Halaman Leads (funnel, filter, form, detail, riwayat) | DONE | Playwright |
+| CRM-05 | Grant Admin `leads.manage` (migrasi), matriks UAT CRM01–04 | DONE | `tenants.0011` |
+
 ## Sprint berikutnya
 
 | Sprint | Minggu | Fokus | Status |

@@ -21,5 +21,6 @@ urlpatterns = [
     path("api/v1/", include("modules.portal.urls", namespace="portal")),
     path("api/v1/", include("modules.notifications.urls", namespace="notifications")),
     path("api/v1/", include("modules.reports.urls", namespace="reports")),
+    path("api/v1/", include("modules.crm.urls", namespace="crm")),
     path("api/v1/", include("modules.trial.urls", namespace="trial")),
 ]
