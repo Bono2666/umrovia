@@ -231,7 +231,7 @@ export type ReportColumn = {key: string; label: string; type: "text" | "money" |
 export type ReportSection = {key: string; title: string; description: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[]; totals: Record<string, string | number | null> | null; truncated: boolean};
 export type Report = {
   report: "operational" | "finance" | "saas" | "sales" | "payments" | "commissions"; title: string; travel: string; environment: string; as_of: string; timezone: string;
-  period: {from: string; to: string}; filters: {package: string; departure: string; status: string; agent?: string; account?: string}; note?: string;
+  period: {from: string; to: string}; filters: {package: string; departure: string; status: string; agent?: string; account?: string; branch?: string}; note?: string;
   kpis: {key: string; label: string; value: number | null; type: ReportColumn["type"]; hint: string}[];
   sections: ReportSection[]; checks: {label: string; ok: boolean; detail: string}[];
 };
@@ -240,6 +240,9 @@ export type TravelExpense = {
   departure: {id: string; code: string; package_name: string} | null; bank_account: {id: string; label: string} | null;
   description: string; reference: string; status: "RECORDED" | "VOIDED"; void_reason: string; voided_at: string | null;
   created_by_name: string | null; created_at: string;
+  /** MOD-11 maker-checker, penerima dana, lampiran bukti, cabang. */
+  approval_status: "APPROVED" | "PENDING" | "REJECTED"; approved_by_name: string | null; rejection_reason: string;
+  payee: string; has_evidence: boolean; branch: {id: string; code: string; name: string} | null;
 };
 export type NotificationStatus = "PENDING" | "SENT" | "FAILED" | "DEAD";
 export type NotificationDelivery = {
@@ -317,6 +320,8 @@ export type Booking = {
   payer_name: string;
   /** MOD-10: agen yang mendapat kredit penjualan. */
   agent: {id: string; code: string; name: string} | null;
+  /** MOD-03: cabang pencatat. */
+  branch: {id: string; code: string; name: string} | null;
   cancel_reason: string;
   canceled_by_name: string | null;
   created_by_name: string | null;
@@ -439,6 +444,7 @@ export type MembershipRow = {
   role_id: string | null;
   status: string;
   permissions: string[];
+  branch?: {id: string; code: string; name: string} | null;
 };
 
 /** Baris GET /roles (S05). */
@@ -644,4 +650,14 @@ export type Commission = {
 export type BookingAgentInfo = {
   agent: AgentRef | null; commission: Commission | null;
   history: {id: string; from_agent: AgentRef | null; to_agent: AgentRef | null; reason: string; changed_by: string | null; changed_at: string}[];
+};
+
+// MOD-03 Cabang
+export type Branch = {id: string; code: string; name: string; manager_name: string; phone: string; address: string; active: boolean; member_count: number | null};
+// MOD-06 Daftar tunggu
+export type WaitlistEntry = {
+  id: string; status: "WAITING" | "BOOKED" | "CANCELED"; status_label: string; position: number | null;
+  departure: {id: string; code: string; package_name: string; start_at: string; available_seats: number};
+  pilgrim: {id: string; code: string; name: string; phone: string}; room_type: string; notes: string; cancel_reason: string;
+  booking: {id: string; code: string} | null; created_at: string; created_by_name: string | null;
 };

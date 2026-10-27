@@ -15,6 +15,7 @@ import { formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { CashPanel } from "@/components/workspace/CashPanel";
 
 /**
  * Kas & Bank (S06, §5.3): daftar rekening bank resmi travel (nomor hanya
@@ -240,6 +241,7 @@ export default function RekeningPage() {
         </fieldset></form>
       </section> : null}
       </div>
+      {rows ? <CashPanel accounts={rows} /> : null}
     </div>
   );
 }
