@@ -12,4 +12,6 @@ urlpatterns = [
         views.BankAccountDetailView.as_view(),
         name="bank-account-detail",
     ),
+    path("expenses", views.ExpenseListCreateView.as_view(), name="expenses"),
+    path("expenses/<uuid:expense_id>/void", views.ExpenseVoidView.as_view(), name="expense-void"),
 ]

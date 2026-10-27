@@ -100,6 +100,10 @@ DEFAULT_ROLE_PERMISSIONS["Finance"] += ["wallet.read", "wallet.export"]
 for _name in ("Admin", "Finance", "Operations"):
     DEFAULT_ROLE_PERMISSIONS[_name] += ["notifications.read"]
 DEFAULT_ROLE_PERMISSIONS["Admin"] += ["notifications.manage"]
+# S17: laporan operasional untuk Operations; laporan keuangan + pengeluaran untuk Finance
+# (Spec §8.5: /reports/finance dan /reports/saas-usage = Owner/Finance).
+DEFAULT_ROLE_PERMISSIONS["Operations"] += ["reports.read"]
+DEFAULT_ROLE_PERMISSIONS["Finance"] += ["reports.finance", "expenses.read", "expenses.write"]
 
 
 def permission_list(role) -> list[str]:
