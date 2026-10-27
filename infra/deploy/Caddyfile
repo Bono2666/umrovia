@@ -1,0 +1,46 @@
+# Reverse proxy staging/produksi (Spec §18.1–18.2): TLS, host terpisah, header keamanan.
+# CADDY_TLS=internal → CA lokal Caddy (uji lokal); isi email ACME untuk sertifikat publik.
+# Host tak dikenal tidak dilayani: tanpa sertifikat → TLS gagal; Host ≠ SNI → 421 (strict_sni_host).
+
+{
+	servers {
+		strict_sni_host on
+	}
+}
+
+(security_headers) {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Cross-Origin-Opener-Policy same-origin
+		-Server
+	}
+}
+
+{$APP_HOST} {
+	tls {$CADDY_TLS}
+	import security_headers
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+# Konsol platform: host terpisah, tetapi otorisasi tetap di server (izin + MFA per endpoint).
+{$ADMIN_HOST} {
+	tls {$CADDY_TLS}
+	import security_headers
+	encode zstd gzip
+	@root path /
+	redir @root /platform 302
+	reverse_proxy web:3000
+}
+
+{$API_HOST} {
+	tls {$CADDY_TLS}
+	import security_headers
+	encode zstd gzip
+	reverse_proxy api:8000 {
+		header_up X-Forwarded-Proto https
+	}
+}

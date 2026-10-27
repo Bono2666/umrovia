@@ -1,0 +1,129 @@
+# Umrovia — staging (S19, Spec §18.2/§19.6): setting PRODUKSI di belakang Caddy (TLS).
+# Terpisah dari stack lokal (project, volume dan jaringan sendiri; database tidak dipublikasikan).
+#
+#   cp infra/deploy/staging.env.example .env.staging   # isi secret sungguhan, jangan di-commit
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+#   infra/deploy/smoke.sh                               # verifikasi pasca-deploy
+#
+# Host bawaan untuk uji lokal: app/admin/api.umrovia.localhost (TLS internal Caddy, port 8443).
+# Staging sungguhan: isi APP_HOST/ADMIN_HOST/API_HOST dengan subdomain staging milik sendiri
+# dan CADDY_TLS=<email ACME> agar sertifikat publik diterbitkan otomatis.
+
+name: umrovia-staging
+
+x-api-environment: &api-environment
+  DJANGO_SETTINGS_MODULE: config.settings.production
+  DATABASE_URL: postgres://${POSTGRES_USER:-umrovia}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib}@db:5432/${POSTGRES_DB:-umrovia}
+  REDIS_URL: redis://redis:6379/0
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY wajib}
+  PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?PII_ENCRYPTION_KEY wajib}
+  ALLOWED_HOSTS: ${API_HOST:-api.umrovia.localhost}
+  CORS_ALLOWED_ORIGINS: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443},https://${ADMIN_HOST:-admin.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+  CSRF_TRUSTED_ORIGINS: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443},https://${ADMIN_HOST:-admin.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+  TENANT_APP_URL: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+  SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-localhost}
+  EMAIL_PORT: ${EMAIL_PORT:-25}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-False}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Umrovia Staging <no-reply@umrovia.com>}
+  CONTACT_RECIPIENT_EMAIL: ${CONTACT_RECIPIENT_EMAIL:-}
+  MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+  MIDTRANS_IS_PRODUCTION: "False"  # staging tidak pernah memakai billing produksi (Spec §18.2)
+  WALLET_MANUAL_BANK_NAME: ${WALLET_MANUAL_BANK_NAME:-}
+  WALLET_MANUAL_ACCOUNT_NAME: ${WALLET_MANUAL_ACCOUNT_NAME:-}
+  WALLET_MANUAL_ACCOUNT_NUMBER: ${WALLET_MANUAL_ACCOUNT_NUMBER:-}
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-umrovia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD wajib}
+      POSTGRES_DB: ${POSTGRES_DB:-umrovia}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-umrovia} -d ${POSTGRES_DB:-umrovia}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment: *api-environment
+    volumes:
+      - media:/backend/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen(urllib.request.Request('http://localhost:8000/api/v1/health/', headers={'Host': '${API_HOST:-api.umrovia.localhost}', 'X-Forwarded-Proto': 'https'}))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    entrypoint: ["python", "manage.py", "run_worker"]
+    environment: *api-environment
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_HOST:-api.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+    environment:
+      NEXT_PUBLIC_API_URL: https://${API_HOST:-api.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2-alpine
+    environment:
+      APP_HOST: ${APP_HOST:-app.umrovia.localhost}
+      ADMIN_HOST: ${ADMIN_HOST:-admin.umrovia.localhost}
+      API_HOST: ${API_HOST:-api.umrovia.localhost}
+      CADDY_TLS: ${CADDY_TLS:-internal}
+      HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./infra/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - web
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
