@@ -680,7 +680,7 @@ format/lint/typecheck; unit; test DB migrations/RLS; E2E smoke; dependency/secur
 | TBD-05 | Platform/tenant legal invoice & tax treatment | Review certified accountant/tax counsel; tenant invoices not issued by platform |
 | TBD-06 | Trial post-conversion demo retention | 30 days recommended; legal/privacy review |
 | TBD-07 | Tenant signup anti-abuse identity | Business domain/legal identity plus manual review when flagged |
-| TBD-08 | Branch-level permissions | Determine scope and booking/finance segregation in pilot |
+| TBD-08 | Branch-level permissions | **Diputuskan (default, dapat diatur): opsi C — ADR-0019.** Role `ALL`/`OWN`; Sales/Operations/Document Reviewer melihat cabang yang ditugaskan + data tanpa cabang; Owner/Admin/Finance semua cabang; master (paket, keberangkatan, jamaah, agen) bersama; penomoran dokumen tetap per travel. Divalidasi ulang dengan travel pilot bercabang. |
 | TBD-09 | Provider for top-up and travel DP | Choose separately, avoid settlement commingling |
 | TBD-10 | Refund top-up balance on termination | Explicit contract, cost, fraud and tax handling |
 | TBD-11 | Email provider quota and storage fair use | Publish limits without undermining no-monthly-fee value prop |

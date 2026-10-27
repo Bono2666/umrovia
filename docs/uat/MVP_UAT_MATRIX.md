@@ -117,3 +117,12 @@ Status per 27 Oktober 2026: semua test di bawah lulus pada suite penuh
 | PKG01 | Harga anak/bayi & layanan tambahan | Usia divalidasi; invoice memuat kategori & layanan tambahan | `tests/test_portal_data_c.py::test_price_variants_addons_flow_to_invoice` | Paket → varian; Booking → kategori & layanan |
 | DOC01 | Masa berlaku dokumen & laporan Jamaah | Dokumen kedaluwarsa tidak bisa disetujui; ditandai bila habis sebelum berangkat | `tests/test_portal_data_c.py::test_document_validity_metadata_and_pilgrim_report` | Review dokumen dengan tanggal berlaku → Laporan Jamaah |
 
+## Cakupan cabang (TBD-08 opsi C, ADR-0019)
+
+| ID | Skenario | Hasil yang diharapkan | Bukti otomatis | Uji manual |
+|---|---|---|---|---|
+| BR02 | Sales cabang JKT membuka booking/invoice cabang SBY | 404; daftar hanya JKT + data tanpa cabang; tulis ke SBY atau transaksi pusat 403 | `tests/test_branch_scope.py::test_own_scope_sees_own_branch_and_unbranched_bookings_only` | Login Sales JKT → Booking, Invoice |
+| BR03 | Staf multi-cabang, belum ditugaskan, travel tanpa cabang | Cakupan mengikuti penugasan; tanpa cabang aktif tidak berpengaruh | `tests/test_branch_scope.py::test_multi_branch_unassigned_and_no_branch_tenant` | Cabang → centang dua cabang |
+| BR04 | Lead, pengeluaran, laporan, manifest, KPI per cabang | Tersaring per cabang; buku kas, laporan keuangan & manifest resmi khusus semua cabang | `tests/test_branch_scope.py::test_leads_expenses_and_reports_are_scoped` | Login Operations JKT → Manifest, Laporan Jamaah |
+| BR05 | Eskalasi cakupan | Staf cabang tidak dapat memberi akses semua cabang | `tests/test_branch_scope.py::test_scope_cannot_be_escalated_and_role_api` | Pengguna & Role → ubah cakupan peran |
+

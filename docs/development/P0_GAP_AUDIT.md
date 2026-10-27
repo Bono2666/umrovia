@@ -46,7 +46,8 @@ SaaS (FT-05), pengeluaran & kas/bank per rekening, konsol platform.
   (indikator, pengingat, keberangkatan terdekat, grafik 12 bulan, drill-down),
   G6 kas/bank (saldo awal berotorisasi, transfer berpasangan, maker-checker &
   lampiran pengeluaran, buku kas), G7 daftar tunggu ([ADR-0017](../adr/0017-operations-cash-branches-waitlist.md)).
-  Penomoran dokumen per cabang dan cakupan izin per cabang tetap TBD-08.
+  Cakupan izin per cabang diputuskan sebagai opsi C ([ADR-0019](../adr/0019-branch-scope-option-c.md));
+  penomoran dokumen tetap satu urutan per travel.
 - **Tahap C (portal & data) — selesai:** G9 sesi & audit login (batas idle/absolut,
   keluar dari semua perangkat, tangguhkan/reset/akhiri sesi oleh Owner), G10
   pengumuman portal & koreksi identitas terverifikasi, G11 keluarga, riwayat &
@@ -54,7 +55,7 @@ SaaS (FT-05), pengeluaran & kas/bank per rekening, konsol platform.
   masa berlaku dokumen, plus laporan Jamaah (G8) ([ADR-0018](../adr/0018-portal-data-session-security.md)).
   Pemindai antimalware tetap butir infrastruktur di GO_LIVE_CHECKLIST.
 
-**Status: seluruh gap P0 G1–G13 telah ditutup** (dengan catatan TBD-08 cabang
+**Status: seluruh gap P0 G1–G13 telah ditutup** (TBD-08 cabang diputuskan lewat ADR-0019
 dan butir infrastruktur yang memang di luar kode).
 
 ## Catatan
