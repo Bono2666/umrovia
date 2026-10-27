@@ -39,6 +39,9 @@ Status per 27 Oktober 2026: semua test di bawah lulus pada suite penuh
 | PAY09 | Batal setelah charge terpotong | Tidak ada refund otomatis; perlu persetujuan | `tests/test_billing.py::test_pay09_cancel_after_posted_charge_requires_approved_refund` | Ajukan refund di SaaS Wallet |
 | PAY10 | 5 charge paralel, dana untuk 2 | Tepat 2 terpotong, 3 tertunda; saldo tidak negatif | `tests/test_billing_concurrency.py::test_pay10_five_charges_funds_for_two` | — (konkurensi) |
 | INV01 | Terbitkan invoice dua kali | Satu nomor/versi aktif | `tests/test_payment_concurrency.py::test_concurrent_invoice_issuance_is_one_document` | Klik terbitkan invoice berulang |
+| INV03 | Booking direservasi (INV-01) | Invoice terbit otomatis dengan pembayar & diskon/biaya tambahan per peserta; kegagalan konfigurasi tidak membatalkan reservasi | `tests/test_agents.py::test_reservation_auto_issues_invoice_with_payer_and_discounts`, `tests/test_payment_security.py::test_invoice_due_config_and_unimplemented_tax_are_not_ignored` | Reservasi kursi → buka Invoice |
+| INV04 | Koreksi invoice (INV-03) | Revisi berversi: nomor tetap, versi lama + PDF diarsipkan; ditolak bila sudah ada pembayaran | `tests/test_agents.py::test_invoice_revision_is_versioned_and_blocked_after_payment` | Invoice → Revisi → beri diskon |
+| INV05 | Diskon tanpa izin | Diskon perlu `bookings.discount`; alasan wajib; harga bersih minimal Rp1 | `tests/test_agents.py::test_discount_rules_and_permission` | Login Sales → coba isi diskon |
 | INV02 | Kuitansi dikirim ulang | Kuitansi sama, tanpa duplikat | `tests/test_payments.py::test_verification_idempotency_and_exactly_one_receipt`, `tests/test_notifications.py::test_ntf01_provider_failure_retries_then_dead_letters_payment_untouched` | Kirim ulang email kuitansi |
 
 ## Portal, operasional, notifikasi, laporan (POR, OPS, NTF, RPT)
@@ -82,3 +85,12 @@ Status per 27 Oktober 2026: semua test di bawah lulus pada suite penuh
 | CRM02 | Tahap, alasan tidak jadi, follow-up terlambat | LOST wajib alasan; WON hanya lewat konversi; follow-up terlambat terhitung | `tests/test_crm.py::test_stage_rules_activities_and_follow_up` | Catat WA dengan follow-up kemarin |
 | CRM03 | Konversi lead → jamaah → booking | Jamaah dibuat/ditautkan sekali; halaman Booking terisi | `tests/test_crm.py::test_convert_to_new_or_existing_pilgrim` | "Jadikan jamaah" → "Buat booking" |
 | CRM04 | Izin & isolasi | Finance/Operations 403; travel lain 404; RLS | `tests/test_crm.py::test_permissions_and_owner_choices`, `tests/test_crm.py::test_tenant_isolation_and_rls` | Login Finance → menu Leads tidak tampil |
+
+## Agen & Komisi (MOD-10, ADR-0016) dan laporan MOD-13
+
+| ID | Skenario | Hasil yang diharapkan | Bukti otomatis | Uji manual |
+|---|---|---|---|---|
+| UAT-09 | Agen menerima komisi setelah syarat tercapai | Komisi sesuai snapshot kebijakan; ESTIMATED → ELIGIBLE → APPROVED → PAID; pembayaran tercatat sebagai pengeluaran | `tests/test_agents.py::test_commission_lifecycle_paid_creates_expense` | Booking beragen → verifikasi DP → Komisi Agen → Setujui → Bayar |
+| UAT-10 | Booking dibatalkan / agen diganti | Komisi belum dibayar REVERSED; histori agen tercatat | `tests/test_agents.py::test_cancel_and_agent_change_reverse_commission`, `tests/test_agents.py::test_manual_reversal_is_not_recreated_and_no_policy_means_no_commission` | Batalkan booking beragen |
+| AGT01 | Izin & isolasi agen | Sales baca saja; Operations 403; travel lain 404; RLS | `tests/test_agents.py::test_agent_permissions_and_isolation` | Login Sales → menu Agen |
+| RPT07 | Laporan booking/penjualan, pembayaran, komisi | Gross − diskon + tambahan = net; per rekening/petugas; komisi dibayar = pengeluaran komisi | `tests/test_agents.py::test_sales_payments_and_commission_reports` | Laporan → tab baru, unduh XLSX |
