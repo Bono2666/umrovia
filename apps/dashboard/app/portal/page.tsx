@@ -8,7 +8,7 @@ import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import {
   API_BASE, apiFetch, apiUpload, downloadFromApi, problemMessage,
-  type PortalAccessView, type PortalBooking, type PortalDocumentItem, type PortalNotification, type PortalProfile, type UserPayload,
+  type ChangeRequest, type PortalAccessView, type PortalBooking, type PortalDocumentItem, type PortalNotification, type PortalProfile, type UserPayload,
 } from "@/lib/api";
 import { formatDate, formatIdr, formatMasked } from "@/lib/format";
 import { ROOM_LABELS } from "@/lib/rooms";
@@ -154,10 +154,19 @@ function AccessSection({ access, onChanged }: { access: PortalAccessView; onChan
       {access.bookings.length === 0 ? (
         <div className="card p-6"><EmptyState title="Belum ada perjalanan" description="Booking Anda akan tampil di sini setelah travel mendaftarkannya." /></div>
       ) : access.bookings.map((booking) => <BookingCard key={booking.booking_id} accessId={access.access_id} booking={booking} />)}
+      {access.announcements.length ? <section className="card p-6" aria-labelledby={`ann-${access.access_id}`}>
+        <h2 id={`ann-${access.access_id}`} className="font-semibold">Pengumuman dari {access.travel.name}</h2>
+        <ul className="mt-3 divide-y divide-border">{access.announcements.map((item) => <li key={item.id} className="py-3">
+          <p className="font-medium">{item.title}</p>
+          <p className="mt-1 whitespace-pre-line text-sm text-muted">{item.body}</p>
+          <p className="mt-1 text-xs text-muted">{item.published_at ? formatDate(item.published_at) : ""}{item.departure ? ` · rombongan ${item.departure.code}` : ""}</p>
+        </li>)}</ul>
+      </section> : null}
       <div className="workspace-columns">
         <DocumentsPanel accessId={access.access_id} />
         <ProfileCard accessId={access.access_id} profile={access.profile} onSaved={onChanged} />
       </div>
+      <IdentityCorrection accessId={access.access_id} requests={access.change_requests} onSent={onChanged} />
     </section>
   );
 }
@@ -350,7 +359,7 @@ function ProfileCard({ accessId, profile, onSaved }: { accessId: string; profile
         <div className="flex justify-between gap-3"><dt className="text-muted">NIK</dt><dd>{profile.identity_masked ? formatMasked(profile.identity_masked) : "—"}</dd></div>
         <div className="flex justify-between gap-3"><dt className="text-muted">Paspor</dt><dd>{profile.passport_masked ? formatMasked(profile.passport_masked) : "—"}</dd></div>
       </dl>
-      <p className="mt-2 text-xs text-muted">Koreksi nama, NIK atau paspor dilakukan oleh travel.</p>
+      <p className="mt-2 text-xs text-muted">Data identitas salah? Ajukan koreksi di bagian “Koreksi data identitas” — travel akan memverifikasinya.</p>
       <form className="mt-6" onSubmit={save}>
         <FormField label="HP / WhatsApp" htmlFor={`p-phone-${accessId}`} inputMode="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
         <FormField label="Email" htmlFor={`p-email-${accessId}`} type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
@@ -361,6 +370,47 @@ function ProfileCard({ accessId, profile, onSaved }: { accessId: string; profile
         {message ? <p className="mb-3 text-sm text-success" role="status">{message}</p> : null}
         <Btn type="submit" loading={busy} disabled={!changed.length}>Simpan kontak</Btn>
       </form>
+    </section>
+  );
+}
+
+const IDENTITY_FIELDS: [string, string, string][] = [
+  ["name", "Nama sesuai dokumen", "text"], ["birth_place", "Tempat lahir", "text"], ["birth_date", "Tanggal lahir", "date"],
+  ["identity_number", "NIK (16 digit)", "text"], ["passport_number", "Nomor paspor", "text"], ["passport_name", "Nama di paspor", "text"],
+  ["passport_issued_at", "Tanggal terbit paspor", "date"], ["passport_expires_at", "Paspor berlaku hingga", "date"],
+];
+
+/** POR-06: jamaah mengajukan koreksi identitas; diterapkan setelah diverifikasi travel. */
+function IdentityCorrection({ accessId, requests, onSent }: { accessId: string; requests: ChangeRequest[]; onSent: () => void }) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pending = requests.find((r) => r.status === "PENDING");
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const changes = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()));
+    setBusy(true); setError(null);
+    const result = await apiFetch<ChangeRequest>(`/portal/accesses/${accessId}/change-requests`, { method: "POST", body: JSON.stringify({ changes, reason }) });
+    setBusy(false);
+    if (!result.ok) { setError(problemMessage(result.error)); return; }
+    setValues({}); setReason(""); onSent();
+  }
+  return (
+    <section className="card p-6">
+      <h2 className="font-semibold">Koreksi data identitas</h2>
+      <p className="mt-1 text-sm text-muted">Isi hanya data yang perlu diperbaiki. Perubahan berlaku setelah diverifikasi travel dengan dokumen asli.</p>
+      {requests.length ? <ul className="mt-3 space-y-2 text-sm">{requests.map((r) => <li key={r.id} className="border border-border/60 p-3">
+        <p className="flex flex-wrap items-center gap-2"><StatusBadge tone={r.status === "APPROVED" ? "success" : r.status === "REJECTED" ? "danger" : "warning"}>{r.status_label}</StatusBadge><span className="text-xs text-muted">{formatDate(r.created_at)}</span></p>
+        <p className="mt-1">{r.changes.map((c) => `${c.label}: ${c.value}`).join(" · ")}</p>
+        {r.decision_note ? <p className="mt-1 text-xs text-muted">Catatan travel: {r.decision_note}</p> : null}
+      </li>)}</ul> : null}
+      {pending ? <p className="mt-4 text-sm text-muted">Permintaan Anda sedang diverifikasi. Anda dapat mengajukan koreksi lain setelah diputuskan.</p> : <form className="mt-5" onSubmit={submit}>
+        <div className="grid gap-x-4 sm:grid-cols-2">{IDENTITY_FIELDS.map(([key, label, type]) => <FormField key={key} label={label} htmlFor={`idc-${key}-${accessId}`} type={type} value={values[key] ?? ""} onChange={(event) => setValues({ ...values, [key]: event.target.value })} />)}</div>
+        <FormTextarea label="Alasan koreksi" htmlFor={`idc-reason-${accessId}`} value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} />
+        {error ? <p className="error-message" role="alert">{error}</p> : null}
+        <Btn type="submit" loading={busy} disabled={!reason.trim() || !Object.values(values).some((v) => v.trim())}>Ajukan koreksi</Btn>
+      </form>}
     </section>
   );
 }

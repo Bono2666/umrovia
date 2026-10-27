@@ -25,6 +25,7 @@ import { formatDate, formatMasked } from "@/lib/format";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { PilgrimExtras } from "@/components/workspace/PilgrimExtras";
 
 const DOC_KIND: Record<string, string> = { ktp: "KTP", passport: "Paspor", photo: "Foto", kk: "Kartu Keluarga", other: "Dokumen lain" };
 const DOC_STATUS: Record<string, string> = { UPLOADED: "Menunggu review", UNDER_REVIEW: "Ditinjau", APPROVED: "Disetujui", REJECTED: "Ditolak" };
@@ -155,6 +156,12 @@ export default function JamaahPage() {
 
   async function reviewDocument(pilgrim: Pilgrim, doc: PilgrimDocument, status: "APPROVED" | "REJECTED") {
     let reason = "";
+    let expiresAt = "";
+    if (status === "APPROVED") {
+      const input = window.prompt(`Masa berlaku ${DOC_KIND[doc.kind] ?? doc.kind} hingga (YYYY-MM-DD). Kosongkan bila tidak ada masa berlaku:`, "");
+      if (input === null) return;
+      expiresAt = input.trim();
+    }
     if (status === "REJECTED") {
       const input = window.prompt(`Alasan menolak ${DOC_KIND[doc.kind] ?? doc.kind} v${doc.version} (akan terlihat oleh jamaah):`);
       if (input === null) return;
@@ -162,7 +169,7 @@ export default function JamaahPage() {
       reason = input.trim();
     }
     setDocBusy(true); setError(null); setMessage(null);
-    const result = await apiFetch<PilgrimDocument>(`/pilgrims/${pilgrim.id}/documents/${doc.id}`, { method: "PATCH", body: JSON.stringify(status === "REJECTED" ? { status, reason } : { status }) });
+    const result = await apiFetch<PilgrimDocument>(`/pilgrims/${pilgrim.id}/documents/${doc.id}`, { method: "PATCH", body: JSON.stringify(status === "REJECTED" ? { status, reason } : { status, ...(expiresAt ? { expires_at: expiresAt } : {}) }) });
     setDocBusy(false);
     if (!result.ok) { setError(problemMessage(result.error)); return; }
     setMessage(`${DOC_KIND[doc.kind] ?? doc.kind} ${status === "APPROVED" ? "disetujui" : "ditolak"}.`);
@@ -311,7 +318,13 @@ export default function JamaahPage() {
 
       <div className="workspace-columns mt-6">
       <section className="card p-6">
-        <h2 className="font-semibold">Daftar jamaah</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Daftar jamaah</h2>
+          {can("pilgrims.export") ? <div className="flex gap-2">
+            <Btn size="xs" variant="tint" onClick={() => downloadFromApi("/api/v1/pilgrims/export?file=xlsx")}>Ekspor Excel</Btn>
+            <Btn size="xs" variant="tint" onClick={() => downloadFromApi("/api/v1/pilgrims/export?file=csv")}>CSV</Btn>
+          </div> : null}
+        </div>
         <FormField
           label="Cari"
           htmlFor="jamaah-search"
@@ -426,6 +439,7 @@ export default function JamaahPage() {
                         <StatusBadge tone={doc.status === "APPROVED" ? "success" : doc.status === "REJECTED" ? "danger" : "warning"}>{DOC_STATUS[doc.status] ?? doc.status}</StatusBadge>
                       </p>
                       {doc.reason ? <p className="mt-1 text-xs text-muted">Alasan: {doc.reason}</p> : null}
+                      {doc.expires_at ? <p className={`mt-1 text-xs ${doc.expired ? "text-danger" : "text-muted"}`}>{doc.expired ? "Kedaluwarsa sejak" : "Berlaku s.d."} {formatDate(doc.expires_at)}</p> : null}
                       {doc.has_file || reviewable ? (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {doc.has_file ? <Btn size="xs" variant="tint" onClick={() => void openDocument(selected, doc)}>Lihat berkas</Btn> : null}
@@ -449,6 +463,12 @@ export default function JamaahPage() {
                 </label>
               </div>
             ) : null}
+
+            <PilgrimExtras key={selected.id} pilgrim={selected} canWrite={can("pilgrims.write") && canEditEnvironment(selected.environment)} onChanged={() => {
+                load(query);
+                void apiFetch<Pilgrim>(`/pilgrims/${selected.id}`).then((result) => {if (result.ok) setSelected(result.data);});
+              }}
+              notify={(text, err) => {setMessage(text); setError(err ?? null);}} />
 
             <h4 className="mt-6 text-sm font-semibold">Portal jamaah</h4>
             {portal === null ? (
