@@ -35,8 +35,9 @@ export default function DashboardPage() {
   const settings = useOptional<SettingsPayload>("/tenant/settings");
   const packages = useOptional<{ results: unknown[] }>("/packages");
   const departures = useOptional<{ results: unknown[] }>("/departures");
-  const bookings = useOptional<{ results: unknown[] }>("/bookings");
-  const invoices = useOptional<{ results: unknown[] }>("/invoices");
+  // Cukup 1 baris untuk mengecek langkah onboarding (paginasi S19).
+  const bookings = useOptional<{ results: unknown[] }>("/bookings?page=1&page_size=1");
+  const invoices = useOptional<{ results: unknown[] }>("/invoices?page=1&page_size=1");
   const demo = wallet.data?.environment === "demo" || (trial.data !== null && !trial.data.converted_at);
   // null = tidak dapat diperiksa dengan peran ini (tanpa tanda centang).
   const has = (value: { results: unknown[] } | null, min = 1) => (value ? value.results.length >= min : null);

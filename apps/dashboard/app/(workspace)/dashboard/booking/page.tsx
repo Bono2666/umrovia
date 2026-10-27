@@ -18,6 +18,7 @@ import {
   problemMessage,
   type Booking,
   type Departure,
+  type Paginated,
   type Pilgrim,
   type RoomType,
 } from "@/lib/api";
@@ -102,6 +103,8 @@ export default function BookingPage() {
   const {can, canEditEnvironment, writableEnvironments} = useWorkspacePermissions();
   const [editing, setEditing] = useState<Booking | null>(null);
   const [rows, setRows] = useState<Booking[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageInfo, setPageInfo] = useState<{count: number; next: string | null; previous: string | null}>({count: 0, next: null, previous: null});
   const [departures, setDepartures] = useState<Departure[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -120,14 +123,17 @@ export default function BookingPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback((q: string) => {
-    const suffix = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
-    apiFetch<{ results: Booking[] }>(`/bookings${suffix}`).then((result) => {
-      if (result.ok) setRows(result.data.results);
+  // Paginasi server (S19): 50 booking per halaman; filter status & cari di server.
+  const load = useCallback((q: string, status = statusFilter, pageNo = page) => {
+    const params = new URLSearchParams({page: String(pageNo)});
+    if (q.trim()) params.set("q", q.trim());
+    if (status) params.set("status", status);
+    apiFetch<Paginated<Booking>>(`/bookings?${params}`).then((result) => {
+      if (result.ok) {setRows(result.data.results); setPageInfo({count: result.data.count, next: result.data.next, previous: result.data.previous});}
       else if (result.error.status === 403) setNoAccess(true);
       else setError(problemMessage(result.error));
     });
-  }, []);
+  }, [statusFilter, page]);
 
   useEffect(() => {
     load(query);
@@ -277,8 +283,7 @@ export default function BookingPage() {
     );
   }
 
-  const visible =
-    rows && statusFilter ? rows.filter((row) => row.status === statusFilter) : rows;
+  const visible = rows;
   const searchable = pilgrimResults.filter((p) => !picked.some((s) => s.id === p.id)).slice(0, 8);
   const selectedDeparture = departures.find((dep) => dep.id === departureId);
   const roomChoices = selectedDeparture?.room_prices ?? [];
@@ -314,7 +319,7 @@ export default function BookingPage() {
             hint="Kode booking atau nama/jamaah."
             className="mt-4"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {setPage(1); setQuery(event.target.value);}}
             placeholder="BK-… / Budi"
           />
           <FormSelect
@@ -322,7 +327,7 @@ export default function BookingPage() {
             htmlFor="booking-status"
             className="mt-2"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+            onChange={(event) => {setPage(1); setStatusFilter(event.target.value);}}
           >
             <option value="">Semua status</option>
             {Object.entries(STATUS_LABEL).map(([value, label]) => (
@@ -408,6 +413,13 @@ export default function BookingPage() {
               ))}
             </ul>
           )}
+          {pageInfo.previous || pageInfo.next ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <Btn size="xs" variant="solid" disabled={!pageInfo.previous} onClick={() => setPage((value) => value - 1)}>Sebelumnya</Btn>
+              <span>Halaman {page} · {pageInfo.count} booking</span>
+              <Btn size="xs" variant="solid" disabled={!pageInfo.next} onClick={() => setPage((value) => value + 1)}>Berikutnya</Btn>
+            </div>
+          ) : null}
         </section>
 
         {can("bookings.create") && writableEnvironments.length > 0 ? <section className="card p-6">

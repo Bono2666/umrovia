@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
-import { API_BASE, apiFetch, problemMessage, type ChargePreview, type TravelInvoice, type TravelPayment } from "@/lib/api";
+import { API_BASE, apiFetch, problemMessage, type ChargePreview, type Paginated, type TravelInvoice, type TravelPayment } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -55,14 +55,35 @@ export default function PaymentsPage() {
   const [busy,setBusy] = useState(false);
   const keys = useRef(new Map<string,{signature:string;key:string}>());
   const canCreate=can("payments.create");
-  const load = useCallback(() => {
-    apiFetch<{results:TravelPayment[]}>("/payments").then((result)=>{if(result.ok)setPayments(result.data.results);else setError(problemMessage(result.error));});
-    apiFetch<{results:TravelInvoice[]}>("/invoices").then((result)=>{if(result.ok){setInvoices(result.data.results);setInvoiceId((prev)=>prev||new URLSearchParams(window.location.search).get("invoice")||"");}});
+  const [page,setPage] = useState(1);
+  const [pageInfo,setPageInfo] = useState<{count:number;next:string|null;previous:string|null}>({count:0,next:null,previous:null});
+  // Paginasi server (S19): pembayaran disaring per invoice di server, 50 per halaman.
+  const loadPayments = useCallback(() => {
+    const params=new URLSearchParams({page:String(page)});
+    if(invoiceId)params.set("invoice",invoiceId);
+    apiFetch<Paginated<TravelPayment>>(`/payments?${params}`).then((result)=>{if(result.ok){setPayments(result.data.results);setPageInfo({count:result.data.count,next:result.data.next,previous:result.data.previous});}else setError(problemMessage(result.error));});
+  },[page,invoiceId]);
+  const [invoiceSearch,setInvoiceSearch] = useState("");
+  // Pilihan invoice: hanya yang masih terbuka (dicari di server), ditambah invoice dari tautan ?invoice= (walau sudah lunas).
+  const loadInvoices = useCallback(() => {
+    const wanted=new URLSearchParams(window.location.search).get("invoice")||"";
+    apiFetch<{results:TravelInvoice[]}>(`/invoices?open=1${invoiceSearch.trim()?`&q=${encodeURIComponent(invoiceSearch.trim())}`:""}`).then(async (result)=>{
+      if(!result.ok)return;
+      let rows=result.data.results;
+      if(wanted&&!rows.some((row)=>row.id===wanted)){const one=await apiFetch<TravelInvoice>(`/invoices/${wanted}`);if(one.ok)rows=[one.data,...rows];}
+      setInvoices(rows);setInvoiceId((prev)=>prev||wanted);
+    });
+  },[invoiceSearch]);
+  const loadOptions = useCallback(() => {
     if(canCreate)apiFetch<{bank_accounts:Account[]}>("/payments/options").then((result)=>{if(result.ok)setAccounts(result.data.bank_accounts);});
   },[canCreate]);
-  useEffect(()=>{if(!loading)load();},[loading,load]);
+  // Setelah aksi (catat/verifikasi/tolak): muat ulang semuanya.
+  const load = useCallback(() => {loadInvoices();loadOptions();loadPayments();},[loadInvoices,loadOptions,loadPayments]);
+  useEffect(()=>{if(!loading)loadInvoices();},[loading,loadInvoices]);
+  useEffect(()=>{if(!loading)loadOptions();},[loading,loadOptions]);
+  useEffect(()=>{if(!loading)loadPayments();},[loading,loadPayments]);
   const invoice=invoices.find((row)=>row.id===invoiceId);
-  const visiblePayments=payments===null?null:payments.filter((payment)=>!invoiceId||payment.invoice_id===invoiceId);
+  const visiblePayments=payments;
   const totalAllocated=Object.values(allocations).reduce((sum,value)=>sum+(Number(value)||0),0);
 
   function operationKey(scope:string,body:unknown){
@@ -135,10 +156,12 @@ export default function PaymentsPage() {
             {payment.receipt&&can("receipts.read")?<a className="text-primary underline" href={`${API_BASE}/api/v1/receipts/${payment.receipt.id}/pdf`}>{payment.receipt.receipt_no} · PDF{payment.receipt.status==="REVERSED"?" (direversal)":""}</a>:null}
           </div>
         </li>)}</ul>}
+        {pageInfo.previous||pageInfo.next?<div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><Btn size="xs" variant="solid" disabled={!pageInfo.previous} onClick={()=>setPage((value)=>value-1)}>Sebelumnya</Btn><span>Halaman {page} · {pageInfo.count} pembayaran</span><Btn size="xs" variant="solid" disabled={!pageInfo.next} onClick={()=>setPage((value)=>value+1)}>Berikutnya</Btn></div>:null}
       </section>
       {canCreate?<section className="card p-6"><h2 className="font-semibold">Catat pembayaran</h2>
         <form onSubmit={create} className="mt-6">
-          <FormSelect label="Invoice" htmlFor="payment-invoice" value={invoiceId} required onChange={(event)=>{setInvoiceId(event.target.value);setAllocations({});setSimulate(false);}}><option value="">— pilih invoice —</option>{invoices.map((row)=><option key={row.id} value={row.id} disabled={["VOIDED","PAID"].includes(row.status)}>{row.invoice_number} · sisa {formatIdr(row.balance_idr)}</option>)}</FormSelect>
+          <FormField label="Cari invoice (nomor, kode booking, pelanggan)" htmlFor="payment-invoice-search" value={invoiceSearch} onChange={(event)=>setInvoiceSearch(event.target.value)} hint="Daftar menampilkan hingga 200 invoice terbuka terbaru."/>
+          <FormSelect label="Invoice" htmlFor="payment-invoice" value={invoiceId} required onChange={(event)=>{setInvoiceId(event.target.value);setPage(1);setAllocations({});setSimulate(false);}}><option value="">— pilih invoice —</option>{invoices.map((row)=><option key={row.id} value={row.id} disabled={["VOIDED","PAID"].includes(row.status)}>{row.invoice_number} · sisa {formatIdr(row.balance_idr)}</option>)}</FormSelect>
           <FormField label="Nominal diterima (Rp)" htmlFor="payment-amount" inputMode="numeric" value={amount} required onChange={(event)=>setAmount(event.target.value)}/>
           <FormSelect label="Jenis pembayaran" htmlFor="payment-kind" value={kind} onChange={(event)=>setKind(event.target.value)}><option value="DP">DP</option><option value="INSTALLMENT">Cicilan</option><option value="BALANCE">Pelunasan</option></FormSelect>
           <FormField label="Tanggal penerimaan" htmlFor="payment-received" type="datetime-local" value={receivedAt} required onChange={(event)=>setReceivedAt(event.target.value)}/>

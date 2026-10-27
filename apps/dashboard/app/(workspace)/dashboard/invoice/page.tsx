@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
-import { API_BASE, apiFetch, problemMessage, type Booking, type PaymentRules, type TravelInvoice } from "@/lib/api";
+import { API_BASE, apiFetch, problemMessage, type Booking, type Paginated, type PaymentRules, type TravelInvoice } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -13,6 +13,8 @@ const LABELS: Record<string, string> = { ISSUED: "Terbit", PARTIALLY_PAID: "Diba
 export default function InvoicePage() {
   const { can, loading } = useWorkspacePermissions();
   const [invoices, setInvoices] = useState<TravelInvoice[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageInfo, setPageInfo] = useState<{count: number; next: string | null; previous: string | null}>({count: 0, next: null, previous: null});
   const [candidates, setCandidates] = useState<Booking[]>([]);
   const [bookingId, setBookingId] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -24,14 +26,14 @@ export default function InvoicePage() {
   const [busy, setBusy] = useState(false);
   const canIssue = can("invoices.issue");
   const load = useCallback(() => {
-    apiFetch<{results: TravelInvoice[]}>("/invoices").then((result) => {
-      if (result.ok) setInvoices(result.data.results);
+    apiFetch<Paginated<TravelInvoice>>(`/invoices?page=${page}`).then((result) => {  // paginasi server (S19)
+      if (result.ok) {setInvoices(result.data.results); setPageInfo({count: result.data.count, next: result.data.next, previous: result.data.previous});}
       else setError(problemMessage(result.error));
     });
     if (canIssue) apiFetch<{results: Booking[]}>("/invoices/candidates").then((result) => {
       if (result.ok) setCandidates(result.data.results);
     });
-  }, [canIssue]);
+  }, [canIssue, page]);
   useEffect(() => { if (!loading) load(); }, [loading, load]);
   useEffect(() => {
     apiFetch<PaymentRules>("/payments/settings").then((result) => {
@@ -78,6 +80,7 @@ export default function InvoicePage() {
               <div className="mt-3 flex flex-wrap gap-3"><a className="text-primary underline" href={`${API_BASE}/api/v1/invoices/${invoice.id}/pdf`}>Unduh invoice PDF</a>{can("payments.read") ? <Link href={`/dashboard/pembayaran?invoice=${invoice.id}`} className="text-primary underline">Lihat pembayaran</Link> : null}</div>
             </li>)}
           </ul>}
+        {pageInfo.previous || pageInfo.next ? <div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><Btn size="xs" variant="solid" disabled={!pageInfo.previous} onClick={() => setPage((value) => value - 1)}>Sebelumnya</Btn><span>Halaman {page} · {pageInfo.count} invoice</span><Btn size="xs" variant="solid" disabled={!pageInfo.next} onClick={() => setPage((value) => value + 1)}>Berikutnya</Btn></div> : null}
       </section>
       <div className="space-y-6">
         {canIssue ? <section className="card p-6"><h2 className="font-semibold">Terbitkan invoice</h2>
