@@ -11,6 +11,7 @@ type Kind = Report["report"];
 const TABS: {kind: Kind; label: string; grant: string; hint: string}[] = [
   {kind: "operational", label: "Operasional", grant: "reports.read", hint: "Okupansi, booking, DP, dokumen dan kesiapan per keberangkatan."},
   {kind: "finance", label: "Keuangan", grant: "reports.finance", hint: "Invoice, penerimaan, piutang, kas/bank, pengeluaran dan margin estimasi milik travel."},
+  {kind: "pilgrims", label: "Jamaah", grant: "reports.read", hint: "Jamaah per keberangkatan: status, kelengkapan & masa berlaku dokumen, pembayaran dan kesiapan."},
   {kind: "sales", label: "Booking & Penjualan", grant: "reports.read", hint: "Booking per tanggal pemesanan dengan gross, diskon dan net per paket dan agen."},
   {kind: "payments", label: "Pembayaran", grant: "reports.finance", hint: "Penerimaan terverifikasi per rekening dan per petugas verifikasi."},
   {kind: "commissions", label: "Komisi Agen", grant: "commissions.read", hint: "Komisi estimasi, earned, disetujui dan dibayar per agen."},
@@ -61,7 +62,7 @@ export default function ReportsPage() {
 
   const [reloads, setReloads] = useState(0);
   const params = new URLSearchParams({from: range.from, to: range.to});
-  const allowed: Record<string, Kind[]> = {status: ["operational"], agent: ["sales", "commissions"], account: ["payments"], branch: ["finance", "sales", "payments", "commissions"]};
+  const allowed: Record<string, Kind[]> = {status: ["operational", "pilgrims"], agent: ["sales", "commissions"], account: ["payments"], branch: ["finance", "sales", "payments", "commissions"]};
   if (active !== "saas") for (const [key, value] of Object.entries(filters)) if (value && (!allowed[key] || (active && allowed[key].includes(active)))) params.set(key, value);
   const query = params.toString();
 
@@ -90,7 +91,7 @@ export default function ReportsPage() {
 
   function choose(next: Kind) {
     setKind(next); setReport(null);
-    const nextPreset = next === "operational" ? "upcoming" : "month";
+    const nextPreset = next === "operational" || next === "pilgrims" ? "upcoming" : "month";
     setPreset(nextPreset); setRange(presetRange(nextPreset));
   }
 
@@ -124,14 +125,14 @@ export default function ReportsPage() {
             {shownDepartures.map((dep) => <option key={dep.id} value={dep.id}>{dep.code} · {dep.package_name}</option>)}
           </FormSelect>
         </> : null}
-        {active === "operational" ? <FormSelect label="Status keberangkatan" htmlFor="report-status" value={filters.status} onChange={(event) => setFilters({...filters, status: event.target.value})}>
+        {active === "operational" || active === "pilgrims" ? <FormSelect label="Status keberangkatan" htmlFor="report-status" value={filters.status} onChange={(event) => setFilters({...filters, status: event.target.value})}>
           {STATUS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </FormSelect> : null}
         {(active === "sales" || active === "commissions") && canAgents ? <FormSelect label="Agen" htmlFor="report-agent" value={filters.agent} onChange={(event) => setFilters({...filters, agent: event.target.value})}>
           <option value="">Semua agen</option>
           {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
         </FormSelect> : null}
-        {branches.length > 0 && active !== "operational" && active !== "saas" ? <FormSelect label="Cabang" htmlFor="report-branch" value={filters.branch} onChange={(event) => setFilters({...filters, branch: event.target.value})}>
+        {branches.length > 0 && active !== "operational" && active !== "saas" && active !== "pilgrims" ? <FormSelect label="Cabang" htmlFor="report-branch" value={filters.branch} onChange={(event) => setFilters({...filters, branch: event.target.value})}>
           <option value="">Semua cabang</option>
           {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
         </FormSelect> : null}

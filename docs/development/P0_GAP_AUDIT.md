@@ -29,12 +29,12 @@ SaaS (FT-05), pengeluaran & kas/bank per rekening, konsol platform.
 | G5 ✅ A | **MOD-07/09 diskon & penyesuaian harga per booking, pembayar (payer); INV-03 koreksi lewat void/credit note/revisi berversi** | ✅ | Pajak/diskon otomatis ditolak (`invoice_config`); invoice hanya bisa VOID saat booking batal, tanpa revisi/credit note. |
 | G6 ✅ B | **MOD-11 saldo awal rekening + koreksi berotorisasi, transfer antarrekening berpasangan, maker-checker & lampiran bukti pengeluaran** | ✅ | Pengeluaran ada (catat/batal); saldo awal dihitung dari transaksi; tidak ada transfer antarrekening, saldo awal manual, maupun persetujuan pengeluaran. |
 | G7 ✅ B | **MOD-06 daftar tunggu** saat keberangkatan penuh | ✅ | Reservasi saat penuh ditolak; tidak ada waitlist. (Hold reservation = P1.) |
-| G8 🟡 A | **MOD-13 laporan Booking, Jamaah, Penjualan (gross/diskon/net), Pembayaran (per rekening/petugas), Komisi** | 🟡 | Tersedia: operasional, keuangan (penerimaan, piutang/aging, kas/bank, pengeluaran, margin), SaaS. Belum: booking, jamaah, penjualan, pembayaran per petugas, komisi. |
-| G9 | **AUTH-02/03/05**: timeout sesi & logout semua perangkat; admin menonaktifkan pengguna & memicu reset sandi; audit login sukses/gagal | 🟡 | Logout & hapus membership ada; `SESSION_COOKIE_AGE` bawaan (2 minggu); login hanya dicatat di log aplikasi, tidak di audit; tidak ada logout semua perangkat/reset oleh admin. |
-| G10 | **POR-05 pengumuman travel; POR-06 permintaan perubahan identitas** diverifikasi admin | ❌ | Portal hanya mengizinkan ubah kontak; tidak ada alur permintaan perubahan maupun pengumuman. |
-| G11 | **MOD-04 pengelompokan keluarga, histori keberangkatan jamaah, ekspor jamaah terotorisasi** | 🟡 | Booking grup ada; tidak ada grup keluarga eksplisit, tab histori, maupun ekspor daftar jamaah. |
-| G12 | **MOD-05 varian harga dewasa/anak/bayi, layanan tambahan, biaya estimasi paket** | 🟡 | Harga dasar + per tipe kamar; belum ada varian usia/add-on/biaya estimasi. |
-| G13 | **MOD-08 metadata dokumen valid_from/expires_at; pemindai antimalware** | 🟡 | Kedaluwarsa paspor ada di profil; metadata per berkas belum; antimalware = butir infrastruktur di GO_LIVE_CHECKLIST. |
+| G8 ✅ A+C | **MOD-13 laporan Booking, Jamaah, Penjualan (gross/diskon/net), Pembayaran (per rekening/petugas), Komisi** | ✅ | Tersedia: operasional, keuangan (penerimaan, piutang/aging, kas/bank, pengeluaran, margin), SaaS. Belum: booking, jamaah, penjualan, pembayaran per petugas, komisi. |
+| G9 ✅ C | **AUTH-02/03/05**: timeout sesi & logout semua perangkat; admin menonaktifkan pengguna & memicu reset sandi; audit login sukses/gagal | ✅ | Logout & hapus membership ada; `SESSION_COOKIE_AGE` bawaan (2 minggu); login hanya dicatat di log aplikasi, tidak di audit; tidak ada logout semua perangkat/reset oleh admin. |
+| G10 ✅ C | **POR-05 pengumuman travel; POR-06 permintaan perubahan identitas** diverifikasi admin | ✅ | Portal hanya mengizinkan ubah kontak; tidak ada alur permintaan perubahan maupun pengumuman. |
+| G11 ✅ C | **MOD-04 pengelompokan keluarga, histori keberangkatan jamaah, ekspor jamaah terotorisasi** | ✅ | Booking grup ada; tidak ada grup keluarga eksplisit, tab histori, maupun ekspor daftar jamaah. |
+| G12 ✅ C | **MOD-05 varian harga dewasa/anak/bayi, layanan tambahan, biaya estimasi paket** | ✅ | Harga dasar + per tipe kamar; belum ada varian usia/add-on/biaya estimasi. |
+| G13 ✅ C | **MOD-08 metadata dokumen valid_from/expires_at; pemindai antimalware** | ✅ | Kedaluwarsa paspor ada di profil; metadata per berkas belum; antimalware = butir infrastruktur di GO_LIVE_CHECKLIST. |
 
 ## Progres penutupan
 
@@ -47,7 +47,15 @@ SaaS (FT-05), pengeluaran & kas/bank per rekening, konsol platform.
   G6 kas/bank (saldo awal berotorisasi, transfer berpasangan, maker-checker &
   lampiran pengeluaran, buku kas), G7 daftar tunggu ([ADR-0017](../adr/0017-operations-cash-branches-waitlist.md)).
   Penomoran dokumen per cabang dan cakupan izin per cabang tetap TBD-08.
-- **Tahap C (portal & data):** G9, G10, G11, G12, G13.
+- **Tahap C (portal & data) — selesai:** G9 sesi & audit login (batas idle/absolut,
+  keluar dari semua perangkat, tangguhkan/reset/akhiri sesi oleh Owner), G10
+  pengumuman portal & koreksi identitas terverifikasi, G11 keluarga, riwayat &
+  ekspor jamaah, G12 harga anak/bayi, layanan tambahan & estimasi biaya, G13
+  masa berlaku dokumen, plus laporan Jamaah (G8) ([ADR-0018](../adr/0018-portal-data-session-security.md)).
+  Pemindai antimalware tetap butir infrastruktur di GO_LIVE_CHECKLIST.
+
+**Status: seluruh gap P0 G1–G13 telah ditutup** (dengan catatan TBD-08 cabang
+dan butir infrastruktur yang memang di luar kode).
 
 ## Catatan
 

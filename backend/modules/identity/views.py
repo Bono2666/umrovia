@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 
 from modules.audit.services import log_event
 from modules.identity import services
+from modules.identity.middleware import start_session
 from modules.identity.models import AuthTokenKind, User, UserStatus
 from modules.identity.serializers import (
     ForgotPasswordSerializer,
@@ -176,6 +177,11 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"].strip().lower()
         user = authenticate(request, username=email, password=serializer.validated_data["password"])
+        if user is None or user.status != UserStatus.ACTIVE:
+            known = user or User.objects.filter(email=email).first()
+            reason = "invalid_credentials" if user is None else user.status.lower()
+            log_event(action="auth.login_failed", request=request, actor=None, object_type="user", object_id=known.pk if known else "",
+                      changes={"email": email, "reason": reason, "user_agent": request.headers.get("User-Agent", "")[:200]})
         if user is None:
             return Response(
                 {"code": "invalid_credentials", "detail": "Email atau password salah."},
@@ -192,6 +198,9 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         auth_login(request, user)
+        start_session(request, user)
+        log_event(action="auth.login", request=request, actor=user, object_type="user", object_id=user.pk,
+                  changes={"user_agent": request.headers.get("User-Agent", "")[:200]})
         logger.info("login: sukses", extra={"user_id": str(user.id)})
         return Response(services.user_payload(user), status=status.HTTP_200_OK)
 
@@ -202,8 +211,31 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        log_event(action="auth.logout", request=request, object_type="user", object_id=request.user.pk)
         auth_logout(request)
         return Response({"status": "logged_out"}, status=status.HTTP_200_OK)
+
+
+class LogoutAllView(APIView):
+    """POST /auth/logout-all — akhiri semua sesi pengguna ini di semua perangkat (AUTH-03)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        services.revoke_sessions(user)
+        log_event(action="auth.logout_all", request=request, object_type="user", object_id=user.pk)
+        auth_logout(request)
+        return Response({"status": "logged_out_everywhere"}, status=status.HTTP_200_OK)
+
+
+class LoginHistoryView(APIView):
+    """GET /me/logins — 20 aktivitas masuk terakhir akun ini (sukses/gagal)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"results": services.login_history(request.user)})
 
 
 class MeView(APIView):
@@ -262,7 +294,9 @@ class ResetPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.set_password(serializer.validated_data["password"])
-        user.save(update_fields=["password", "updated_at"])
+        user.session_version += 1  # reset sandi mengakhiri semua sesi lama
+        user.save(update_fields=["password", "session_version", "updated_at"])
+        log_event(action="auth.password_reset", request=request, actor=user, object_type="user", object_id=user.pk)
         logger.info("reset-password: sukses", extra={"user_id": str(user.id)})
         return Response({"status": "password_updated"}, status=status.HTTP_200_OK)
 

@@ -95,6 +95,8 @@ class BookingCreateSerializer(serializers.Serializer):
     allow_duplicate = serializers.BooleanField(required=False, default=False)
     payer_name = serializers.CharField(required=False, allow_blank=True, max_length=160, default="")
     branch = serializers.UUIDField(required=False, allow_null=True, default=None)
+    price_categories = serializers.DictField(child=serializers.ChoiceField(choices=["ADULT", "CHILD_NO_BED", "INFANT"]), required=False)
+    addons = serializers.DictField(child=serializers.ListField(child=serializers.CharField(max_length=24), max_length=20), required=False)
     agent = serializers.UUIDField(required=False, allow_null=True, default=None)
     adjustments = serializers.DictField(child=AdjustmentSerializer(), required=False)
 
@@ -114,6 +116,8 @@ class BookingUpdateSerializer(serializers.Serializer):
     allow_duplicate = serializers.BooleanField(required=False, default=False)
     payer_name = serializers.CharField(required=False, allow_blank=True, max_length=160)
     branch = serializers.UUIDField(required=False, allow_null=True)
+    price_categories = serializers.DictField(child=serializers.ChoiceField(choices=["ADULT", "CHILD_NO_BED", "INFANT"]), required=False)
+    addons = serializers.DictField(child=serializers.ListField(child=serializers.CharField(max_length=24), max_length=20), required=False)
     agent = serializers.UUIDField(required=False, allow_null=True)
     adjustments = serializers.DictField(child=AdjustmentSerializer(), required=False)
 

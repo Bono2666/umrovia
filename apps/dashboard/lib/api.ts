@@ -40,6 +40,8 @@ export type UserPayload = {
 export type Pilgrim = {
   /** Belum dipakai; data terpakai diarsipkan/dinonaktifkan/dibatalkan (S13+). */
   deletable: boolean;
+  /** MOD-04: kelompok keluarga. */
+  family?: {id: string; name: string; relation: string} | null;
   id: string;
   code: string;
   environment: string;
@@ -69,6 +71,8 @@ export type Pilgrim = {
 
 /** Metadata dokumen jamaah (S07) — object_key ber-prefix tenant/environment. */
 export type PilgrimDocument = {
+  /** MOD-08 masa berlaku dokumen. */
+  valid_from?: string | null; expires_at?: string | null; expired?: boolean;
   id: string;
   pilgrim_id: string;
   environment: string;
@@ -97,6 +101,11 @@ export type TravelPackage = {
   duration_days: number;
   price_idr: number;
   room_prices: RoomPrice[];
+  /** MOD-05 varian harga, layanan tambahan, estimasi biaya per jamaah. */
+  child_no_bed_price_idr?: number | null; infant_price_idr?: number | null;
+  addons?: {code: string; name: string; price_idr: number}[];
+  estimated_costs?: {category: string; description: string; amount_idr: number}[];
+  estimated_cost_per_pax_idr?: number; estimated_margin_per_pax_idr?: number;
   inclusions: string[];
   exclusions: string[];
   cancellation_policy: string;
@@ -230,7 +239,7 @@ export type LeadSummary = {
 export type ReportColumn = {key: string; label: string; type: "text" | "money" | "int" | "percent" | "date"};
 export type ReportSection = {key: string; title: string; description: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[]; totals: Record<string, string | number | null> | null; truncated: boolean};
 export type Report = {
-  report: "operational" | "finance" | "saas" | "sales" | "payments" | "commissions"; title: string; travel: string; environment: string; as_of: string; timezone: string;
+  report: "operational" | "finance" | "saas" | "sales" | "payments" | "commissions" | "pilgrims"; title: string; travel: string; environment: string; as_of: string; timezone: string;
   period: {from: string; to: string}; filters: {package: string; departure: string; status: string; agent?: string; account?: string; branch?: string}; note?: string;
   kpis: {key: string; label: string; value: number | null; type: ReportColumn["type"]; hint: string}[];
   sections: ReportSection[]; checks: {label: string; ok: boolean; detail: string}[];
@@ -609,6 +618,14 @@ export type PortalProfile = {
 export type PortalAccessView = {
   access_id: string; environment: string; travel: {name: string; phone: string};
   profile: PortalProfile; bookings: PortalBooking[];
+  /** POR-05 pengumuman travel & POR-06 permintaan koreksi identitas. */
+  announcements: {id: string; title: string; body: string; published_at: string | null; departure: {id: string; code: string} | null}[];
+  change_requests: ChangeRequest[];
+};
+export type ChangeRequest = {
+  id: string; status: "PENDING" | "APPROVED" | "REJECTED"; status_label: string; fields: string[];
+  changes: {field: string; label: string; value: string}[]; reason: string; decision_note: string; created_at: string; decided_at: string | null;
+  pilgrim?: {id: string; code: string; name: string};
 };
 export type PortalInviteInfo = {
   valid: boolean; code: string | null; detail: string; travel_name: string;
@@ -660,4 +677,12 @@ export type WaitlistEntry = {
   departure: {id: string; code: string; package_name: string; start_at: string; available_seats: number};
   pilgrim: {id: string; code: string; name: string; phone: string}; room_type: string; notes: string; cancel_reason: string;
   booking: {id: string; code: string} | null; created_at: string; created_by_name: string | null;
+};
+
+// MOD-04 keluarga & riwayat
+export type FamilyGroup = {id: string; name: string; notes: string; members: {id: string; code: string; name: string; relation: string; gender: string}[]};
+export type PilgrimHistory = {
+  trips: {booking: {id: string; code: string; status: string; booked_at: string}; departure: {id: string; code: string; start_at: string; status: string}; package: string; room_type: string; participant_status: string; price_idr: number | null; paid_idr: number}[];
+  completed_trips: number; documents: {kind: string; version: number; status: string; uploaded_at: string; expires_at: string | null}[];
+  change_requests: ChangeRequest[]; family: FamilyGroup | null;
 };

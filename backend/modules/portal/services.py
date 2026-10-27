@@ -295,6 +295,8 @@ def overview(user):
                 "access_id": str(access.pk), "travel": {"name": tenant.display_name, "phone": tenant.phone},
                 "environment": access.environment, "profile": _profile_payload(pilgrim),
                 "bookings": [_booking_payload(p) for p in _participants(pilgrim)],
+                "announcements": announcements_for(pilgrim),
+                "change_requests": [change_request_payload(r) for r in pilgrim.change_requests.all()[:5]],
             })
     return result
 
@@ -371,3 +373,111 @@ def update_profile(*, user, access_id, data):
         pilgrim.save()
         log_event(action="pilgrims.updated", tenant=tenant, actor=user, object_type="pilgrim", object_id=pilgrim.pk, changes={"code": pilgrim.code, "fields": sorted(data), "source": "portal"})
         return _profile_payload(pilgrim)
+
+
+# ------------------------------------------------------- pengumuman (POR-05) --
+
+
+def announcement_payload(row):
+    return {"id": str(row.pk), "title": row.title, "body": row.body, "published_at": row.published_at.isoformat() if row.published_at else None,
+            "departure": {"id": str(row.departure_id), "code": row.departure.code} if row.departure_id else None}
+
+
+def announcements_for(pilgrim, limit=10):
+    from django.db.models import Q
+
+    from modules.portal.models import Announcement
+
+    now = timezone.now()
+    departures = list(_participants(pilgrim).exclude(booking__status="CANCELED").values_list("booking__departure_id", flat=True))
+    rows = (Announcement.objects.filter(environment=pilgrim.environment, published_at__isnull=False, published_at__lte=now)
+            .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now)).filter(Q(departure__isnull=True) | Q(departure_id__in=departures))
+            .select_related("departure").order_by("-published_at")[:limit])
+    return [announcement_payload(r) for r in rows]
+
+
+# ------------------------------------------- permintaan perubahan identitas (POR-06) --
+IDENTITY_FIELDS = ["name", "gender", "birth_date", "birth_place", "nationality", "identity_number", "passport_number", "passport_name",
+                   "passport_issued_at", "passport_expires_at", "passport_place_of_issue"]
+FIELD_LABELS = {"name": "Nama sesuai dokumen", "gender": "Jenis kelamin", "birth_date": "Tanggal lahir", "birth_place": "Tempat lahir", "nationality": "Kewarganegaraan",
+                "identity_number": "NIK", "passport_number": "Nomor paspor", "passport_name": "Nama di paspor", "passport_issued_at": "Tanggal terbit paspor",
+                "passport_expires_at": "Paspor berlaku hingga", "passport_place_of_issue": "Kantor penerbit paspor"}
+SECRET_FIELDS = {"identity_number", "passport_number"}
+
+
+def change_request_payload(row):
+    return {"id": str(row.pk), "status": row.status, "status_label": row.get_status_display(), "fields": row.fields,
+            "changes": [{"field": f, "label": FIELD_LABELS.get(f, f), "value": row.preview_json.get(f, "")} for f in row.fields],
+            "reason": row.reason, "decision_note": row.decision_note, "created_at": row.created_at.isoformat(),
+            "decided_at": row.decided_at.isoformat() if row.decided_at else None}
+
+
+def _validated_identity(pilgrim, data):
+    import json
+
+    from modules.pilgrims.crypto import mask_last4
+    from modules.pilgrims.serializers import PilgrimWriteSerializer
+
+    unknown = set(data) - set(IDENTITY_FIELDS)
+    if unknown:
+        raise ValidationError({key: "Field ini tidak termasuk data identitas." for key in unknown})
+    if not data:
+        raise ValidationError({"changes": "Isi minimal satu data yang ingin dikoreksi."})
+    serializer = PilgrimWriteSerializer(pilgrim, data=data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    clean = {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in serializer.validated_data.items()}
+    preview = {k: (mask_last4(str(v)) if k in SECRET_FIELDS else v) for k, v in clean.items()}
+    return clean, preview, json.dumps(clean)
+
+
+def submit_change_request(*, user, access_id, data, reason):
+    from modules.pilgrims.crypto import encrypt_pii
+    from modules.portal.models import ProfileChangeRequest
+
+    changes = data if isinstance(data, dict) else {}
+    if not str(reason or "").strip():
+        raise ValidationError({"reason": "Jelaskan alasan koreksi (mis. salah ketik nama sesuai paspor)."})
+    with transaction.atomic(), scoped_access(user, access_id) as (access, pilgrim):
+        tenant = Tenant.objects.get(pk=access.tenant_id)
+        assert_environment_writable(tenant, pilgrim.environment)
+        pilgrim = Pilgrim.objects.select_for_update().get(pk=pilgrim.pk)
+        if ProfileChangeRequest.objects.filter(pilgrim=pilgrim, status="PENDING").exists():
+            raise ValidationError({"changes": "Masih ada permintaan koreksi yang menunggu verifikasi travel."})
+        clean, preview, raw = _validated_identity(pilgrim, changes)
+        row = ProfileChangeRequest.objects.create(
+            tenant_id=pilgrim.tenant_id, environment=pilgrim.environment, pilgrim=pilgrim, requested_by=user,
+            fields=sorted(clean), payload_encrypted=encrypt_pii(raw), preview_json=preview, reason=str(reason).strip()[:500],
+        )
+        log_event(action="pilgrims.change_requested", tenant=tenant, actor=user, object_type="pilgrim", object_id=pilgrim.pk, changes={"fields": row.fields, "source": "portal"})
+        return change_request_payload(row)
+
+
+@transaction.atomic
+def decide_change_request(*, request_id, actor, approve, note="", request=None):
+    import json
+
+    from modules.pilgrims.crypto import decrypt_pii
+    from modules.pilgrims.serializers import PilgrimWriteSerializer
+    from modules.pilgrims.views import _apply_identity, _mark_duplicate
+    from modules.portal.models import ProfileChangeRequest
+
+    row = ProfileChangeRequest.objects.select_for_update().select_related("pilgrim").get(pk=request_id)
+    if row.status != "PENDING":
+        raise ValidationError({"status": "Permintaan ini sudah diputuskan."})
+    if not approve and not (note or "").strip():
+        raise ValidationError({"note": "Alasan penolakan wajib diisi agar jamaah tahu yang perlu diperbaiki."})
+    pilgrim = Pilgrim.objects.select_for_update().get(pk=row.pilgrim_id)
+    assert_environment_writable(pilgrim.tenant, pilgrim.environment)
+    if approve:
+        serializer = PilgrimWriteSerializer(pilgrim, data=json.loads(decrypt_pii(row.payload_encrypted)), partial=True)
+        serializer.is_valid(raise_exception=True)
+        validated = dict(serializer.validated_data)
+        _apply_identity(pilgrim, validated)
+        for field, value in validated.items():
+            setattr(pilgrim, field, value)
+        _mark_duplicate(pilgrim)
+        pilgrim.save()
+    row.status, row.decided_by, row.decided_at, row.decision_note = ("APPROVED" if approve else "REJECTED"), actor, timezone.now(), (note or "").strip()[:500]
+    row.save(update_fields=["status", "decided_by", "decided_at", "decision_note", "updated_at"])
+    log_event(action=f"pilgrims.change_{'approved' if approve else 'rejected'}", request=request, actor=actor, object_type="pilgrim", object_id=pilgrim.pk, changes={"fields": row.fields})
+    return row

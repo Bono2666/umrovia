@@ -22,6 +22,7 @@ import {
   type Paginated,
   type Pilgrim,
   type RoomType,
+  type TravelPackage,
 } from "@/lib/api";
 import { ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
@@ -89,7 +90,8 @@ const NO_ADJUSTMENT: Adjustment = {discount: "", extra: "", note: ""};
 const rupiah = (value: string) => Number(value.replace(/\D/g, "")) || 0;
 const snapshotNumber = (snapshot: Record<string, unknown>, key: string) => Number(snapshot[key] ?? 0) || 0;
 /** Harga bersih peserta = paket − diskon + biaya tambahan (sama dengan server). */
-const netPrice = (snapshot: Record<string, unknown>) => snapshotNumber(snapshot, "unit_price_idr") - snapshotNumber(snapshot, "discount_idr") + snapshotNumber(snapshot, "extra_idr");
+const netPrice = (snapshot: Record<string, unknown>) => snapshotNumber(snapshot, "unit_price_idr") - snapshotNumber(snapshot, "discount_idr") + snapshotNumber(snapshot, "extra_idr") + snapshotNumber(snapshot, "addons_idr");
+const CATEGORY_LABEL: Record<string, string> = {CHILD_NO_BED: "Anak tanpa kasur", INFANT: "Bayi"};
 const adjustmentFrom = (snapshot: Record<string, unknown>): Adjustment => ({
   discount: snapshot.discount_idr ? String(snapshot.discount_idr) : "", extra: snapshot.extra_idr ? String(snapshot.extra_idr) : "", note: String(snapshot.adjustment_note ?? ""),
 });
@@ -139,6 +141,9 @@ export default function BookingPage() {
   const [branchId, setBranchId] = useState<string | null>(null);  // null = cabang default staf
   const [branches, setBranches] = useState<{id: string; code: string; name: string}[]>([]);
   const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>({});
+  const [categories, setCategories] = useState<Record<string, string>>({});
+  const [addonChoices, setAddonChoices] = useState<Record<string, string[]>>({});
+  const [packageInfo, setPackageInfo] = useState<TravelPackage | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentEdit, setAgentEdit] = useState<{bookingId: string; agent: string; reason: string} | null>(null);
   const canAgents = can("agents.read");
@@ -186,6 +191,14 @@ export default function BookingPage() {
     if (!canBranches) return;
     void apiFetch<{results: {id: string; code: string; name: string}[]}>("/branches?active=1").then((result) => {if (result.ok) setBranches(result.data.results);});
   }, [canBranches]);
+
+  const selectedPackageId = departures.find((dep) => dep.id === departureId)?.package_id ?? "";
+  useEffect(() => {
+    if (!selectedPackageId) return;
+    let cancelled = false;
+    void apiFetch<TravelPackage>(`/packages/${selectedPackageId}`).then((result) => {if (!cancelled && result.ok) setPackageInfo(result.data);});
+    return () => {cancelled = true;};
+  }, [selectedPackageId]);
 
   useEffect(() => {
     if (!canAgents) return;
@@ -274,12 +287,16 @@ export default function BookingPage() {
         notes: notes.trim(),
         payer_name: payerName.trim(),
         agent: agentId || null,
+        price_categories: Object.fromEntries(picked.filter((p) => categories[p.id] && categories[p.id] !== "ADULT").map((p) => [p.id, categories[p.id]])),
+        addons: Object.fromEntries(picked.filter((p) => addonChoices[p.id]?.length).map((p) => [p.id, addonChoices[p.id]])),
         ...(branchId !== null ? {branch: branchId || null} : {}),
         adjustments: Object.fromEntries(adjusted.map((p) => [p.id, adjustmentPayload(adjustments[p.id])])),
       };
     const original = editing ? {departure:editing.departure_id, notes:editing.notes, payer_name:editing.payer_name, agent:editing.agent?.id ?? null, branch:editing.branch?.id ?? null,
       participants:editing.participants.map((p) => p.pilgrim_id),
       room_types:Object.fromEntries(editing.participants.filter((p) => p.pricing_snapshot.room_type).map((p) => [p.pilgrim_id, p.pricing_snapshot.room_type])),
+      price_categories:Object.fromEntries(editing.participants.filter((p) => p.pricing_snapshot.price_category && p.pricing_snapshot.price_category !== "ADULT").map((p) => [p.pilgrim_id, p.pricing_snapshot.price_category])),
+      addons:Object.fromEntries(editing.participants.filter((p) => Array.isArray(p.pricing_snapshot.addons) && (p.pricing_snapshot.addons as unknown[]).length).map((p) => [p.pilgrim_id, (p.pricing_snapshot.addons as {code: string}[]).map((a) => a.code)])),
       adjustments:Object.fromEntries(editing.participants.filter((p) => p.pricing_snapshot.discount_idr || p.pricing_snapshot.extra_idr).map((p) => [p.pilgrim_id, adjustmentPayload(adjustmentFrom(p.pricing_snapshot))]))} : {};
     const result = await apiFetch<Booking>(editing ? `/bookings/${editing.id}` : "/bookings", {
       method: editing ? "PATCH" : "POST",
@@ -295,7 +312,7 @@ export default function BookingPage() {
   }
 
   function resetForm() {
-    setEditing(null); setDepartureId(""); setNotes(""); setPicked([]); setRoomTypes({}); setPayerName(""); setAgentId(""); setAdjustments({}); setBranchId(null);
+    setEditing(null); setDepartureId(""); setNotes(""); setPicked([]); setRoomTypes({}); setPayerName(""); setAgentId(""); setAdjustments({}); setBranchId(null); setCategories({}); setAddonChoices({});
     setPilgrimQuery(""); setPilgrimResults([]); setFormErrors({});
   }
 
@@ -316,6 +333,8 @@ export default function BookingPage() {
     const booking = result.data;
     if (booking.status !== "DRAFT") {setBusy(false); setError("Hanya booking draf yang dapat dikoreksi. Perbarui daftar untuk melihat status terbaru."); load(query); return;}
     resetForm(); setEditing(booking); setDepartureId(booking.departure_id); setNotes(booking.notes); setPayerName(booking.payer_name); setAgentId(booking.agent?.id ?? ""); setBranchId(booking.branch?.id ?? "");
+    setCategories(Object.fromEntries(booking.participants.map((p) => [p.pilgrim_id, String(p.pricing_snapshot.price_category ?? "ADULT")])));
+    setAddonChoices(Object.fromEntries(booking.participants.map((p) => [p.pilgrim_id, ((p.pricing_snapshot.addons as {code: string}[] | undefined) ?? []).map((a) => a.code)])));
     setAdjustments(Object.fromEntries(booking.participants.filter((p) => p.pricing_snapshot.discount_idr || p.pricing_snapshot.extra_idr).map((p) => [p.pilgrim_id, adjustmentFrom(p.pricing_snapshot)])));
     setPicked(booking.participants.map((p) => ({id:p.pilgrim_id, name:p.pilgrim_name, code:p.pilgrim_code})));
     setRoomTypes(Object.fromEntries(booking.participants.filter((p) => p.pricing_snapshot.room_type).map((p) => [p.pilgrim_id, p.pricing_snapshot.room_type as RoomType])));
@@ -350,8 +369,12 @@ export default function BookingPage() {
   const searchable = pilgrimResults.filter((p) => !picked.some((s) => s.id === p.id)).slice(0, 8);
   const selectedDeparture = departures.find((dep) => dep.id === departureId);
   const roomChoices = selectedDeparture?.room_prices ?? [];
-  const estimatedTotal = picked.reduce((total, person) => total + (existingPrice(person.id, roomTypes[person.id] ?? "") ?? roomChoices.find((room) => room.room_type === roomTypes[person.id])?.price_idr ?? selectedDeparture?.package_price_idr ?? 0)
-    - rupiah(adjustments[person.id]?.discount ?? "") + rupiah(adjustments[person.id]?.extra ?? ""), 0);
+  const pkg = packageInfo && packageInfo.id === selectedDeparture?.package_id ? packageInfo : null;
+  const categoryPrice = (id: string) => categories[id] === "CHILD_NO_BED" ? pkg?.child_no_bed_price_idr ?? 0 : categories[id] === "INFANT" ? pkg?.infant_price_idr ?? 0 : null;
+  const addonTotal = (id: string) => (addonChoices[id] ?? []).reduce((sum, code) => sum + (pkg?.addons?.find((a) => a.code === code)?.price_idr ?? 0), 0);
+  const estimatedTotal = picked.reduce((total, person) => total + (categoryPrice(person.id) ?? existingPrice(person.id, roomTypes[person.id] ?? "") ?? roomChoices.find((room) => room.room_type === roomTypes[person.id])?.price_idr ?? selectedDeparture?.package_price_idr ?? 0)
+    - rupiah(adjustments[person.id]?.discount ?? "") + rupiah(adjustments[person.id]?.extra ?? "") + addonTotal(person.id), 0);
+  const hasVariants = Boolean(pkg && (pkg.child_no_bed_price_idr != null || pkg.infant_price_idr != null));
   const setAdjustment = (id: string, patch: Partial<Adjustment>) => setAdjustments((prev) => ({...prev, [id]: {...(prev[id] ?? NO_ADJUSTMENT), ...patch}}));
 
   return (
@@ -445,7 +468,7 @@ export default function BookingPage() {
                       >
                         {p.pilgrim_name}
                         <span className="text-muted">
-                          · {ROOM_LABELS[p.pricing_snapshot.room_type as RoomType] ?? "Standar"} · {formatIdr(netPrice(p.pricing_snapshot))}
+                          · {CATEGORY_LABEL[String(p.pricing_snapshot.price_category)] ?? ROOM_LABELS[p.pricing_snapshot.room_type as RoomType] ?? "Standar"} · {formatIdr(netPrice(p.pricing_snapshot))}
                           {p.pricing_snapshot.discount_idr ? ` (diskon ${formatIdr(snapshotNumber(p.pricing_snapshot, "discount_idr"))})` : ""}
                           {p.pricing_snapshot.extra_idr ? ` (+${formatIdr(snapshotNumber(p.pricing_snapshot, "extra_idr"))})` : ""} · {PARTICIPANT_LABEL[p.participant_status] ?? p.participant_status}
                         </span>
@@ -594,13 +617,31 @@ export default function BookingPage() {
 
             {picked.length > 0 ? (
               <div className="my-6 border-t border-border pt-6">
-                {roomChoices.length > 0 || Object.keys(roomTypes).length > 0 ? picked.map((person) => (
+                {hasVariants ? picked.map((person) => <FormSelect key={`cat-${person.id}`} label={`Kategori harga ${person.name}`} htmlFor={`category-${person.id}`} value={categories[person.id] ?? "ADULT"} onChange={(event) => setCategories((prev) => ({...prev, [person.id]: event.target.value}))}>
+                  <option value="ADULT">Dewasa / anak dengan kasur (harga kamar)</option>
+                  {pkg?.child_no_bed_price_idr != null ? <option value="CHILD_NO_BED">Anak tanpa kasur · {formatIdr(pkg.child_no_bed_price_idr)}</option> : null}
+                  {pkg?.infant_price_idr != null ? <option value="INFANT">Bayi · {formatIdr(pkg.infant_price_idr)}</option> : null}
+                </FormSelect>) : null}
+                {roomChoices.length > 0 || Object.keys(roomTypes).length > 0 ? picked.filter((person) => (categories[person.id] ?? "ADULT") === "ADULT").map((person) => (
                   <FormSelect key={person.id} label={`Kamar ${person.name}`} htmlFor={`room-${person.id}`} value={roomTypes[person.id] ?? ""} required={existingPrice(person.id, "") === undefined} onChange={(event) => setRoomTypes((prev) => ({...prev, [person.id]: event.target.value as RoomType}))}>
                     <option value="">{existingPrice(person.id, "") !== undefined ? "Pertahankan harga standar booking" : "— pilih kamar —"}</option>
                     {roomTypes[person.id] && !roomChoices.some((room) => room.room_type === roomTypes[person.id]) ? <option value={roomTypes[person.id]}>{ROOM_LABELS[roomTypes[person.id]]} · harga booking {formatIdr(existingPrice(person.id, roomTypes[person.id]) ?? 0)}</option> : null}
                     {roomChoices.map((room) => <option key={room.room_type} value={room.room_type}>{ROOM_LABELS[room.room_type]} · {formatIdr(existingPrice(person.id, room.room_type) ?? room.price_idr)} / jamaah</option>)}
                   </FormSelect>
                 )) : null}
+                {pkg?.addons?.length ? <fieldset className="mb-4">
+                  <legend className="text-sm font-medium">Layanan tambahan</legend>
+                  {picked.map((person) => <div key={`addon-${person.id}`} className="mt-2 text-sm">
+                    <p className="text-xs text-muted">{person.name}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">{pkg.addons!.map((addon) => <label key={addon.code} className="flex items-center gap-1.5">
+                      <input type="checkbox" checked={(addonChoices[person.id] ?? []).includes(addon.code)} onChange={(event) => setAddonChoices((prev) => {
+                        const current = prev[person.id] ?? [];
+                        return {...prev, [person.id]: event.target.checked ? [...current, addon.code] : current.filter((code) => code !== addon.code)};
+                      })} />
+                      {addon.name} <span className="text-xs text-muted">{formatIdr(addon.price_idr)}</span>
+                    </label>)}</div>
+                  </div>)}
+                </fieldset> : null}
                 <details className="mb-4" open={Object.keys(adjustments).length > 0}>
                   <summary className="cursor-pointer text-sm font-medium">Diskon &amp; biaya tambahan</summary>
                   <p className="mt-2 text-xs text-muted">{canDiscount ? "Isi per jamaah bila ada potongan harga atau layanan tambahan; alasan wajib dan tercetak di invoice." : "Biaya tambahan dapat diisi; diskon memerlukan izin Owner/Admin."}</p>

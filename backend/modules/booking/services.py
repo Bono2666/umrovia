@@ -270,21 +270,55 @@ def _consume_trial_quota(tenant, units: int) -> None:
     trial.save(update_fields=["dummy_count", "updated_at"])
 
 
-def _snapshot_unit_price(departure: Departure, room_type: str = "") -> dict:
+PRICE_CATEGORIES = {"ADULT": "Dewasa", "CHILD_NO_BED": "Anak tanpa kasur", "INFANT": "Bayi"}
+AGE_LIMITS = {"CHILD_NO_BED": 12, "INFANT": 2}  # usia (tahun) pada tanggal berangkat
+
+
+def _age_on(birth_date, day):
+    return day.year - birth_date.year - ((day.month, day.day) < (birth_date.month, birth_date.day))
+
+
+def _snapshot_unit_price(departure: Departure, room_type: str = "", category: str = "ADULT", addons=None, pilgrim=None) -> dict:
+    """Snapshot harga per peserta (UAT-04): dewasa per tipe kamar, atau varian
+    anak tanpa kasur/bayi (MOD-05), ditambah layanan tambahan pilihan."""
     pkg = departure.package
-    prices = {row.room_type: row.price_idr for row in pkg.room_prices.all()}
-    if prices and room_type not in prices:
-        raise ValidationError({"room_types": "Pilih tipe kamar yang tersedia untuk setiap jamaah."})
-    if not prices and room_type:
-        raise ValidationError({"room_types": "Paket ini belum memiliki harga tipe kamar tersebut."})
-    return {
+    category = category or "ADULT"
+    if category not in PRICE_CATEGORIES:
+        raise ValidationError({"price_categories": "Kategori harga tidak dikenal."})
+    if category == "ADULT":
+        prices = {row.room_type: row.price_idr for row in pkg.room_prices.all()}
+        if prices and room_type not in prices:
+            raise ValidationError({"room_types": "Pilih tipe kamar yang tersedia untuk setiap jamaah."})
+        if not prices and room_type:
+            raise ValidationError({"room_types": "Paket ini belum memiliki harga tipe kamar tersebut."})
+        unit = int(prices[room_type] if prices else pkg.price_idr)
+    else:
+        unit = pkg.child_no_bed_price_idr if category == "CHILD_NO_BED" else pkg.infant_price_idr
+        if unit is None:
+            raise ValidationError({"price_categories": f"Paket ini tidak menawarkan harga {PRICE_CATEGORIES[category].lower()}."})
+        room_type = ""
+        birth = getattr(pilgrim, "birth_date", None)
+        if birth and _age_on(birth, departure.start_at.date()) >= AGE_LIMITS[category]:
+            raise ValidationError({"price_categories": f"{pilgrim.name}: usia saat berangkat tidak memenuhi kategori {PRICE_CATEGORIES[category].lower()} (< {AGE_LIMITS[category]} tahun)."})
+    catalog = {row["code"]: row for row in (pkg.addons_json or [])}
+    chosen = []
+    for code in addons or []:
+        if code not in catalog:
+            raise ValidationError({"addons": f"Layanan tambahan {code} tidak tersedia pada paket ini."})
+        chosen.append({"code": code, "name": catalog[code]["name"], "price_idr": int(catalog[code]["price_idr"])})
+    snapshot = {
         "package_id": str(pkg.id),
         "package_code": pkg.code,
         "package_name": pkg.name,
         "room_type": room_type,
-        "unit_price_idr": int(prices[room_type] if prices else pkg.price_idr),
+        "price_category": category,
+        "unit_price_idr": int(unit),
         "snapshot_at": timezone.now().isoformat(),
     }
+    if chosen:
+        snapshot["addons"] = chosen
+        snapshot["addons_idr"] = sum(row["price_idr"] for row in chosen)
+    return snapshot
 
 
 ADJUSTMENT_KEYS = ("discount_idr", "extra_idr", "adjustment_note")
@@ -293,7 +327,7 @@ MAX_ADJUSTMENT_IDR = 10_000_000_000
 
 def participant_net(snapshot: dict) -> int:
     """Harga bersih peserta = harga paket − diskon + biaya tambahan (MOD-07 §5.2)."""
-    return int(snapshot["unit_price_idr"]) - int(snapshot.get("discount_idr") or 0) + int(snapshot.get("extra_idr") or 0)
+    return int(snapshot["unit_price_idr"]) - int(snapshot.get("discount_idr") or 0) + int(snapshot.get("extra_idr") or 0) + int(snapshot.get("addons_idr") or 0)
 
 
 def _with_adjustment(snapshot: dict, adjustment: dict, *, label: str) -> dict:
@@ -351,12 +385,16 @@ def _create_price_line(*, booking: Booking, qty: int | None = None) -> None:
     revisi invoice berotorisasi. Paket per kelompok kamar (gross) + baris
     `adjustment` per peserta untuk diskon (negatif) dan biaya tambahan."""
     booking.price_lines.all().delete()
-    groups = {}
+    groups, addon_groups = {}, {}
     adjustments = []
     for participant in booking.participants.select_related("pilgrim").order_by("created_at", "id"):
         snapshot = participant.pricing_snapshot_json
-        key = (snapshot.get("package_name", booking.departure.package.name), snapshot.get("room_type", ""), int(snapshot["unit_price_idr"]))
+        label = snapshot.get("room_type", "") or (PRICE_CATEGORIES.get(snapshot.get("price_category", ""), "") if snapshot.get("price_category", "ADULT") != "ADULT" else "")
+        key = (snapshot.get("package_name", booking.departure.package.name), label, int(snapshot["unit_price_idr"]))
         groups[key] = groups.get(key, 0) + 1
+        for addon in snapshot.get("addons", []):
+            akey = (f"Layanan tambahan · {addon['name']}", int(addon["price_idr"]))
+            addon_groups[akey] = addon_groups.get(akey, 0) + 1
         note = snapshot.get("adjustment_note", "")
         if snapshot.get("discount_idr"):
             adjustments.append((f"Diskon · {participant.pilgrim.name} ({note})", -int(snapshot["discount_idr"])))
@@ -367,6 +405,11 @@ def _create_price_line(*, booking: Booking, qty: int | None = None) -> None:
             tenant=booking.tenant, environment=booking.environment, booking=booking,
             item_type="package", description=f"{name} · {room}" if room else name,
             qty=count, unit_price=Decimal(unit), amount=Decimal(unit * count),
+        )
+    for (description, unit), count in sorted(addon_groups.items()):
+        BookingPriceLine.objects.create(
+            tenant=booking.tenant, environment=booking.environment, booking=booking,
+            item_type="addon", description=description[:200], qty=count, unit_price=Decimal(unit), amount=Decimal(unit * count),
         )
     for description, amount in adjustments:
         BookingPriceLine.objects.create(
@@ -398,6 +441,8 @@ def create_booking(
     adjustments=None,
     can_discount: bool = False,
     branch=None,
+    price_categories=None,
+    addons=None,
 ) -> Booking:
     """Buat booking DRAFT dengan peserta & snapshot harga (UI-07, UAT-03/04).
 
@@ -441,8 +486,11 @@ def create_booking(
         raise ValidationError({"code": "Gagal membuat booking, coba lagi."})
 
     choices = _room_choices(room_types, [p.pk for p in pilgrims])
+    categories = _room_choices(price_categories, [p.pk for p in pilgrims])
+    extras = _room_choices(addons, [p.pk for p in pilgrims])
     for pilgrim in pilgrims:
-        snapshot = _snapshot_unit_price(departure, choices.get(str(pilgrim.pk), ""))
+        key = str(pilgrim.pk)
+        snapshot = _snapshot_unit_price(departure, choices.get(key, ""), categories.get(key, "ADULT"), extras.get(key), pilgrim)
         BookingParticipant.objects.create(
             tenant=tenant,
             environment=environment,
@@ -478,6 +526,8 @@ def update_draft_booking(
     can_discount: bool = False,
     actor=None,
     branch=UNSET,
+    price_categories=None,
+    addons=None,
 ) -> Booking:
     """Update booking DRAFT saja (§8.3 "Detail/update draft").
 
@@ -533,16 +583,24 @@ def update_draft_booking(
                 pilgrim=pilgrim,
                 participant_status=ParticipantStatus.DRAFT,
                 saas_charge_state=SaasChargeState.NOT_ELIGIBLE,
-                pricing_snapshot_json=_snapshot_unit_price(departure, choices.get(str(pilgrim.pk), "")),
+                pricing_snapshot_json=_snapshot_unit_price(
+                    departure, choices.get(str(pilgrim.pk), ""), (price_categories or {}).get(str(pilgrim.pk), "ADULT"), (addons or {}).get(str(pilgrim.pk)), pilgrim,
+                ),
             )
         participants_changed = True
 
-    current_rows = list(booking.participants.all())
-    choices = _room_choices(room_types, [p.pilgrim_id for p in current_rows])
+    current_rows = list(booking.participants.select_related("pilgrim"))
+    ids = [p.pilgrim_id for p in current_rows]
+    choices, categories, extras = _room_choices(room_types, ids), _room_choices(price_categories, ids), _room_choices(addons, ids)
     for row in current_rows:
-        requested = choices.get(str(row.pilgrim_id), row.pricing_snapshot_json.get("room_type", ""))
-        if departure_changed or (str(row.pilgrim_id) in choices and requested != row.pricing_snapshot_json.get("room_type", "")):
-            row.pricing_snapshot_json = _carry_adjustment(row.pricing_snapshot_json, _snapshot_unit_price(departure, requested))
+        key, snap = str(row.pilgrim_id), row.pricing_snapshot_json
+        requested = choices.get(key, snap.get("room_type", ""))
+        category = categories.get(key, snap.get("price_category", "ADULT"))
+        chosen = extras[key] if key in extras else [a["code"] for a in snap.get("addons", [])]
+        changed = (key in choices and requested != snap.get("room_type", "")) or category != snap.get("price_category", "ADULT") \
+            or sorted(chosen) != sorted(a["code"] for a in snap.get("addons", []))
+        if departure_changed or changed:
+            row.pricing_snapshot_json = _carry_adjustment(snap, _snapshot_unit_price(departure, requested if category == "ADULT" else "", category, chosen, row.pilgrim))
             row.save(update_fields=["pricing_snapshot_json", "updated_at"])
             participants_changed = True
 

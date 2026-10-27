@@ -44,6 +44,13 @@ const STATUS_TONE: Record<string, "neutral" | "success" | "warning"> = {
   ARCHIVED: "neutral",
 };
 
+const digits = (value: string) => Number(value.replace(/\D/g, "")) || 0;
+/** Baris "a | b | c" → [a, b, c] (baris kosong diabaikan). */
+const parseRows = (text: string) => text.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+  const parts = line.split("|").map((part) => part.trim());
+  return [parts[0] ?? "", parts[1] ?? "", parts[2] ?? "0"];
+});
+
 export default function PaketPage() {
   const {can, canEditEnvironment, writableEnvironments} = useWorkspacePermissions();
   const [cancellationPolicy, setCancellationPolicy] = useState("");
@@ -66,6 +73,10 @@ export default function PaketPage() {
   const [exclusions, setExclusions] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string | null>>({});
   const [busy, setBusy] = useState(false);
+  const [childPrice, setChildPrice] = useState("");
+  const [infantPrice, setInfantPrice] = useState("");
+  const [addonsText, setAddonsText] = useState("");
+  const [costsText, setCostsText] = useState("");
 
   const load = useCallback((q: string) => {
     const suffix = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
@@ -113,6 +124,10 @@ export default function PaketPage() {
           : "Harga Rp0 – Rp10 miliar (integer rupiah).",
       room_prices: variants.every((row) => Number.isInteger(row.price_idr) && row.price_idr >= 0 && row.price_idr <= 10_000_000_000) ? null : "Harga kamar harus integer Rp0–Rp10 miliar.",
     };
+    const addons = parseRows(addonsText).map(([code, label, amount]) => ({ code: code.toUpperCase(), name: label, price_idr: digits(amount) }));
+    const costs = parseRows(costsText).map(([category, label, amount]) => ({ category, description: label, amount_idr: digits(amount) }));
+    errors.addons = addons.every((row) => /^[A-Z0-9_-]{2,24}$/.test(row.code) && row.name && row.price_idr >= 0) ? null : "Format layanan tambahan: KODE | Nama | harga (satu per baris).";
+    errors.estimated_costs = costs.every((row) => row.category && row.description) ? null : "Format estimasi biaya: Kategori | Uraian | jumlah per jamaah.";
     setFormErrors(errors);
     if (Object.values(errors).some(Boolean)) return;
 
@@ -129,6 +144,9 @@ export default function PaketPage() {
         inclusions: inclusions.split("\n").map((line) => line.trim()).filter(Boolean),
         exclusions: exclusions.split("\n").map((line) => line.trim()).filter(Boolean),
         cancellation_policy:cancellationPolicy.trim(), payment_terms:paymentTerms.trim(),
+        child_no_bed_price_idr: childPrice.trim() ? digits(childPrice) : null,
+        infant_price_idr: infantPrice.trim() ? digits(infantPrice) : null,
+        addons, estimated_costs: costs,
       };
     const result = await apiFetch<TravelPackage>(editing ? `/packages/${editing.id}` : "/packages", {
       method: editing ? "PATCH" : "POST",
@@ -147,7 +165,7 @@ export default function PaketPage() {
     setEditing(null);
     setDescription("");
     setInclusions("");
-    setExclusions(""); setCancellationPolicy(""); setPaymentTerms("");
+    setExclusions(""); setCancellationPolicy(""); setPaymentTerms(""); setChildPrice(""); setInfantPrice(""); setAddonsText(""); setCostsText("");
     setMessage(`Paket ${result.data.code} tersimpan${editing ? "; harga booking yang sudah ada tetap" : " sebagai draf"}.`);
     load(query);
   }
@@ -169,6 +187,9 @@ export default function PaketPage() {
     setPrice(String(pkg.price_idr)); setDescription(pkg.description);
     setInclusions(pkg.inclusions.join("\n")); setExclusions(pkg.exclusions.join("\n"));
     setRoomPrices({ ...EMPTY_ROOM_PRICES, ...Object.fromEntries((pkg.room_prices ?? []).map((row) => [row.room_type, String(row.price_idr)])) });
+    setChildPrice(pkg.child_no_bed_price_idr != null ? String(pkg.child_no_bed_price_idr) : ""); setInfantPrice(pkg.infant_price_idr != null ? String(pkg.infant_price_idr) : "");
+    setAddonsText((pkg.addons ?? []).map((a) => `${a.code} | ${a.name} | ${a.price_idr}`).join("\n"));
+    setCostsText((pkg.estimated_costs ?? []).map((c) => `${c.category} | ${c.description} | ${c.amount_idr}`).join("\n"));
     setFormErrors({});
   }
 
@@ -244,6 +265,9 @@ export default function PaketPage() {
                       {pkg.duration_days ? `${pkg.duration_days} hari · ` : ""}{(pkg.room_prices ?? []).length ? "Mulai " : ""}{formatIdr(pkg.price_idr)}
                     </p>
                     {(pkg.room_prices ?? []).length ? <p className="mt-1 text-xs text-muted">{pkg.room_prices.map((room) => `${ROOM_LABELS[room.room_type]} ${formatIdr(room.price_idr)}`).join(" · ")}</p> : null}
+                    {pkg.child_no_bed_price_idr != null || pkg.infant_price_idr != null ? <p className="mt-1 text-xs text-muted">{[pkg.child_no_bed_price_idr != null ? `Anak tanpa kasur ${formatIdr(pkg.child_no_bed_price_idr)}` : "", pkg.infant_price_idr != null ? `Bayi ${formatIdr(pkg.infant_price_idr)}` : ""].filter(Boolean).join(" · ")}</p> : null}
+                    {pkg.addons?.length ? <p className="mt-1 text-xs text-muted">Layanan tambahan: {pkg.addons.map((a) => `${a.name} ${formatIdr(a.price_idr)}`).join(" · ")}</p> : null}
+                    {pkg.estimated_cost_per_pax_idr ? <p className="mt-1 text-xs text-muted">Estimasi biaya {formatIdr(pkg.estimated_cost_per_pax_idr)}/jamaah · estimasi margin {formatIdr(pkg.estimated_margin_per_pax_idr ?? 0)} dari harga terendah</p> : null}
                   </div>
                   {can("packages.write") && canEditEnvironment(pkg.environment) ? <div className="mt-3 flex flex-wrap gap-1.5">
                     {pkg.status === "DRAFT" ? (
@@ -355,6 +379,14 @@ export default function PaketPage() {
               ))}
               {formErrors.room_prices ? <p className="error-message" role="alert">{formErrors.room_prices}</p> : null}
             </fieldset>
+            <fieldset className="my-6 border-t border-border pt-6">
+              <legend className="text-sm font-semibold">Varian anak & bayi (opsional)</legend>
+              <p className="mt-2 text-xs text-muted">Anak tanpa kasur: usia di bawah 12 tahun saat berangkat. Bayi: di bawah 2 tahun. Kosongkan bila tidak ditawarkan.</p>
+              <FormField label="Anak tanpa kasur (Rp)" htmlFor="price-child" inputMode="numeric" value={childPrice} onChange={(event) => setChildPrice(event.target.value)} hint={childPrice ? formatIdr(digits(childPrice)) : undefined} />
+              <FormField label="Bayi (Rp)" htmlFor="price-infant" inputMode="numeric" value={infantPrice} onChange={(event) => setInfantPrice(event.target.value)} hint={infantPrice ? formatIdr(digits(infantPrice)) : undefined} />
+            </fieldset>
+            <FormTextarea label="Layanan tambahan" htmlFor="package-addons" hint="Satu per baris: KODE | Nama | harga per jamaah, mis. KERETA | Kereta cepat Makkah–Madinah | 1200000" value={addonsText} onChange={(event) => setAddonsText(event.target.value)} error={formErrors.addons} />
+            <FormTextarea label="Estimasi biaya per jamaah" htmlFor="package-costs" hint="Satu per baris: Kategori | Uraian | jumlah, mis. HOTEL | Hotel Makkah 5 malam | 9000000. Dipakai untuk estimasi margin." value={costsText} onChange={(event) => setCostsText(event.target.value)} error={formErrors.estimated_costs} />
             <FormTextarea
               label="Deskripsi"
               htmlFor="package-description"

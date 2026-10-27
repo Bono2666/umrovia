@@ -79,7 +79,13 @@ def summary(request):
             from modules.manifest.services import readiness
 
             soon = Departure.objects.filter(environment=environment, start_at__gt=now, start_at__lte=now + timedelta(days=30)).exclude(status__in=[DepartureStatus.CANCELED, DepartureStatus.DEPARTED, DepartureStatus.COMPLETED])
+            from modules.pilgrims.models import PilgrimDocument
+
             for dep in soon[:10]:
+                expired = PilgrimDocument.objects.filter(status="APPROVED", expires_at__lt=dep.start_at.date(), pilgrim__booking_participations__booking__departure=dep,
+                                                         pilgrim__booking_participations__booking__status__in=ACTIVE).values("pilgrim_id").distinct().count()
+                if expired:
+                    data["reminders"].append({"kind": "expiry", "tone": "danger", "text": f"{dep.code}: dokumen {expired} jamaah kedaluwarsa sebelum berangkat", "href": f"/dashboard/manifest?departure={dep.pk}"})
                 info = readiness(dep)
                 missing = info["participants"] - info["docs_complete"]
                 if missing > 0:

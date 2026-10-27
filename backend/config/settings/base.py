@@ -47,6 +47,10 @@ INSTALLED_APPS = [
     "modules.documents",
 ]
 
+# AUTH-02: sesi berakhir setelah 2 jam tanpa aktivitas dan paling lama 12 jam sejak login.
+SESSION_COOKIE_AGE = int(env("SESSION_IDLE_SECONDS", "7200"))
+SESSION_ABSOLUTE_SECONDS = int(env("SESSION_ABSOLUTE_SECONDS", "43200"))
+
 MIDDLEWARE = [
     "common.middleware.RequestIDMiddleware",  # T10: request ID + logging context (paling atas)
     "django.middleware.security.SecurityMiddleware",
@@ -56,6 +60,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "modules.identity.middleware.SessionSecurityMiddleware",  # AUTH-02/03: idle/absolut/logout semua perangkat
     "modules.tenants.middleware.TenantContextMiddleware",  # T06: setelah auth — resolve tenant
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

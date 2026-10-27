@@ -20,6 +20,7 @@ import {
   type UserPayload,
 } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
+import { MemberSecurity } from "@/components/workspace/MemberSecurity";
 
 /**
  * Pengguna & Role (S06, §4.1): daftar membership + undang staf
@@ -145,6 +146,8 @@ export default function PenggunaPage() {
     load();
   }
 
+  const [securityMember, setSecurityMember] = useState<MembershipRow | null>(null);
+
   async function onRevoke(row: MembershipRow) {
     const self = row.user.email.toLowerCase() === currentEmail;
     const confirmed = window.confirm(
@@ -265,6 +268,7 @@ export default function PenggunaPage() {
                         ) : isLastOwner(row) ? (
                           <span className="block max-w-20 whitespace-normal text-xs text-muted sm:max-w-none sm:whitespace-nowrap" title="Tambahkan Owner lain sebelum mengubah peran atau mencabut akses akun ini.">Owner terakhir</span>
                         ) : <>
+                          <Btn size="xs" variant="tint" onClick={() => setSecurityMember(row)}>Keamanan</Btn>
                           {roles.length > 0 ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setEditingMember(row.id); setRoleDraft(row.role_id ?? ""); setError(null);}}>Ubah peran</Btn> : null}
                           <Btn size="xs" variant="danger" disabled={roleBusy} onClick={() => onRevoke(row)}>Cabut akses</Btn>
                         </>}
@@ -277,6 +281,8 @@ export default function PenggunaPage() {
           </div>
         )}
       </section>
+      {securityMember ? <div className="lg:col-span-2"><MemberSecurity member={securityMember} self={securityMember.user.email.toLowerCase() === currentEmail}
+        onClose={() => setSecurityMember(null)} onChanged={(text) => {setMessage(text); setSecurityMember(null); load();}} /></div> : null}
 
       {hasSidePanels ? <div className="grid grid-cols-1 items-start gap-6 lg:col-span-2 lg:grid-cols-2">
       {canInvite ? (

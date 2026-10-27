@@ -5,6 +5,7 @@ nilai asli tidak pernah masuk payload respons; output selalu varian masked.
 """
 from datetime import date
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from modules.pilgrims.crypto import (
@@ -51,6 +52,7 @@ def pilgrim_payload(pilgrim: Pilgrim, *, include_restricted: bool = True) -> dic
         "passport_place_of_issue": pilgrim.passport_place_of_issue,
         "status": pilgrim.status,
         "possible_duplicate_of": str(pilgrim.possible_duplicate_of_id) if pilgrim.possible_duplicate_of_id else None,
+        "family": {"id": str(pilgrim.family_id), "name": pilgrim.family.name, "relation": pilgrim.family_relation} if pilgrim.family_id else None,
     }
     if include_restricted:
         data["special_needs"] = pilgrim.special_needs
@@ -141,7 +143,7 @@ class PilgrimDocumentReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PilgrimDocument
-        fields = ["status", "reason"]
+        fields = ["status", "reason", "valid_from", "expires_at"]
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -155,6 +157,11 @@ class PilgrimDocumentReviewSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"reason": "Alasan penolakan wajib diisi."})
         if "reason" in attrs:  # approve tanpa alasan → reason lama tidak dihapus
             attrs["reason"] = reason
+        start, end = attrs.get("valid_from", self.instance.valid_from if self.instance else None), attrs.get("expires_at", self.instance.expires_at if self.instance else None)
+        if start and end and end < start:
+            raise serializers.ValidationError({"expires_at": "Tanggal berakhir tidak boleh sebelum tanggal berlaku."})
+        if status_value == "APPROVED" and end and end < timezone.localdate():
+            raise serializers.ValidationError({"expires_at": "Dokumen sudah kedaluwarsa; tolak dan minta dokumen terbaru."})
         return attrs
 
 
@@ -172,6 +179,9 @@ def document_payload(doc: PilgrimDocument) -> dict:
         "reviewed_by": str(doc.reviewed_by_id) if doc.reviewed_by_id else None,
         "reviewed_at": doc.reviewed_at.isoformat() if doc.reviewed_at else None,
         "reason": doc.reason,
+        "valid_from": doc.valid_from.isoformat() if doc.valid_from else None,
+        "expires_at": doc.expires_at.isoformat() if doc.expires_at else None,
+        "expired": bool(doc.expires_at and doc.expires_at < timezone.localdate()),
         "uploaded_at": doc.created_at.isoformat(),
         "has_file": has_file(doc),
     }

@@ -4,6 +4,7 @@ from django.core import signing
 from django.core.files.storage import default_storage
 from django.db import transaction
 from django.http import HttpResponse
+from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers
@@ -18,7 +19,7 @@ from modules.payments.models import TravelInvoice, TravelReceipt
 from modules.pilgrims.models import Pilgrim, PilgrimDocument
 from modules.portal import files, services
 from modules.portal.models import PortalAccess, PortalAccessStatus
-from modules.tenants.environment import assert_environment_writable
+from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.models import MembershipStatus, Tenant, TenantMembership
 from modules.tenants.rbac import has_permission, permission_list, require_permission
 from modules.wallet.services import platform_tenant_context
@@ -276,3 +277,117 @@ class PilgrimDocumentLinkView(APIView):
         if doc is None or not files.has_file(doc):
             raise NotFound("Berkas tidak ditemukan.")
         return Response({"path": files.signed_download_path(document=doc, user=request.user, scope="staff")})
+
+
+# ------------------------------------------------- POR-05 / POR-06 (staf & portal) --
+class PortalChangeRequestView(APIView):
+    """Jamaah mengajukan koreksi identitas (nama/NIK/paspor/tanggal lahir) untuk diverifikasi travel."""
+
+    permission_classes = [ActivePortalUser]
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={201: OpenApiTypes.OBJECT})
+    def post(self, request, access_id):
+        data = request.data if isinstance(request.data, dict) else {}
+        return Response(services.submit_change_request(user=request.user, access_id=access_id, data=data.get("changes") or {}, reason=data.get("reason", "")), status=201)
+
+
+def _announcement_staff_payload(row):
+    payload = services.announcement_payload(row)
+    payload.update({"expires_at": row.expires_at.isoformat() if row.expires_at else None, "status": "DRAFT" if not row.published_at else "EXPIRED" if row.expires_at and row.expires_at <= timezone.now() else "PUBLISHED",
+                    "created_by": (row.created_by.full_name or row.created_by.email) if row.created_by_id else None, "created_at": row.created_at.isoformat()})
+    return payload
+
+
+class AnnouncementSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=160)
+    body = serializers.CharField(max_length=5000)
+    departure = serializers.UUIDField(required=False, allow_null=True)
+    publish = serializers.BooleanField(required=False, default=True)
+    expires_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class AnnouncementListCreateView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("announcements.manage")]
+
+    def get(self, request):
+        from modules.portal.models import Announcement
+
+        rows = Announcement.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("departure", "created_by").order_by("-created_at")[:100]
+        return Response({"results": [_announcement_staff_payload(r) for r in rows]})
+
+    @transaction.atomic
+    def post(self, request):
+        from modules.departures.models import Departure
+        from modules.portal.models import Announcement
+
+        environment = resolve_active_environment(request.tenant)
+        assert_environment_writable(request.tenant, environment)
+        serializer = AnnouncementSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        departure = None
+        if data.get("departure"):
+            departure = Departure.objects.filter(pk=data["departure"], environment=environment).first()
+            if departure is None:
+                raise ValidationError({"departure": "Keberangkatan tidak ditemukan."})
+        if data.get("expires_at") and data["expires_at"] <= timezone.now():
+            raise ValidationError({"expires_at": "Batas tayang harus di masa depan."})
+        row = Announcement.objects.create(tenant=request.tenant, environment=environment, title=data["title"].strip(), body=data["body"].strip(), departure=departure,
+                                          published_at=timezone.now() if data["publish"] else None, expires_at=data.get("expires_at"), created_by=request.user)
+        log_event(action="announcements.created", request=request, object_type="announcement", object_id=row.pk, changes={"title": row.title, "published": bool(row.published_at)})
+        return Response(_announcement_staff_payload(row), status=201)
+
+
+class AnnouncementDetailView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("announcements.manage")]
+
+    @transaction.atomic
+    def patch(self, request, announcement_id):
+        from modules.portal.models import Announcement
+
+        row = Announcement.objects.filter(pk=announcement_id).select_related("departure", "created_by").first()
+        if row is None:
+            raise NotFound("Pengumuman tidak ditemukan.")
+        assert_environment_writable(request.tenant, row.environment)
+        action = request.data.get("action")
+        if action == "publish":
+            row.published_at = row.published_at or timezone.now()
+        elif action == "unpublish":
+            row.published_at = None
+        elif action == "archive":
+            row.expires_at = timezone.now()
+        else:
+            serializer = AnnouncementSerializer(data={"title": row.title, "body": row.body, **request.data}, partial=True)
+            serializer.is_valid(raise_exception=True)
+            row.title, row.body = serializer.validated_data["title"].strip(), serializer.validated_data["body"].strip()
+        row.save()
+        log_event(action="announcements.updated", request=request, object_type="announcement", object_id=row.pk, changes={"action": action or "edit"})
+        return Response(_announcement_staff_payload(row))
+
+
+class ChangeRequestListView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("pilgrims.write")]
+
+    def get(self, request):
+        from modules.portal.models import ProfileChangeRequest
+
+        status_filter = request.query_params.get("status", "PENDING")
+        qs = ProfileChangeRequest.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("pilgrim")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        rows = [{**services.change_request_payload(r), "pilgrim": {"id": str(r.pilgrim_id), "code": r.pilgrim.code, "name": r.pilgrim.name}} for r in qs[:200]]
+        return Response({"results": rows})
+
+
+class ChangeRequestDecisionView(APIView):
+    permission_classes = [IsAuthenticated, require_permission("pilgrims.write")]
+    action = "approve"
+
+    def post(self, request, request_id):
+        from modules.portal.models import ProfileChangeRequest
+
+        row = ProfileChangeRequest.objects.filter(pk=request_id, environment=resolve_active_environment(request.tenant)).first()
+        if row is None:
+            raise NotFound("Permintaan tidak ditemukan.")
+        row = services.decide_change_request(request_id=row.pk, actor=request.user, approve=self.action == "approve", note=str(request.data.get("note") or ""), request=request)
+        return Response(services.change_request_payload(row))

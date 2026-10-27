@@ -191,7 +191,7 @@ class BookingPriceLine(TenantScopedModel, BaseAppModel):
     )
     item_type = models.CharField(
         max_length=24,
-        choices=[("package", "Paket"), ("adjustment", "Penyesuaian")],
+        choices=[("package", "Paket"), ("addon", "Layanan tambahan"), ("adjustment", "Penyesuaian")],
         default="package",
     )
     description = models.CharField(max_length=200)

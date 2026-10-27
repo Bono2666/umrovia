@@ -287,6 +287,7 @@ def test_notification_role_migration_only_upgrades_untouched_defaults(tenant_a, 
             import_module("modules.tenants.migrations.0011_lead_role_defaults").upgrade(apps, editor)  # CRM
             import_module("modules.tenants.migrations.0012_agent_commission_role_defaults").upgrade(apps, editor)  # agen & komisi
             import_module("modules.tenants.migrations.0014_branch_role_defaults").upgrade(apps, editor)  # cabang
+            import_module("modules.tenants.migrations.0015_portal_data_role_defaults").upgrade(apps, editor)  # portal & data
     for name, role in defaults.items():
         role.refresh_from_db()
         assert set(role.permissions_json) == set(DEFAULT_ROLE_PERMISSIONS[name])

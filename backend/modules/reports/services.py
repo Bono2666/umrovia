@@ -587,5 +587,53 @@ def commissions_report(tenant, environment, f):
     )
 
 
-BUILDERS = {"operational": operational, "finance": finance, "saas": saas_usage, "sales": sales, "payments": payments_report, "commissions": commissions_report}
-PERMISSIONS = {"operational": "reports.read", "finance": "reports.finance", "saas": "wallet.read", "sales": "reports.read", "payments": "reports.finance", "commissions": "commissions.read"}
+def pilgrims_report(tenant, environment, f):
+    """MOD-13 Jamaah: per keberangkatan (periode berangkat) — status, kategori, kesiapan dokumen & pembayaran."""
+    from modules.manifest.services import manifest_rows
+    from modules.pilgrims.models import PilgrimDocument
+
+    deps = _scope_departures(Departure.objects.filter(environment=environment, start_at__gte=f["start_dt"], start_at__lt=f["end_dt"]), f)
+    if f["status"]:
+        deps = deps.filter(status=f["status"])
+    deps = list(deps.select_related("package").order_by("start_at", "code")[:100])
+    participant_label = {"AWAITING_DP": "Menunggu DP", "DP_VERIFIED_PENDING_CHARGE": "DP terverifikasi", "CONFIRMED": "Terkonfirmasi", "READY": "Siap",
+                         "DEPARTED": "Berangkat", "COMPLETED": "Selesai", "REGISTERED": "Terdaftar", "REVIEW_REQUIRED": "Perlu review"}
+    payment_label = {"paid": "Lunas", "partial": "Sebagian", "unpaid": "Belum bayar"}
+    rows, ready = [], 0
+    for dep in deps:
+        entries = manifest_rows(dep)
+        pilgrim_ids = [e["pilgrim_id"] for e in entries]
+        expiring = set(str(pid) for pid in PilgrimDocument.objects.filter(pilgrim_id__in=pilgrim_ids, status="APPROVED", expires_at__lt=dep.start_at.date()).values_list("pilgrim_id", flat=True))
+        for e in entries:
+            ok = e["docs_complete"] and e["payment_status"] == "paid" and e["pilgrim_id"] not in expiring
+            ready += ok
+            rows.append({
+                "departure": dep.code, "start_at": _local_date(dep.start_at, f["zone"]), "booking_code": e["booking_code"], "pilgrim_code": e["pilgrim_code"],
+                "name": e["name"], "gender": e["gender"] or "—", "room_type": e["room_type"] or "—",
+                "status": participant_label.get(e["participant_status"], e["participant_status"]),
+                "documents": "Lengkap" if e["docs_complete"] else f"Kurang {len(e['docs_missing'])}", "doc_expiry": "Kedaluwarsa sebelum berangkat" if e["pilgrim_id"] in expiring else "—",
+                "payment": payment_label.get(e["payment_status"], e["payment_status"]), "balance_idr": e["balance_idr"], "readiness": "Siap" if ok else "Belum",
+            })
+    truncated = len(rows) > ROW_LIMIT
+    rows = rows[:ROW_LIMIT]
+    money = "money"
+    return _envelope(
+        "pilgrims", "Laporan Jamaah", tenant, environment, f,
+        note="Jamaah aktif per keberangkatan dalam periode (tanggal berangkat). Siap = dokumen lengkap & berlaku, dan lunas.",
+        kpis=[
+            {"key": "pilgrims", "label": "Jamaah", "value": len(rows), "type": "int", "hint": f"{len(deps)} keberangkatan"},
+            {"key": "ready", "label": "Siap berangkat", "value": ready, "type": "int", "hint": f"{_pct(ready, len(rows)) or 0}% dari jamaah"},
+            {"key": "docs_incomplete", "label": "Dokumen belum lengkap", "value": sum(1 for r in rows if r["documents"] != "Lengkap"), "type": "int", "hint": f"{sum(1 for r in rows if r['doc_expiry'] != '—')} dokumen kedaluwarsa sebelum berangkat"},
+            {"key": "balance", "label": "Sisa tagihan", "value": sum(r["balance_idr"] for r in rows), "type": money, "hint": f"{sum(1 for r in rows if r['payment'] != 'Lunas')} jamaah belum lunas"},
+        ],
+        sections=[_section("pilgrims", "Daftar jamaah", [
+            _col("departure", "Keberangkatan"), _col("start_at", "Berangkat", "date"), _col("booking_code", "Booking"), _col("pilgrim_code", "Kode"), _col("name", "Nama"),
+            _col("gender", "L/P"), _col("room_type", "Kamar"), _col("status", "Status"), _col("documents", "Dokumen"), _col("doc_expiry", "Masa berlaku"),
+            _col("payment", "Pembayaran"), _col("balance_idr", "Sisa", money), _col("readiness", "Kesiapan"),
+        ], rows, totals={"departure": "Total", "balance_idr": sum(r["balance_idr"] for r in rows)}, truncated=truncated)],
+        checks=[],
+    )
+
+
+BUILDERS = {"operational": operational, "finance": finance, "saas": saas_usage, "sales": sales, "payments": payments_report, "commissions": commissions_report, "pilgrims": pilgrims_report}
+PERMISSIONS = {"operational": "reports.read", "finance": "reports.finance", "saas": "wallet.read", "sales": "reports.read", "payments": "reports.finance", "commissions": "commissions.read", "pilgrims": "reports.read"}
