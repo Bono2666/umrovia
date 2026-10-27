@@ -113,3 +113,15 @@ def settle_demo_dp():
         return post(f"/api/v1/payments/{payment['id']}/verify", {})
 
     return fund
+
+
+def mark_platform_mfa(client):
+    """S18: sesi staf platform yang sudah lulus MFA (endpoint /platform/* mensyaratkannya)."""
+    import time
+
+    from modules.platform.access import MFA_SESSION_KEY
+
+    session = client.session
+    session[MFA_SESSION_KEY] = time.time()
+    session.save()
+    return client

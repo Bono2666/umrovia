@@ -14,12 +14,27 @@ RLS gagal-tertutup (fail-closed).
 import logging
 
 from django.db import connection, transaction
+from django.http import JsonResponse
 
+from common.request_context import get_request_id
 from modules.tenants.context import clear_current_tenant, set_current_tenant
-from modules.tenants.models import MembershipStatus, TenantMembership
+from modules.tenants.models import BLOCKED_STATES, MembershipStatus, TenantMembership
 from modules.tenants.resolver import slug_from_host
 
 logger = logging.getLogger(__name__)
+
+# S18: workspace ditangguhkan/diakhiri platform hanya boleh mengakses akun, pemilihan
+# workspace dan tiket dukungan; seluruh API operasional tenant ditolak (fail-closed).
+SUSPENDED_ALLOWED_PREFIXES = ("/api/v1/me", "/api/v1/auth/", "/api/v1/workspaces/", "/api/v1/support/", "/api/v1/health/", "/api/v1/platform/", "/api/v1/portal/", "/api/v1/contact")
+
+
+def suspended_response(tenant):
+    terminated = tenant.state == "TERMINATED"
+    detail = ("Workspace travel ini telah diakhiri oleh platform." if terminated
+              else "Workspace travel ini sedang ditangguhkan oleh platform. Hubungi dukungan Umrovia melalui menu Bantuan.")
+    code = "tenant_terminated" if terminated else "tenant_suspended"
+    return JsonResponse({"type": f"https://umrovia.com/problems/{code}", "title": "Workspace tidak aktif", "status": 403, "code": code,
+                         "detail": detail, "request_id": get_request_id()}, status=403)
 
 
 class TenantContextMiddleware:
@@ -53,6 +68,9 @@ class TenantContextMiddleware:
         request.membership = None
         try:
             membership = self._resolve_membership(request)
+            if (membership is not None and membership.tenant.state in BLOCKED_STATES
+                    and request.path.startswith("/api/v1/") and not request.path.startswith(SUSPENDED_ALLOWED_PREFIXES)):
+                return suspended_response(membership.tenant)
             if membership is not None:
                 request.tenant = membership.tenant
                 request.membership = membership

@@ -141,6 +141,7 @@ REST_FRAMEWORK = {
         "contact-submit": "5/hour",
         "portal-invite": "30/hour",
         "portal-upload": "60/hour",
+        "platform-mfa": "10/min",
     },
     "EXCEPTION_HANDLER": "common.api.exception_handler",  # RFC7807-style (Spec §8)
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"] + (
@@ -224,6 +225,9 @@ NOTIFICATION_RETRY_DELAYS = env("NOTIFICATION_RETRY_DELAYS", "60,300,1800,7200")
 NOTIFICATION_BATCH_SIZE = int(env("NOTIFICATION_BATCH_SIZE", "50") or "50")
 NOTIFICATION_LEASE_SECONDS = int(env("NOTIFICATION_LEASE_SECONDS", "300") or "300")
 WORKER_INTERVAL_SECONDS = float(env("WORKER_INTERVAL_SECONDS", "5") or "5")
+
+# S18 konsol platform: verifikasi MFA berlaku per sesi selama TTL ini (detik).
+PLATFORM_MFA_TTL_SECONDS = int(env("PLATFORM_MFA_TTL_SECONDS", "28800") or "28800")
 # Basis domain tempat subdomain = slug tenant (Spec §2.2 resolver): <slug>.<base>
 TENANT_DOMAIN_BASES = [b.strip().lower() for b in env("TENANT_DOMAIN_BASES", "umrovia.com,localhost").split(",") if b.strip()]
 PLATFORM_ADMIN_URL = env("PLATFORM_ADMIN_URL", "http://localhost:3002")

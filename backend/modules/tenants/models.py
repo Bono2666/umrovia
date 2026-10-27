@@ -30,6 +30,9 @@ class TenantState(models.TextChoices):
     TERMINATED = "TERMINATED", "Diakhiri"
 
 
+BLOCKED_STATES = {TenantState.SUSPENDED, TenantState.TERMINATED}
+
+
 class Tenant(BaseAppModel):
     slug = models.SlugField(max_length=63, unique=True, validators=[validate_reserved_slug])
     legal_name = models.CharField(max_length=160)
@@ -38,6 +41,11 @@ class Tenant(BaseAppModel):
     timezone = models.CharField(max_length=64, default="Asia/Jakarta")
     state = models.CharField(max_length=24, choices=TenantState.choices, default=TenantState.PENDING_EMAIL)
     active_at = models.DateTimeField(null=True, blank=True)  # saat berubah ACTIVE
+    # S18 lifecycle platform: suspend keamanan menyimpan state sebelumnya agar dapat dipulihkan.
+    state_before_suspension = models.CharField(max_length=24, blank=True, default="")
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspension_reason = models.CharField(max_length=240, blank=True, default="")
+    terminated_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )

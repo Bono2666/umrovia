@@ -155,4 +155,6 @@ def user_payload(user: User) -> dict:
         "memberships": membership_summary(user),
         # Portal jamaah (S14): grant aktif, tanpa membership tenant.
         "portal_access_count": user.portal_accesses.filter(status="ACTIVE").count(),
+        # S18: staf platform diarahkan ke konsol /platform (otorisasi tetap di server).
+        "is_platform_staff": bool(user.is_staff and user.is_active),
     }

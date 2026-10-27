@@ -206,7 +206,8 @@ def revoke_portal(*, pilgrim, actor, access_id=None, invite_id=None):
 
 
 def active_accesses(user):
-    return PortalAccess.objects.filter(user=user, status=PortalAccessStatus.ACTIVE).select_related("tenant").order_by("created_at")
+    # Travel yang ditangguhkan/diakhiri platform: portal jamaahnya ikut tertutup (S18).
+    return PortalAccess.objects.filter(user=user, status=PortalAccessStatus.ACTIVE).exclude(tenant__state__in=["SUSPENDED", "TERMINATED"]).select_related("tenant").order_by("created_at")
 
 
 @contextmanager

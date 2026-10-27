@@ -4,7 +4,8 @@ import type { UserPayload } from "@/lib/api";
  *  `next` hanya diterima untuk path portal internal (tanpa open redirect). */
 export function landingPath(me: UserPayload, next?: string | null): string {
   const hasWorkspace = me.memberships.some((m) => m.status === "ACTIVE");
-  if (next && /^\/portal(\/|\?|$)/.test(next) && !next.startsWith("//")) return next;
+  if (next && /^\/(portal|platform)(\/|\?|$)/.test(next) && !next.startsWith("//")) return next;
+  if (!hasWorkspace && me.is_platform_staff) return "/platform";
   if (!hasWorkspace && me.portal_access_count > 0) return "/portal";
   return "/dashboard";
 }

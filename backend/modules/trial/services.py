@@ -153,10 +153,14 @@ def _convert_locked(tenant, trial: TenantTrial, *, actor, trigger: str) -> bool:
     TenantEnvironment.objects.get_or_create(
         tenant=tenant_locked, environment=Environment.PRODUCTION, defaults={"state": EnvironmentState.ACTIVE}
     )
-    tenant_locked.state = TenantState.ACTIVE
+    if tenant_locked.state == TenantState.SUSPENDED:
+        # S18: konversi tidak mencabut suspend platform; state yang dipulihkan nanti = ACTIVE.
+        tenant_locked.state_before_suspension = TenantState.ACTIVE
+    elif tenant_locked.state != TenantState.TERMINATED:
+        tenant_locked.state = TenantState.ACTIVE
     if tenant_locked.active_at is None:
         tenant_locked.active_at = now  # kolom tenants.active_at (§5.1): saat berubah ACTIVE
-    tenant_locked.save(update_fields=["state", "active_at", "updated_at"])
+    tenant_locked.save(update_fields=["state", "state_before_suspension", "active_at", "updated_at"])
 
     event_type = TrialEventType.CONVERTED_EARLY if trigger == "manual" else TrialEventType.EXPIRED_CONVERTED
     log_trial_event(

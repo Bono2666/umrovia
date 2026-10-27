@@ -32,6 +32,8 @@ export type UserPayload = {
   portal_access_count: number;
   /** Sesi switch aktif (S06); null = fallback membership ACTIVE pertama. */
   active_tenant_slug?: string | null;
+  /** S18: staf platform → konsol /platform (server tetap memeriksa izin + MFA). */
+  is_platform_staff?: boolean;
 };
 
 /** Payload jamaah (S07, Spec §8.3) — field sensitif SELALU masked (§10.1). */
@@ -190,6 +192,23 @@ export type WalletLedger = {
   description: string; created_at: string;
 };
 export type Paginated<T> = {count: number; next: string | null; previous: string | null; results: T[]};
+export type PlatformSession = {email: string; full_name: string; permissions: string[]; mfa: {enrolled: boolean; verified: boolean; recovery_codes_left: number}};
+export type PlatformTrial = {status: string; started_at: string; ends_at: string; converted_at: string | null; dummy_used: number; dummy_limit: number};
+export type PlatformTenant = {
+  id: string; slug: string; display_name: string; legal_name: string; state: string; state_label: string; created_at: string; active_at: string | null;
+  suspended_at: string | null; suspension_reason: string; terminated_at: string | null; owner_email: string; members: number; environments: string[];
+  trial: PlatformTrial | null;
+  usage?: {wallet_balance_idr: number; wallet_status: string | null; pending_charges: number; pending_charge_idr: number; posted_charges: number; active_bookings: number; active_participants: number};
+};
+export type PlatformLifecycleRequest = {id: string; kind: string; status: string; reason: string; requested_by: string; requested_at: string; decided_by: string | null; decided_at: string | null; decision_reason: string};
+export type PlatformAuditRow = {id: string; occurred_at: string; action: string; object_type: string; object_id: string; tenant: string | null; actor: string; actor_platform: boolean; changes: Record<string, string | number | boolean>};
+export type PlatformTenantDetail = PlatformTenant & {members_detail: {email: string; role: string | null; status: string; joined_at: string}[]; lifecycle_requests: PlatformLifecycleRequest[]; history: PlatformAuditRow[]; open_tickets: number};
+export type SupportMessage = {id: string; created_at: string; from_platform: boolean; internal: boolean; body: string; author: string};
+export type SupportTicket = {
+  id: string; number: string; subject: string; category: string; category_label: string; status: string; status_label: string; priority: string;
+  created_at: string; last_message_at: string; resolved_at: string | null; opened_by: string | null;
+  tenant?: {id: string; slug: string; display_name: string; state: string}; assigned_to?: string | null; messages?: SupportMessage[]; diagnosis?: PlatformTenant;
+};
 export type ReportColumn = {key: string; label: string; type: "text" | "money" | "int" | "percent" | "date"};
 export type ReportSection = {key: string; title: string; description: string; columns: ReportColumn[]; rows: Record<string, string | number | null>[]; totals: Record<string, string | number | null> | null; truncated: boolean};
 export type Report = {

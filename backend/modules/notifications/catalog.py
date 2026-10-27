@@ -110,6 +110,14 @@ TEMPLATES = {t.key: t for t in [
         ("kode_booking", "nominal_biaya"), editable=False,
     ),
     TemplateDef(
+        "support.replied", "Balasan tiket dukungan", "owner",
+        "Balasan untuk tiket {{ nomor_tiket }} — Umrovia",
+        "Halo,\n\nTim Umrovia telah membalas tiket {{ nomor_tiket }} ({{ judul }}).\n\n"
+        "Baca balasan dan tanggapi melalui menu Bantuan:\n{{ tautan_bantuan }}",
+        {"nama_travel": "Nama travel", "nomor_tiket": "Nomor tiket", "judul": "Judul tiket", "tautan_bantuan": "Tautan bantuan"},
+        ("nomor_tiket",), editable=False,
+    ),
+    TemplateDef(
         "trial.reminder", "Pengingat masa trial", "owner",
         "Masa trial Umrovia berakhir {{ sisa_hari }} hari lagi — {{ nama_travel }}",
         "Halo,\n\nMasa trial {{ nama_travel }} di Umrovia berakhir pada {{ tanggal_berakhir }} ({{ sisa_hari }} hari lagi). "

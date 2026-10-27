@@ -11,6 +11,7 @@ from modules.audit.services import log_event
 from modules.billing import services
 from modules.billing.models import SaaSAdjustment, SaaSCharge
 from modules.billing.services import charge_status
+from modules.platform.access import require_platform
 from modules.tenants.environment import resolve_active_environment
 from modules.wallet.serializers import StrictSerializer
 from modules.wallet.views import _page, wallet_permission
@@ -97,7 +98,7 @@ class RefundRequestView(APIView):
 
 
 class PlatformRefundListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, require_platform("billing.approve_adjustment")]  # S18: + MFA segar
 
     @extend_schema(responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("status", str, enum=["REQUESTED", "APPROVED", "REJECTED"]), OpenApiParameter("page", int)], description="Platform billing queue for one explicit tenant; booking references only, no pilgrim data.")
     def get(self, request, tenant_id):
@@ -114,7 +115,7 @@ class PlatformRefundListView(APIView):
 
 
 class PlatformRefundDecisionView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, require_platform("billing.approve_adjustment")]  # S18: + MFA segar
 
     @extend_schema(request=RefundDecisionSerializer, responses=OpenApiTypes.OBJECT, description="Platform staff with Django billing.approve_adjustment only. APPROVED appends one compensating REFUND ledger credit; replay returns the same decision.")
     @transaction.atomic

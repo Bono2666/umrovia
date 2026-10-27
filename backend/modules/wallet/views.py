@@ -18,6 +18,7 @@ from modules.audit.services import log_event
 from modules.billing.models import SaaSCharge
 from modules.billing.services import current_price
 from modules.booking.models import BookingParticipant
+from modules.platform.access import require_platform
 from modules.tenants.environment import resolve_active_environment
 from modules.tenants.rbac import require_permission
 from modules.wallet import midtrans, services
@@ -215,7 +216,7 @@ class MidtransNotificationView(APIView):
 
 
 class PlatformTopupSettleView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, require_platform("wallet.settle_topup")]  # S18: + MFA segar
 
     @extend_schema(request=TopupSettleSerializer, responses=OpenApiTypes.OBJECT, description="Platform staff with Django wallet.settle_topup permission only; requester cannot settle their own top-up. Exact bank settlement reference is globally unique. No tenant role grants this authority.")
     @transaction.atomic
@@ -228,7 +229,7 @@ class PlatformTopupSettleView(APIView):
 
 
 class PlatformTopupListView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, require_platform("wallet.settle_topup")]  # S18: + MFA segar
 
     @extend_schema(responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("page", int), OpenApiParameter("status", str)], description="Platform billing review queue for one explicitly scoped tenant; includes transfer evidence references, no pilgrim data.")
     def get(self, request, tenant_id):
