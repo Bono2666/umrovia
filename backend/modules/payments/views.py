@@ -37,6 +37,7 @@ from modules.payments.serializers import (
     invoice_payload,
     payment_payload,
 )
+from modules.tenants.branches import scope_filter
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.models import TenantSettings
 from modules.tenants.rbac import has_permission, permission_list, require_permission
@@ -62,7 +63,11 @@ def _payments(request):
     )
     if not has_permission(permission_list(request.membership.role), "payments.read_all"):
         qs = qs.filter(created_by=request.user)
-    return qs
+    return scope_filter(qs, request, "booking__branch")
+
+
+def _invoices(request):
+    return scope_filter(TravelInvoice.objects, request, "booking__branch")
 
 
 def _filter_uuid(value, field):
@@ -77,7 +82,7 @@ class InvoiceListView(APIView):
 
     @extend_schema(operation_id="invoices_list", responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("booking", OpenApiTypes.UUID), OpenApiParameter("status", str)])
     def get(self, request):
-        qs = TravelInvoice.objects.select_related("booking", "tenant").defer("pdf_data")  # S19: tanpa N+1/PDF
+        qs = _invoices(request).select_related("booking", "tenant").defer("pdf_data")  # S19: tanpa N+1/PDF
         if request.query_params.get("booking"):
             qs = qs.filter(booking_id=_filter_uuid(request.query_params["booking"], "booking"))
         if request.query_params.get("status"):
@@ -98,7 +103,7 @@ class InvoiceCandidatesView(APIView):
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         environment = resolve_active_environment(request.tenant)
-        qs = Booking.objects.filter(environment=environment).exclude(status__in=["DRAFT", "CANCELED", "EXPIRED"]).filter(invoice__isnull=True)
+        qs = scope_filter(Booking.objects, request).filter(environment=environment).exclude(status__in=["DRAFT", "CANCELED", "EXPIRED"]).filter(invoice__isnull=True)
         qs = qs.select_related("departure__package", "created_by", "canceled_by").prefetch_related("participants__pilgrim", "price_lines")
         return Response({"results": [booking_payload(row) for row in qs[:200]]})
 
@@ -108,7 +113,7 @@ class InvoiceDetailView(APIView):
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request, invoice_id):
-        return Response(invoice_detail_payload(_get(TravelInvoice.objects.select_related("booking"), pk=invoice_id)))
+        return Response(invoice_detail_payload(_get(_invoices(request).select_related("booking"), pk=invoice_id)))
 
 
 class IssueInvoiceView(APIView):
@@ -117,7 +122,7 @@ class IssueInvoiceView(APIView):
     @extend_schema(request=IssueInvoiceSerializer, responses=OpenApiTypes.OBJECT, description="Issue invoice idempotently from frozen participant pricing. Optional DP target never blocks payment eligibility.")
     @transaction.atomic
     def post(self, request, booking_id):
-        booking = _get(Booking.objects, pk=booking_id)
+        booking = _get(scope_filter(Booking.objects, request), pk=booking_id)
         serializer = IssueInvoiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invoice = services.issue_invoice(booking_id=booking.pk, actor=request.user, **serializer.validated_data)
@@ -148,6 +153,7 @@ class PaymentListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         invoice = data["invoice"]
+        _get(_invoices(request), pk=invoice.pk)  # cakupan cabang
         booking = _get(Booking.objects.select_for_update(), pk=invoice.booking_id)
         assert_environment_writable(request.tenant, booking.environment)
         result = services.idempotent_operation(
@@ -289,7 +295,7 @@ class InvoicePdfView(APIView):
 
     @extend_schema(responses={(200, "application/pdf"): OpenApiTypes.BINARY})
     def get(self, request, invoice_id):
-        return _pdf_response(request, _get(TravelInvoice.objects, pk=invoice_id), "invoice_number")
+        return _pdf_response(request, _get(_invoices(request), pk=invoice_id), "invoice_number")
 
 
 class InvoiceRevisionPdfView(APIView):
@@ -297,6 +303,7 @@ class InvoiceRevisionPdfView(APIView):
 
     @extend_schema(responses={(200, "application/pdf"): OpenApiTypes.BINARY}, description="PDF versi invoice sebelum revisi (arsip INV-03).")
     def get(self, request, invoice_id, version):
+        _get(_invoices(request), pk=invoice_id)
         revision = _get(TravelInvoiceRevision.objects, invoice_id=invoice_id, version=version)
         return _pdf_response(request, revision, "invoice_number", filename=f"{revision.invoice_number}-v{revision.version}")
 
@@ -307,7 +314,7 @@ class InvoiceReviseView(APIView):
     @extend_schema(request=InvoiceReviseSerializer, responses=OpenApiTypes.OBJECT, description="INV-03 revisi berversi: hanya invoice tanpa pembayaran DRAFT/SUBMITTED/VERIFIED. Versi lama (snapshot + PDF) diarsipkan; nomor invoice tetap. Mengubah diskon memerlukan `bookings.discount`.")
     @transaction.atomic
     def post(self, request, invoice_id):
-        invoice = _get(TravelInvoice.objects, pk=invoice_id)
+        invoice = _get(_invoices(request), pk=invoice_id)
         serializer = InvoiceReviseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

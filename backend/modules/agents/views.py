@@ -31,6 +31,7 @@ from modules.audit.services import log_event
 from modules.booking.models import Booking
 from modules.catalog.models import TravelPackage
 from modules.payments.dates import tenant_today
+from modules.tenants.branches import scope_filter
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import require_permission
 from modules.travel_finance.models import TravelBankAccount, mask_account_number
@@ -287,7 +288,7 @@ class CommissionListView(APIView):
 
     @extend_schema(operation_id="commissions_list", responses=OpenApiTypes.OBJECT, parameters=[OpenApiParameter("status", str, enum=CommissionStatus.values), OpenApiParameter("agent", OpenApiTypes.UUID), OpenApiParameter("booking", OpenApiTypes.UUID), OpenApiParameter("page", int)])
     def get(self, request):
-        qs = _commissions().filter(environment=resolve_active_environment(request.tenant))
+        qs = scope_filter(_commissions(), request, "booking__branch").filter(environment=resolve_active_environment(request.tenant))
         params = request.query_params
         if params.get("status"):
             if params["status"] not in CommissionStatus.values:
@@ -305,7 +306,7 @@ class CommissionSummaryView(APIView):
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
-        qs = Commission.objects.filter(environment=resolve_active_environment(request.tenant))
+        qs = scope_filter(Commission.objects, request, "booking__branch").filter(environment=resolve_active_environment(request.tenant))
         rows = {row["status"]: row for row in qs.values("status").annotate(count=Count("id"), total=Sum("amount_idr"))}
         return Response({"statuses": [{"status": value, "label": label, "count": rows.get(value, {}).get("count", 0), "total_idr": rows.get(value, {}).get("total") or 0} for value, label in CommissionStatus.choices]})
 
@@ -329,7 +330,7 @@ class CommissionActionView(APIView):
     @extend_schema(request=CommissionActionSerializer, responses=OpenApiTypes.OBJECT)
     @transaction.atomic
     def post(self, request, commission_id):
-        commission = Commission.objects.filter(pk=commission_id, environment=resolve_active_environment(request.tenant)).first()
+        commission = scope_filter(Commission.objects, request, "booking__branch").filter(pk=commission_id, environment=resolve_active_environment(request.tenant)).first()
         if commission is None:
             raise NotFound("Komisi tidak ditemukan.")
         assert_environment_writable(request.tenant, commission.environment)
@@ -368,7 +369,7 @@ class BookingAgentView(APIView):
         return {"agent": agent_ref(booking.agent), "commission": commission_payload(commission) if commission else None, "history": [history_payload(c) for c in changes]}
 
     def _get(self, booking_id):
-        booking = Booking.objects.select_related("agent").filter(pk=booking_id).first()
+        booking = scope_filter(Booking.objects, self.request).select_related("agent").filter(pk=booking_id).first()
         if booking is None:
             raise NotFound("Booking tidak ditemukan.")
         return booking

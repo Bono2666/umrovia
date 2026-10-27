@@ -30,6 +30,8 @@ def _month_start(day: date, offset=0) -> date:
 
 
 def summary(request):
+    from modules.tenants.branches import scope_filter
+
     tenant, grants = request.tenant, permission_list(request.membership.role)
     can = lambda permission: has_permission(grants, permission)  # noqa: E731
     from modules.tenants.environment import resolve_active_environment
@@ -44,7 +46,7 @@ def summary(request):
     data = {"as_of": now.isoformat(), "environment": environment, "operations": None, "finance": None, "reminders": [], "chart": None, "upcoming": None}
 
     if can("bookings.read"):
-        bookings = Booking.objects.filter(environment=environment)
+        bookings = scope_filter(Booking.objects, request).filter(environment=environment)
         by_status = dict(bookings.values_list("status").annotate(n=Count("id")))
         new_this_month = bookings.filter(booked_at__gte=month_start).exclude(status="DRAFT")
         sales_rows = BookingParticipant.objects.filter(booking__in=new_this_month.exclude(status__in=["CANCELED", "EXPIRED"])).exclude(participant_status="CANCELED")
@@ -93,7 +95,7 @@ def summary(request):
                     data["reminders"].append({"kind": "documents", "tone": "danger" if days <= 14 else "warning", "text": f"{dep.code} berangkat {days} hari lagi: dokumen {missing} jamaah belum lengkap", "href": f"/dashboard/manifest?departure={dep.pk}"})
 
     if can("invoices.read"):
-        invoices = TravelInvoice.objects.filter(environment=environment, status__in=OPEN_INVOICES, balance_idr__gt=0)
+        invoices = scope_filter(TravelInvoice.objects, request, "booking__branch").filter(environment=environment, status__in=OPEN_INVOICES, balance_idr__gt=0)
         totals = invoices.aggregate(n=Count("id"), t=Sum("balance_idr"))
         overdue = invoices.filter(due_at__lt=today).aggregate(n=Count("id"), t=Sum("balance_idr"))
         due_soon = invoices.filter(due_at__gte=today, due_at__lte=today + timedelta(days=7)).aggregate(n=Count("id"), t=Sum("balance_idr"))
@@ -103,7 +105,7 @@ def summary(request):
         if due_soon["n"]:
             data["reminders"].append({"kind": "due", "tone": "warning", "text": f"{due_soon['n']} invoice jatuh tempo dalam 7 hari", "href": "/dashboard/invoice"})
         if can("payments.read_all") or can("reports.finance"):
-            payments = TravelPayment.objects.filter(environment=environment)
+            payments = scope_filter(TravelPayment.objects, request, "booking__branch").filter(environment=environment)
             finance["payments_month_idr"] = payments.filter(status="VERIFIED", verified_at__gte=month_start).aggregate(t=Sum("amount_idr"))["t"] or 0
             finance["pending_verification"] = payments.filter(status="SUBMITTED").count()
             if finance["pending_verification"] and can("payments.verify"):
@@ -113,7 +115,7 @@ def summary(request):
     if can("bookings.read"):
         months = [_month_start(today, offset) for offset in range(-11, 1)]
         series = {m: {"bookings": 0, "sales_idr": 0, "payments_idr": None} for m in months}
-        for booking in Booking.objects.filter(environment=environment, booked_at__gte=chart_start).exclude(status__in=["DRAFT", "CANCELED", "EXPIRED"]).prefetch_related("participants"):
+        for booking in scope_filter(Booking.objects, request).filter(environment=environment, booked_at__gte=chart_start).exclude(status__in=["DRAFT", "CANCELED", "EXPIRED"]).prefetch_related("participants"):
             key = booking.booked_at.astimezone(zone).date().replace(day=1)
             if key in series:
                 series[key]["bookings"] += 1
@@ -121,7 +123,7 @@ def summary(request):
         if data["finance"] and data["finance"]["payments_month_idr"] is not None:
             for m in months:
                 series[m]["payments_idr"] = 0
-            for p in TravelPayment.objects.filter(environment=environment, status="VERIFIED", verified_at__gte=chart_start).only("amount_idr", "verified_at"):
+            for p in scope_filter(TravelPayment.objects, request, "booking__branch").filter(environment=environment, status="VERIFIED", verified_at__gte=chart_start).only("amount_idr", "verified_at"):
                 key = p.verified_at.astimezone(zone).date().replace(day=1)
                 if key in series:
                     series[key]["payments_idr"] += p.amount_idr

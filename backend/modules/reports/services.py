@@ -409,6 +409,8 @@ def _booking_scope(qs, f, prefix=""):
         qs = qs.filter(**{f"{prefix}agent_id": f["agent"]})
     if f.get("branch"):
         qs = qs.filter(**{f"{prefix}branch_id": f["branch"]})
+    if f.get("branch_scope") is not None:
+        qs = qs.filter(Q(**{f"{prefix}branch_id__in": f["branch_scope"]}) | Q(**{f"{prefix}branch__isnull": True}))
     return qs
 
 
@@ -564,7 +566,7 @@ def commissions_report(tenant, environment, f):
     expense_total = TravelExpense.objects.filter(environment=environment, category="COMMISSION", voided_at__isnull=True, approval_status="APPROVED", spent_on__gte=f["from"], spent_on__lte=f["to"])
     expense_total = expense_total.aggregate(t=Sum("amount_idr"))["t"] or 0
     money = "money"
-    scoped = bool(f["package"] or f["departure"] or f.get("agent") or f.get("branch"))
+    scoped = bool(f["package"] or f["departure"] or f.get("agent") or f.get("branch") or f.get("branch_scope") is not None)
     return _envelope(
         "commissions", "Laporan Komisi Agen", tenant, environment, f,
         note="Komisi dikelompokkan menurut tanggal dibuat (booking direservasi). Earned = layak dibayar + disetujui + dibayar.",
@@ -600,8 +602,11 @@ def pilgrims_report(tenant, environment, f):
                          "DEPARTED": "Berangkat", "COMPLETED": "Selesai", "REGISTERED": "Terdaftar", "REVIEW_REQUIRED": "Perlu review"}
     payment_label = {"paid": "Lunas", "partial": "Sebagian", "unpaid": "Belum bayar"}
     rows, ready = [], 0
+    allowed = None
+    if f.get("branch_scope") is not None:
+        allowed = {str(pk) for pk in _booking_scope(Booking.objects.filter(departure__in=deps), f).values_list("pk", flat=True)}
     for dep in deps:
-        entries = manifest_rows(dep)
+        entries = [e for e in manifest_rows(dep) if allowed is None or e["booking_id"] in allowed]
         pilgrim_ids = [e["pilgrim_id"] for e in entries]
         expiring = set(str(pid) for pid in PilgrimDocument.objects.filter(pilgrim_id__in=pilgrim_ids, status="APPROVED", expires_at__lt=dep.start_at.date()).values_list("pilgrim_id", flat=True))
         for e in entries:

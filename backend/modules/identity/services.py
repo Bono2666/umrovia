@@ -132,6 +132,7 @@ def membership_summary(user: User) -> list[dict]:
                 "writable_environments": [row.environment for row in m.tenant.environments.all() if row.state == "ACTIVE"],
             },
             "role": m.role.name if m.role else None,
+            "branch_scope": "ALL" if not m.role or m.role.name == "Owner" else m.role.branch_scope,
             "status": m.status,
             "permissions": _permission_list(m.role),
         }

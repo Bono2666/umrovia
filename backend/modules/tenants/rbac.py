@@ -122,6 +122,10 @@ DEFAULT_ROLE_PERMISSIONS["Admin"] += ["announcements.manage", "pilgrims.export"]
 DEFAULT_ROLE_PERMISSIONS["Operations"] += ["announcements.manage"]
 
 
+# TBD-08 opsi C: cakupan cabang default per role (Owner selalu semua cabang).
+DEFAULT_ROLE_BRANCH_SCOPE = {"Owner": "ALL", "Admin": "ALL", "Finance": "ALL", "Sales": "OWN", "Operations": "OWN", "Document Reviewer": "OWN"}
+
+
 def permission_list(role) -> list[str]:
     """Daftar grant permission sebuah role (normalisasi dict lama → list)."""
     raw = getattr(role, "permissions_json", None) if role is not None else None

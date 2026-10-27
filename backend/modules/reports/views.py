@@ -12,6 +12,7 @@ from modules.catalog.models import TravelPackage
 from modules.departures.models import Departure, DepartureStatus
 from modules.manifest.printing import print_meta
 from modules.reports import export, services
+from modules.tenants.branches import branch_scope, require_full_scope
 from modules.tenants.environment import resolve_active_environment
 from modules.tenants.rbac import has_permission, permission_list
 
@@ -71,6 +72,14 @@ class ReportView(APIView):
         environment = resolve_active_environment(request.tenant)
         f = services.parse_filters(request.query_params, request.tenant)
         labels = filter_labels(f, environment)
+        # TBD-08 opsi C: staf bercakupan cabang hanya melihat cabangnya (+ data tanpa cabang).
+        scope = branch_scope(request)
+        if scope is not None:
+            if kind in {"finance", "saas"}:
+                require_full_scope(request, "Laporan ini")
+            if f.get("branch") and f["branch"] not in scope:
+                raise PermissionDenied("Cabang ini di luar cakupan akses Anda.")
+            f["branch_scope"] = scope
         report = services.BUILDERS[kind](request.tenant, environment, f)
         report["filter_labels"] = labels
         file = request.query_params.get("file")

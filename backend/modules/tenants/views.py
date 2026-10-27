@@ -97,8 +97,17 @@ class RoleNameMixin:
         return name
 
 
+def _assert_scope_grant(request, scope):
+    """Hanya staf bercakupan semua cabang yang boleh memberi cakupan semua cabang (anti eskalasi)."""
+    from modules.tenants.branches import has_full_scope
+
+    if scope == "ALL" and not has_full_scope(request):
+        raise PermissionDenied("Anda tidak dapat memberikan akses semua cabang.")
+
+
 class CreateRoleSerializer(RoleNameMixin, serializers.Serializer):
     name = serializers.CharField(max_length=64)
+    branch_scope = serializers.ChoiceField(choices=["ALL", "OWN"], required=False, default="ALL")
     permissions = serializers.ListField(child=serializers.CharField(max_length=64), required=False)
 
     def validate_permissions(self, value):
@@ -107,6 +116,7 @@ class CreateRoleSerializer(RoleNameMixin, serializers.Serializer):
 
 class UpdateRoleSerializer(RoleNameMixin, serializers.Serializer):
     name = serializers.CharField(max_length=64, required=False)
+    branch_scope = serializers.ChoiceField(choices=["ALL", "OWN"], required=False)
     permissions = serializers.ListField(child=serializers.CharField(max_length=64), required=False)
 
     def validate_permissions(self, value):
@@ -146,6 +156,8 @@ def _membership_row(m: TenantMembership) -> dict:
         "role": m.role.name if m.role else None,
         "role_id": str(m.role_id) if m.role_id else None,
         "branch": {"id": str(m.branch_id), "code": m.branch.code, "name": m.branch.name} if m.branch_id else None,
+        "branches": [{"id": str(a.branch_id), "code": a.branch.code, "name": a.branch.name} for a in m.branch_assignments.select_related("branch").order_by("branch__code")],
+        "branch_scope": "ALL" if not m.role or m.role.name == "Owner" else m.role.branch_scope,
         "status": m.status,
         "permissions": permission_list(m.role),
     }
@@ -165,6 +177,7 @@ def _role_payload(role: Role) -> dict:
         "name": role.name,
         "is_system": role.is_system,
         "permissions": permission_list(role),
+        "branch_scope": "ALL" if role.name == "Owner" else role.branch_scope,
     }
 
 
@@ -349,11 +362,13 @@ class ListCreateRolesView(APIView):
         _assert_grant_scope(request, serializer.validated_data.get("permissions", []))
         if Role.objects.filter(tenant=request.tenant, name=name).exists():
             raise serializers.ValidationError({"name": f"Role '{name}' sudah ada di workspace ini."})
+        _assert_scope_grant(request, serializer.validated_data["branch_scope"])
         role = Role.objects.create(
             tenant=request.tenant,
             name=name,
             permissions_json=serializer.validated_data.get("permissions", []),
             is_system=False,
+            branch_scope=serializer.validated_data["branch_scope"],
         )
         log_event(
             action="roles.created",
@@ -394,6 +409,10 @@ class RoleDetailView(APIView):
             role.name = new_name
         if "permissions" in serializer.validated_data:
             role.permissions_json = serializer.validated_data["permissions"]
+        if "branch_scope" in serializer.validated_data:
+            _assert_scope_grant(request, serializer.validated_data["branch_scope"])
+            before["branch_scope"] = role.branch_scope
+            role.branch_scope = serializer.validated_data["branch_scope"]
         role.save()
         log_event(
             action="roles.updated",
@@ -403,6 +422,7 @@ class RoleDetailView(APIView):
             changes={
                 "name": {"from": before["name"], "to": role.name},
                 "permissions_changed": before["permissions"] != permission_list(role),
+                "branch_scope": {"from": before.get("branch_scope", role.branch_scope), "to": role.branch_scope},
             },
         )
         return Response({"role": _role_payload(role)}, status=status.HTTP_200_OK)

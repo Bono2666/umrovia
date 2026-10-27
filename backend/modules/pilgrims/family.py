@@ -121,7 +121,9 @@ class PilgrimHistoryView(APIView):
         pilgrim = Pilgrim.objects.filter(pk=pilgrim_id).select_related("family").first()
         if pilgrim is None:
             raise NotFound("Jamaah tidak ditemukan.")
-        participations = BookingParticipant.objects.filter(pilgrim=pilgrim).select_related("booking__departure__package").order_by("-booking__booked_at")
+        from modules.tenants.branches import scope_filter
+
+        participations = scope_filter(BookingParticipant.objects, request, "booking__branch").filter(pilgrim=pilgrim).select_related("booking__departure__package").order_by("-booking__booked_at")
         paid = dict(PaymentAllocation.objects.filter(participant__pilgrim=pilgrim, payment__status="VERIFIED").values_list("participant_id").annotate(t=Sum("amount_idr")))
         trips = [{
             "booking": {"id": str(p.booking_id), "code": p.booking.code, "status": p.booking.status, "booked_at": p.booking.booked_at.isoformat()},

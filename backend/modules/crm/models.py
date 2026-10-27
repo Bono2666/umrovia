@@ -55,6 +55,7 @@ class Lead(TenantScopedModel, BaseAppModel):
     stage_changed_at = models.DateTimeField(auto_now_add=True)
     lost_reason = models.CharField(max_length=240, blank=True, default="")
     owner = models.ForeignKey("identity.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    branch = models.ForeignKey("tenants.Branch", null=True, blank=True, on_delete=models.PROTECT, related_name="leads")
     next_follow_up_at = models.DateTimeField(null=True, blank=True)
     converted_pilgrim = models.ForeignKey("pilgrims.Pilgrim", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     converted_at = models.DateTimeField(null=True, blank=True)

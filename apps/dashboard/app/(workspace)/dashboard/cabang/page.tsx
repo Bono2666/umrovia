@@ -47,12 +47,12 @@ export default function BranchesPage() {
     void load();
   }
 
-  async function assign(member: MembershipRow, branch: string) {
+  async function assign(member: MembershipRow, branches: string[], branch: string | null) {
     setError(null); setMessage(null);
-    const result = await apiFetch<{branch: Branch | null}>(`/memberships/${member.id}/branch`, {method: "POST", body: JSON.stringify({branch: branch || null})});
+    const result = await apiFetch<{branch: Branch | null; branches: Branch[]}>(`/memberships/${member.id}/branch`, {method: "POST", body: JSON.stringify({branches, branch})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
-    setMembers((prev) => prev.map((m) => m.id === member.id ? {...m, branch: result.data.branch} : m));
-    setMessage(`Cabang default ${member.user.full_name || member.user.email} disimpan.`);
+    setMembers((prev) => prev.map((m) => m.id === member.id ? {...m, branch: result.data.branch, branches: result.data.branches} : m));
+    setMessage(`Penugasan cabang ${member.user.full_name || member.user.email} disimpan.`);
     void load();
   }
 
@@ -62,7 +62,7 @@ export default function BranchesPage() {
 
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Cabang</RevealText>
-    <p className="mt-1 max-w-3xl text-sm text-muted">Kantor cabang atau unit kerja. Booking, pengeluaran dan transfer kas dapat ditandai per cabang, dan laporan dapat disaring per cabang. Semua staf tetap melihat data seluruh cabang sesuai perannya.</p>
+    <p className="mt-1 max-w-3xl text-sm text-muted">Kantor cabang atau unit kerja. Booking, lead, pengeluaran dan transfer kas ditandai per cabang. Peran berakses “cabang sendiri” (default: Sales, Operations, Document Reviewer) hanya melihat cabang yang ditugaskan; Owner, Admin dan Finance melihat semua cabang. Atur cakupan peran di Pengguna & Role.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
     {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
     <div className="workspace-columns mt-6">
@@ -82,13 +82,26 @@ export default function BranchesPage() {
             </div>
           </li>)}</ul>}
         {canManage && members.length > 0 && active.length > 0 ? <>
-          <h3 className="mt-8 font-semibold">Cabang default staf</h3>
-          <p className="mt-1 text-xs text-muted">Dipakai sebagai isian awal cabang saat staf mencatat booking, pengeluaran atau transfer.</p>
-          <div className="mt-4">{members.map((member) => <FormSelect key={member.id} label={`${member.user.full_name || member.user.email} · ${member.role ?? "-"}`} htmlFor={`member-branch-${member.id}`}
-            value={member.branch?.id ?? ""} onChange={(event) => void assign(member, event.target.value)}>
-            <option value="">Tanpa cabang default</option>
-            {active.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
-          </FormSelect>)}</div>
+          <h3 className="mt-8 font-semibold">Penugasan staf</h3>
+          <p className="mt-1 text-xs text-muted">Staf dengan peran berakses <strong>cabang sendiri</strong> hanya melihat booking, invoice, lead, pengeluaran dan komisi cabang yang dicentang, ditambah data tanpa cabang. Cabang default dipakai sebagai isian awal transaksi baru.</p>
+          <ul className="mt-4 divide-y divide-border">{members.map((member) => {
+            const assigned = (member.branches ?? []).map((b) => b.id);
+            const toggle = (id: string, on: boolean) => {
+              const next = on ? [...assigned, id] : assigned.filter((x) => x !== id);
+              void assign(member, next, member.branch && next.includes(member.branch.id) ? member.branch.id : next[0] ?? null);
+            };
+            return <li key={member.id} className="py-3 text-sm">
+              <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{member.user.full_name || member.user.email}</span><span className="text-xs text-muted">{member.role ?? "-"}</span>
+                <StatusBadge tone={member.branch_scope === "OWN" ? "warning" : "neutral"}>{member.branch_scope === "OWN" ? "Cabang sendiri" : "Semua cabang"}</StatusBadge></p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">{active.map((branch) => <label key={branch.id} className="flex items-center gap-1.5">
+                <input type="checkbox" checked={assigned.includes(branch.id)} onChange={(event) => toggle(branch.id, event.target.checked)} />{branch.code}
+              </label>)}</div>
+              {assigned.length > 1 ? <FormSelect label="Cabang default" htmlFor={`member-branch-${member.id}`} value={member.branch?.id ?? ""} onChange={(event) => void assign(member, assigned, event.target.value || null)}>
+                {active.filter((b) => assigned.includes(b.id)).map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
+              </FormSelect> : null}
+              {member.branch_scope === "OWN" && assigned.length === 0 ? <p className="mt-1 text-xs text-warning">Belum ditugaskan: hanya melihat data tanpa cabang.</p> : null}
+            </li>;
+          })}</ul>
         </> : null}
       </section>
       {canManage ? <section className="card min-w-0 p-6"><h2 className="font-semibold">{editing ? `Ubah ${editing.code}` : "Tambah cabang"}</h2>

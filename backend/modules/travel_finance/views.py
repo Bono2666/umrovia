@@ -22,7 +22,13 @@ from modules.audit.services import log_event
 from modules.departures.models import Departure
 from modules.payments.dates import tenant_today
 from modules.payments.models import TravelPayment
-from modules.tenants.branches import default_branch, resolve_branch
+from modules.tenants.branches import (
+    assert_branch_allowed,
+    default_branch,
+    require_full_scope,
+    resolve_branch,
+    scope_filter,
+)
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.rbac import require_permission
 from modules.travel_finance import services as cash
@@ -212,7 +218,7 @@ class ExpenseListCreateView(APIView):
         return [IsAuthenticated(), require_permission(grant)()]
 
     def get(self, request):
-        qs = TravelExpense.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("departure__package", "bank_account", "created_by", "approved_by", "branch")
+        qs = scope_filter(TravelExpense.objects, request).filter(environment=resolve_active_environment(request.tenant)).select_related("departure__package", "bank_account", "created_by", "approved_by", "branch")
         params = request.query_params
         try:
             if params.get("from"):
@@ -243,7 +249,7 @@ class ExpenseListCreateView(APIView):
         rows = paginator.paginate_queryset(qs.order_by("-spent_on", "-created_at", "id"), request)
         response = paginator.get_paginated_response([expense_payload(row) for row in rows])
         response.data["total_idr"] = qs.filter(voided_at__isnull=True, approval_status="APPROVED").aggregate(total=Sum("amount_idr"))["total"] or 0
-        response.data["pending_count"] = TravelExpense.objects.filter(environment=resolve_active_environment(request.tenant), approval_status="PENDING", voided_at__isnull=True).count()
+        response.data["pending_count"] = scope_filter(TravelExpense.objects, request).filter(environment=resolve_active_environment(request.tenant), approval_status="PENDING", voided_at__isnull=True).count()
         return response
 
     @transaction.atomic
@@ -265,7 +271,7 @@ class ExpenseListCreateView(APIView):
             account = TravelBankAccount.objects.filter(pk=data["bank_account"], active=True).first()
             if account is None:
                 raise ValidationError({"bank_account": "Rekening tidak ditemukan atau nonaktif."})
-        branch = resolve_branch(data["branch"]) if "branch" in data else default_branch(request)
+        branch = assert_branch_allowed(request, resolve_branch(data["branch"])) if "branch" in data else default_branch(request)
         # Maker-checker kas (MOD-11): pengeluaran menunggu persetujuan staf lain bila diaktifkan.
         pending = cash_rules(request.tenant)["maker_checker"]
         expense = TravelExpense.objects.create(
@@ -283,7 +289,7 @@ class ExpenseVoidView(APIView):
 
     @transaction.atomic
     def post(self, request, expense_id):
-        expense = TravelExpense.objects.select_for_update(of=("self",)).select_related("departure__package", "bank_account", "created_by").filter(pk=expense_id).first()
+        expense = scope_filter(TravelExpense.objects, request).select_for_update(of=("self",)).select_related("departure__package", "bank_account", "created_by").filter(pk=expense_id).first()
         if expense is None:
             raise NotFound("Pengeluaran tidak ditemukan.")
         assert_environment_writable(request.tenant, expense.environment)
@@ -303,7 +309,7 @@ class ExpenseDecisionView(APIView):
     action = "approve"
 
     def post(self, request, expense_id):
-        expense = TravelExpense.objects.filter(pk=expense_id).first()
+        expense = scope_filter(TravelExpense.objects, request).filter(pk=expense_id).first()
         if expense is None:
             raise NotFound("Pengeluaran tidak ditemukan.")
         assert_environment_writable(request.tenant, expense.environment)
@@ -325,7 +331,7 @@ class ExpenseEvidenceView(APIView):
 
         from modules.portal.files import inspect_upload
 
-        expense = TravelExpense.objects.filter(pk=expense_id).first()
+        expense = scope_filter(TravelExpense.objects, request).filter(pk=expense_id).first()
         if expense is None:
             raise NotFound("Pengeluaran tidak ditemukan.")
         assert_environment_writable(request.tenant, expense.environment)
@@ -344,7 +350,7 @@ class ExpenseEvidenceView(APIView):
 
         from modules.portal.files import CONTENT_TYPES
 
-        expense = TravelExpense.objects.filter(pk=expense_id).first()
+        expense = scope_filter(TravelExpense.objects, request).filter(pk=expense_id).first()
         if expense is None or not expense.evidence_key:
             raise NotFound("Lampiran tidak ditemukan.")
         with default_storage.open(expense.evidence_key, "rb") as handle:
@@ -409,6 +415,7 @@ class CashBookView(APIView):
     permission_classes = [IsAuthenticated, require_permission("bank_accounts.read")]
 
     def get(self, request):
+        require_full_scope(request, "Buku kas")
         today = tenant_today(request.tenant)
         try:
             start = date.fromisoformat(request.query_params["from"]) if request.query_params.get("from") else today.replace(day=1)
@@ -444,6 +451,7 @@ class OpeningBalanceListCreateView(APIView):
         return [IsAuthenticated(), require_permission("bank_accounts.write" if self.request.method == "POST" else "bank_accounts.read")()]
 
     def get(self, request):
+        require_full_scope(request, "Saldo awal")
         rows = OpeningBalance.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("bank_account", "created_by", "decided_by")[:200]
         return Response({"results": [opening_payload(r) for r in rows]})
 
@@ -451,6 +459,7 @@ class OpeningBalanceListCreateView(APIView):
     def post(self, request):
         environment = resolve_active_environment(request.tenant)
         assert_environment_writable(request.tenant, environment)
+        require_full_scope(request, "Saldo awal")
         serializer = OpeningBalanceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -476,7 +485,7 @@ class TransferListCreateView(APIView):
         return [IsAuthenticated(), require_permission("bank_accounts.write" if self.request.method == "POST" else "bank_accounts.read")()]
 
     def get(self, request):
-        rows = CashTransfer.objects.filter(environment=resolve_active_environment(request.tenant)).select_related("from_account", "to_account", "branch", "created_by")[:200]
+        rows = scope_filter(CashTransfer.objects, request).filter(environment=resolve_active_environment(request.tenant)).select_related("from_account", "to_account", "branch", "created_by")[:200]
         return Response({"results": [transfer_payload(r) for r in rows]})
 
     @transaction.atomic
@@ -486,7 +495,7 @@ class TransferListCreateView(APIView):
         serializer = TransferSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        branch = resolve_branch(data["branch"]) if "branch" in data else default_branch(request)
+        branch = assert_branch_allowed(request, resolve_branch(data["branch"])) if "branch" in data else default_branch(request)
         row = cash.record_transfer(tenant=request.tenant, environment=environment, data=data, actor=request.user, branch=branch)
         return Response(transfer_payload(row), status=status.HTTP_201_CREATED)
 
@@ -495,7 +504,7 @@ class TransferVoidView(APIView):
     permission_classes = [IsAuthenticated, require_permission("bank_accounts.write")]
 
     def post(self, request, transfer_id):
-        row = CashTransfer.objects.filter(pk=transfer_id, environment=resolve_active_environment(request.tenant)).first()
+        row = scope_filter(CashTransfer.objects, request).filter(pk=transfer_id, environment=resolve_active_environment(request.tenant)).first()
         if row is None:
             raise NotFound("Transfer tidak ditemukan.")
         assert_environment_writable(request.tenant, row.environment)

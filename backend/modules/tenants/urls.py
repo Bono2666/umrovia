@@ -14,6 +14,7 @@ urlpatterns = [
         name="memberships-detail",
     ),
     path("branches", branches.BranchListCreateView.as_view(), name="branches"),
+    path("branches/mine", branches.MyBranchesView.as_view(), name="branches-mine"),
     path("branches/<uuid:branch_id>", branches.BranchDetailView.as_view(), name="branch-detail"),
     path("memberships/<uuid:membership_id>/branch", branches.MembershipBranchView.as_view(), name="membership-branch"),
     path("memberships/<uuid:membership_id>/logins", views.MembershipSecurityView.as_view(action="logins"), name="membership-logins"),

@@ -288,7 +288,8 @@ export default function ManifestPage() {
   const canExport = permissions !== null && hasPermission(permissions, "manifest.export");
   const canExportPii =
     permissions !== null && hasPermission(permissions, "manifest.export_pii");
-  const canPublish = permissions !== null && hasPermission(permissions, "manifest.publish");
+  // TBD-08 opsi C: staf cakupan cabang melihat roster cabangnya; manifest resmi diterbitkan pusat.
+  const canPublish = permissions !== null && hasPermission(permissions, "manifest.publish") && envelope?.full_scope !== false;
   const canManage =
     permissions !== null && hasPermission(permissions, "documents.requirements.manage");
   const gaps = envelope?.checklist_gaps ?? [];

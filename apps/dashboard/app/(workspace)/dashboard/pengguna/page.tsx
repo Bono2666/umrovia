@@ -49,6 +49,7 @@ export default function PenggunaPage() {
   const [editingRole, setEditingRole] = useState<RoleRow | null>(null);
   const [creatingRole, setCreatingRole] = useState(false);
   const [roleName, setRoleName] = useState("");
+  const [roleScope, setRoleScope] = useState<"ALL" | "OWN">("ALL");
   const [rolePermissions, setRolePermissions] = useState("");
 
   const load = useCallback(() => {
@@ -329,25 +330,26 @@ export default function PenggunaPage() {
       {canReadRoles && roles.length > 0 ? (
         <section className="card p-6">
           <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Peran</h2>
-            {canWriteRoles && !editingRole && !creatingRole ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setCreatingRole(true); setRoleName(""); setRolePermissions(""); setError(null);}}>Tambah peran</Btn> : null}</div>
+            {canWriteRoles && !editingRole && !creatingRole ? <Btn size="xs" variant="tint" disabled={roleBusy} onClick={() => {setCreatingRole(true); setRoleName(""); setRolePermissions(""); setRoleScope("OWN"); setError(null);}}>Tambah peran</Btn> : null}</div>
           {editingRole || creatingRole ? <form className="mt-6" onSubmit={async (event) => {
             event.preventDefault(); setRoleBusy(true); setError(null);
-            const body = JSON.stringify({name:roleName.trim(), permissions:rolePermissions.split(/[\n,]/).map((item) => item.trim()).filter(Boolean)});
+            const body = JSON.stringify({name:roleName.trim(), branch_scope:roleScope, permissions:rolePermissions.split(/[\n,]/).map((item) => item.trim()).filter(Boolean)});
             const result = editingRole ? await apiFetch(`/roles/${editingRole.id}`, {method:"PATCH", body}) : await apiFetch("/roles", {method:"POST", body});
             setRoleBusy(false);
             if (!result.ok) {setError(problemMessage(result.error)); return;}
             setMessage(editingRole ? "Definisi peran tersimpan." : `Peran ${roleName.trim()} ditambahkan.`); setEditingRole(null); setCreatingRole(false); load();
-          }}><fieldset className="min-w-0" disabled={roleBusy}><FormField label="Nama peran" htmlFor="role-name" value={roleName} onChange={(event) => setRoleName(event.target.value)} required maxLength={64} /><FormTextarea label="Izin peran" htmlFor="role-permissions" value={rolePermissions} onChange={(event) => setRolePermissions(event.target.value)} hint="Satu izin per baris. Perubahan berlaku untuk semua anggota yang memakai peran ini." /><div className="flex flex-wrap gap-2"><Btn type="submit">{editingRole ? "Simpan perubahan" : "Tambah peran"}</Btn><Btn type="button" variant="tint" onClick={() => {setEditingRole(null); setCreatingRole(false);}}>{editingRole ? "Batal ubah" : "Batal"}</Btn></div></fieldset></form> : null}
+          }}><fieldset className="min-w-0" disabled={roleBusy}><FormField label="Nama peran" htmlFor="role-name" value={roleName} onChange={(event) => setRoleName(event.target.value)} required maxLength={64} /><FormTextarea label="Izin peran" htmlFor="role-permissions" value={rolePermissions} onChange={(event) => setRolePermissions(event.target.value)} hint="Satu izin per baris. Perubahan berlaku untuk semua anggota yang memakai peran ini." /><FormSelect label="Cakupan cabang" htmlFor="role-scope" value={roleScope} onChange={(event) => setRoleScope(event.target.value as "ALL" | "OWN")} hint="Cabang sendiri: hanya booking, invoice, lead, pengeluaran dan komisi cabang yang ditugaskan (atur di menu Cabang), ditambah data tanpa cabang."><option value="OWN">Cabang sendiri</option><option value="ALL">Semua cabang</option></FormSelect><div className="flex flex-wrap gap-2"><Btn type="submit">{editingRole ? "Simpan perubahan" : "Tambah peran"}</Btn><Btn type="button" variant="tint" onClick={() => {setEditingRole(null); setCreatingRole(false);}}>{editingRole ? "Batal ubah" : "Batal"}</Btn></div></fieldset></form> : null}
           <ul className="mt-3 space-y-3">
             {roles.map((role) => (
               <li key={role.id}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{role.name}</span>
-                  {canWriteRoles && !role.is_system && role.name !== "Owner" ? <Btn variant="link" size="xs" disabled={roleBusy} onClick={() => {setCreatingRole(false); setEditingRole(role); setRoleName(role.name); setRolePermissions(role.permissions.join("\n")); setError(null);}}>Ubah definisi peran</Btn> : null}
+                  {canWriteRoles && !role.is_system && role.name !== "Owner" ? <Btn variant="link" size="xs" disabled={roleBusy} onClick={() => {setCreatingRole(false); setEditingRole(role); setRoleName(role.name); setRolePermissions(role.permissions.join("\n")); setRoleScope(role.branch_scope ?? "ALL"); setError(null);}}>Ubah definisi peran</Btn> : null}
                   {canWriteRoles && !role.is_system && role.name !== "Owner" && rows !== null && !rows.some((row) => row.role_id === role.id) ? <Btn variant="link" size="xs" disabled={roleBusy || editingRole?.id === role.id} onClick={() => void onDeleteRole(role)}>Hapus</Btn> : null}
                   {role.is_system ? (
                     <StatusBadge>SISTEM</StatusBadge>
                   ) : null}
+                  <span className="text-xs text-muted">{role.branch_scope === "OWN" ? "· cabang sendiri" : "· semua cabang"}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {(role.permissions.length > 0 ? role.permissions : ["(tanpa permission)"]).map((perm) => (

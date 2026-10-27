@@ -19,6 +19,7 @@ from modules.crm import services
 from modules.crm.models import OPEN_STAGES, ActivityKind, Lead, LeadSource, LeadStage
 from modules.departures.models import Departure
 from modules.pilgrims.crypto import normalize_phone
+from modules.tenants.branches import assert_branch_allowed, default_branch, resolve_branch, scope_filter
 from modules.tenants.environment import assert_environment_writable, resolve_active_environment
 from modules.tenants.models import MembershipStatus, TenantMembership
 from modules.tenants.rbac import has_permission, permission_list, require_permission
@@ -46,6 +47,7 @@ def lead_payload(lead, *, detail=False):
         "follow_up_overdue": bool(lead.next_follow_up_at and lead.next_follow_up_at < timezone.now() and lead.stage in OPEN_STAGES),
         "converted_pilgrim": {"id": str(lead.converted_pilgrim_id), "code": lead.converted_pilgrim.code, "name": lead.converted_pilgrim.name} if lead.converted_pilgrim_id else None,
         "converted_at": lead.converted_at.isoformat() if lead.converted_at else None, "created_at": lead.created_at.isoformat(),
+        "branch": {"id": str(lead.branch_id), "code": lead.branch.code} if lead.branch_id else None,
         "deletable": lead.converted_pilgrim_id is None,
     }
     if detail:
@@ -55,12 +57,12 @@ def lead_payload(lead, *, detail=False):
     return data
 
 
-def _leads():
-    return Lead.objects.select_related("interest_package", "interest_departure", "owner", "converted_pilgrim")
+def _leads(request):
+    return scope_filter(Lead.objects, request).select_related("interest_package", "interest_departure", "owner", "converted_pilgrim", "branch")
 
 
-def _get(lead_id):
-    lead = _leads().filter(pk=lead_id).first()
+def _get(lead_id, request):
+    lead = _leads(request).filter(pk=lead_id).first()
     if lead is None:
         raise NotFound("Lead tidak ditemukan.")
     return lead
@@ -108,7 +110,7 @@ class LeadListCreateView(APIView):
     @extend_schema(parameters=LIST_PARAMS, responses=OpenApiTypes.OBJECT, description="Lead workspace aktif. `?page=` untuk paginasi (50/halaman).")
     def get(self, request):
         params = request.query_params
-        qs = _leads().filter(environment=resolve_active_environment(request.tenant))
+        qs = _leads(request).filter(environment=resolve_active_environment(request.tenant))
         for field, choices in (("stage", LeadStage), ("source", LeadSource)):
             value = params.get(field, "")
             if value == "open" and field == "stage":
@@ -149,9 +151,11 @@ class LeadListCreateView(APIView):
         assert_environment_writable(request.tenant, environment)
         serializer = LeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        lead = services.create_lead(tenant=request.tenant, environment=environment, actor=request.user, data=serializer.resolve(request, environment),
+        data = serializer.resolve(request, environment)
+        data["branch"] = assert_branch_allowed(request, resolve_branch(request.data.get("branch"))) if request.data.get("branch") else default_branch(request)
+        lead = services.create_lead(tenant=request.tenant, environment=environment, actor=request.user, data=data,
                                     allow_duplicate=str(request.data.get("allow_duplicate", "")).lower() in {"true", "1"})
-        return Response(lead_payload(_get(lead.pk), detail=True), status=status.HTTP_201_CREATED)
+        return Response(lead_payload(_get(lead.pk, request), detail=True), status=status.HTTP_201_CREATED)
 
 
 class LeadSummaryView(APIView):
@@ -159,7 +163,7 @@ class LeadSummaryView(APIView):
 
     @extend_schema(responses=OpenApiTypes.OBJECT, description="Funnel per tahap, tingkat konversi (jadi ÷ (jadi + tidak jadi)), follow-up, sumber.")
     def get(self, request):
-        return Response(services.summary(request.tenant, resolve_active_environment(request.tenant)))
+        return Response(services.summary(request.tenant, resolve_active_environment(request.tenant), queryset=scope_filter(Lead.objects, request)))
 
 
 class LeadOwnersView(APIView):
@@ -177,12 +181,12 @@ class LeadDetailView(APIView):
 
     @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request, lead_id):
-        return Response(lead_payload(_get(lead_id), detail=True))
+        return Response(lead_payload(_get(lead_id, request), detail=True))
 
     @extend_schema(request=LeadSerializer, responses=OpenApiTypes.OBJECT, description="Ubah data lead (tahap diubah lewat /stage).")
     @transaction.atomic
     def patch(self, request, lead_id):
-        lead = _get(lead_id)
+        lead = _get(lead_id, request)
         assert_environment_writable(request.tenant, lead.environment)
         serializer = LeadSerializer(data={**lead_payload(lead, detail=False), **request.data, "interest_package": request.data.get("interest_package", lead.interest_package_id),
                                           "interest_departure": request.data.get("interest_departure", lead.interest_departure_id), "owner": request.data.get("owner", lead.owner_id)})
@@ -195,11 +199,11 @@ class LeadDetailView(APIView):
             setattr(lead, key, data[key])
         lead.save()
         log_event(action="leads.updated", request=request, object_type="lead", object_id=lead.pk, changes={"code": lead.code, "fields": changed})
-        return Response(lead_payload(_get(lead.pk), detail=True))
+        return Response(lead_payload(_get(lead.pk, request), detail=True))
 
     @transaction.atomic
     def delete(self, request, lead_id):
-        lead = _get(lead_id)
+        lead = _get(lead_id, request)
         assert_environment_writable(request.tenant, lead.environment)
         if lead.converted_pilgrim_id:
             raise ValidationError({"lead": "Lead yang sudah menjadi jamaah tidak dapat dihapus."})
@@ -213,10 +217,10 @@ class LeadStageView(APIView):
 
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT, description="Pindah tahap; LOST wajib `lost_reason`; WON hanya lewat konversi.")
     def post(self, request, lead_id):
-        lead = _get(lead_id)
+        lead = _get(lead_id, request)
         assert_environment_writable(request.tenant, lead.environment)
         services.change_stage(lead, stage=str(request.data.get("stage", "")), actor=request.user, lost_reason=str(request.data.get("lost_reason", "")))
-        return Response(lead_payload(_get(lead.pk), detail=True))
+        return Response(lead_payload(_get(lead.pk, request), detail=True))
 
 
 class ActivitySerializer(serializers.Serializer):
@@ -231,12 +235,12 @@ class LeadActivityView(APIView):
 
     @extend_schema(request=ActivitySerializer, responses={201: OpenApiTypes.OBJECT}, description="Catat aktivitas; kontak pertama memindahkan NEW → CONTACTED; opsional jadwal follow-up berikutnya.")
     def post(self, request, lead_id):
-        lead = _get(lead_id)
+        lead = _get(lead_id, request)
         assert_environment_writable(request.tenant, lead.environment)
         serializer = ActivitySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         services.add_activity(lead, actor=request.user, **serializer.validated_data)
-        return Response(lead_payload(_get(lead.pk), detail=True), status=status.HTTP_201_CREATED)
+        return Response(lead_payload(_get(lead.pk, request), detail=True), status=status.HTTP_201_CREATED)
 
 
 class LeadConvertView(APIView):
@@ -244,7 +248,7 @@ class LeadConvertView(APIView):
 
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT, description="Jadikan jamaah baru (atau tautkan `pilgrim` yang sudah ada); tahap WON. Idempoten.")
     def post(self, request, lead_id):
-        lead = _get(lead_id)
+        lead = _get(lead_id, request)
         assert_environment_writable(request.tenant, lead.environment)
         lead, pilgrim = services.convert(lead, actor=request.user, pilgrim_id=request.data.get("pilgrim") or None)
-        return Response({**lead_payload(_get(lead.pk), detail=True), "pilgrim": {"id": str(pilgrim.pk), "code": pilgrim.code, "name": pilgrim.name}})
+        return Response({**lead_payload(_get(lead.pk, request), detail=True), "pilgrim": {"id": str(pilgrim.pk), "code": pilgrim.code, "name": pilgrim.name}})
