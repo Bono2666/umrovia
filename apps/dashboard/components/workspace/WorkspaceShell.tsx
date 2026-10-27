@@ -11,6 +11,7 @@ import {
   FileText,
   Landmark,
   LayoutDashboard,
+  LifeBuoy,
   Package,
   PlaneTakeoff,
   Receipt,
@@ -25,7 +26,7 @@ import { UmroviaMark } from "@/components/UmroviaMark";
 import { TrialBanner } from "@/components/workspace/TrialBanner";
 import { WorkspaceReveal } from "@/components/workspace/WorkspaceReveal";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
-import { Btn, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, BtnLink, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
 
 type Phase = "loading" | "unauth" | "no-workspace" | "ok";
@@ -138,6 +139,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         permission: "tenant.settings.read",
         icon: Building2,
       },
+      { href: "/dashboard/bantuan", label: "Bantuan", icon: LifeBuoy },
     ],
   },
 ];
@@ -211,6 +213,11 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
           return;
         }
         setPhase("unauth");
+        return;
+      }
+      // Staf platform tanpa workspace travel → konsol platform.
+      if (!result.data.memberships.some((m) => m.status === "ACTIVE") && result.data.is_platform_staff) {
+        router.replace("/platform");
         return;
       }
       // Akun jamaah (tanpa workspace) memakai portal, bukan dashboard staf.
@@ -332,6 +339,9 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
           ) : null}
           <div className="ml-auto flex items-center gap-3">
             <ThemeToggle />
+            {me.is_platform_staff ? (
+              <Link href="/platform" className="hidden text-sm font-semibold text-primary underline sm:inline">Konsol platform</Link>
+            ) : null}
             <span className="hidden text-sm text-muted sm:inline">{me.email}</span>
             <LogoutButton />
           </div>
@@ -436,7 +446,23 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             canConvert={hasPermission(permissions, "trial.convert")}
             onConverted={loadMe}
           />
-          <WorkspaceReveal>{children}</WorkspaceReveal>
+          {(active.tenant.state === "SUSPENDED" || active.tenant.state === "TERMINATED") && pathname !== "/dashboard/bantuan" ? (
+            <section className="card max-w-2xl p-8" role="alert">
+              <StatusBadge tone="danger">{environment.label}</StatusBadge>
+              <h1 className="mt-3 text-xl font-bold">
+                {active.tenant.state === "TERMINATED" ? "Workspace ini telah diakhiri" : "Workspace ini sedang ditangguhkan"}
+              </h1>
+              <p className="mt-2 text-sm text-muted">
+                {active.tenant.state === "TERMINATED"
+                  ? "Akses operasional dan portal jamaah ditutup oleh platform Umrovia. Data tetap tersimpan sesuai kebijakan retensi."
+                  : "Platform Umrovia menangguhkan akses operasional dan portal jamaah untuk sementara. Data Anda tetap aman dan tidak berubah."}
+              </p>
+              <p className="mt-2 text-sm text-muted">Hubungi tim Umrovia melalui menu Bantuan untuk informasi dan pemulihan akses.</p>
+              <div className="mt-5"><BtnLink href="/dashboard/bantuan">Buka Bantuan</BtnLink></div>
+            </section>
+          ) : (
+            <WorkspaceReveal>{children}</WorkspaceReveal>
+          )}
         </main>
       </div>
     </div>
