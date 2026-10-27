@@ -200,6 +200,15 @@ def notify_owners(*, tenant, environment, event_type, source_key, key, values):
     return rows
 
 
+def notify_user(*, tenant, user, event_type, source_key, key, values):
+    """Email ke satu pengguna travel (mis. pembuka tiket dukungan); lingkungan "platform" tanpa awalan DEMO."""
+    return _enqueue(
+        tenant=tenant, environment="platform", event_type=event_type, source_key=source_key, key=key,
+        recipient_type=RecipientType.USER, recipient_id=user.pk, recipient_name=user.full_name or user.email,
+        email=user.email, values=values, channels=[Channel.EMAIL],
+    )
+
+
 def hook(fn):
     """Savepoint + telan error: notifikasi tidak boleh menggagalkan transaksi bisnis (NTF-04)."""
     @functools.wraps(fn)

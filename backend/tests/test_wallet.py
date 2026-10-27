@@ -20,6 +20,7 @@ from modules.tenants.rbac import DEFAULT_ROLE_PERMISSIONS
 from modules.wallet.models import Wallet, WalletEvent, WalletLedger, WalletOperation, WalletReconciliation, WalletTopup
 from modules.wallet.services import Conflict, atomic_debit, platform_tenant_context, reconcile_wallet
 
+from .conftest import mark_platform_mfa
 from .test_payments import ok, post, record
 from .test_payments import scenario as scenario
 
@@ -36,6 +37,7 @@ def wallet_setup(auth_client, tenant_a, user, settings):
     billing.user_permissions.add(Permission.objects.get(content_type__app_label="wallet", codename="settle_topup"))
     platform = Client()
     platform.force_login(billing)
+    mark_platform_mfa(platform)
     return {"client": auth_client, "tenant": tenant_a, "owner": user, "billing": billing, "platform": platform}
 
 
@@ -125,6 +127,7 @@ def test_only_authorized_platform_staff_can_settle(wallet_setup):
     s["owner"].is_staff = True
     s["owner"].user_permissions.add(permission)
     s["owner"].save()
+    mark_platform_mfa(s["client"])
     assert post(s["client"], url, body).status_code == 403  # cannot settle own transfer
     assert balance(s)["balance_idr"] == 0
 
@@ -182,7 +185,8 @@ def test_frozen_and_inactive_tenant_cannot_mutate(wallet_setup):
     s["tenant"].state = "SUSPENDED"
     s["tenant"].save()
     assert settle(s, t).status_code == 403
-    assert balance(s)["balance_idr"] == 0
+    assert s["client"].get("/api/v1/wallet").json()["code"] == "tenant_suspended"  # S18: workspace tertutup
+    assert WalletLedger.objects.without_tenant_guard().count() == 0
 
 
 def test_restricted_tenant_can_still_top_up(wallet_setup):
@@ -344,7 +348,8 @@ def test_platform_review_queue_and_suspended_user(wallet_setup):
     s = wallet_setup
     t = topup(s)
     url = f"/api/v1/platform/tenants/{s['tenant'].pk}/wallet/topups?status=PENDING"
-    assert post(s["client"], url).status_code == 405
+    assert post(s["platform"], url).status_code == 405
+    assert post(s["client"], url).status_code == 403  # S18: non-staf ditolak sebelum metode diperiksa
     assert s["client"].get(url).status_code == 403
     queue = ok(s["platform"].get(url))
     assert queue["count"] == 1 and queue["results"][0]["evidence_ref"] == t["evidence_ref"]

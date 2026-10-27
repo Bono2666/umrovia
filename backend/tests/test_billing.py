@@ -18,6 +18,7 @@ from modules.tenants.models import Role, Tenant, TenantMembership
 from modules.wallet.models import Wallet, WalletLedger
 from modules.wallet.services import platform_tenant_context, reconcile_wallet
 
+from .conftest import mark_platform_mfa
 from .test_payment_security import staff
 from .test_payments import ok, post
 from .test_payments import scenario as scenario
@@ -32,6 +33,7 @@ def billing(wallet_setup, scenario):
     refunds.user_permissions.add(Permission.objects.get(content_type__app_label="billing", codename="approve_adjustment"))
     s["refunds"] = Client()
     s["refunds"].force_login(refunds)
+    mark_platform_mfa(s["refunds"])
     s["travel"] = scenario(environment="production")
     return s
 
@@ -228,6 +230,7 @@ def test_refund_rules_permissions_and_rejection(billing):
     s["owner"].is_staff = True
     s["owner"].save(update_fields=["is_staff"])
     s["owner"].user_permissions.add(Permission.objects.get(content_type__app_label="billing", codename="approve_adjustment"))
+    mark_platform_mfa(s["client"])
     assert post(s["client"], decide, {"decision": "APPROVED", "reason": "ok"}).status_code == 403
     rejected = ok(post(s["refunds"], decide, {"decision": "REJECTED", "reason": "Di luar kebijakan"}))
     assert rejected["status"] == "REJECTED" and rejected["ledger_entry_id"] is None
