@@ -32,7 +32,7 @@ def send_contact_notification(message: ContactMessage) -> None:
     )
     try:
         if email.send() != 1:
-            logger.error("contact: email notification not sent; reference=%s", message.pk)
+            logger.error("contact: email notification not sent (CONTACT_RECIPIENT_EMAIL empty?); reference=%s", message.pk)
     except Exception as exc:
         # Do not expose backend errors or visitor details in the public API/logs.
         # The saved message remains available to staff through Django admin.

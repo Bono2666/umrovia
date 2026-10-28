@@ -35,6 +35,25 @@ Cek dari laptop (semuanya harus berujung di `103.87.66.228`):
 for h in umrovia.com www.umrovia.com app.umrovia.com admin.umrovia.com api.umrovia.com; do echo "$h: $(dig +short @satu.neodns.id $h | tr '\n' ' ')"; done
 ```
 
+### Record email
+
+Email keluar aplikasi lewat **Brevo** (SMTP relay); email masuk `@umrovia.com` (mis. `halo@`,
+penerima formulir kontak) lewat **Zoho Mail**. Nilai kode/kunci diambil dari dashboard masing-masing.
+
+| Nama | Tipe | Nilai | Untuk |
+|---|---|---|---|
+| `@` | TXT | `brevo-code:…` | verifikasi domain Brevo |
+| `brevo1._domainkey`, `brevo2._domainkey` | CNAME | dari Brevo | DKIM Brevo |
+| `_dmarc` | TXT | `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` | DMARC |
+| `@` | TXT | `zoho-verification=…` | verifikasi domain Zoho |
+| `@` | MX | `mx.zoho.com` (10), `mx2.zoho.com` (20), `mx3.zoho.com` (50) | email masuk |
+| `@` | TXT | `v=spf1 include:zohomail.com ~all` | SPF |
+
+Di form NEO DNS: Name domain utama ditulis `@`, dan nilai MX **tanpa** titik di akhir (dengan titik
+ditolak "Failed to add DNS record"). Setelah menambah record, cek bahwa versi zona naik dan record
+terpublikasi (`dig +short MX umrovia.com @satu.neodns.id`); bila tidak, tambahkan ulang atau hubungi
+Support Biznet Gio.
+
 Domain utama `umrovia.com` dan `www` (saat ini CNAME ke `umrovia.com`) belum dilayani
 stack ini; halaman marketing ada di host `app`. Bila ingin `umrovia.com` ikut aktif,
 arahkan juga ke IP VPS lalu tambahkan blok pengalihan di `infra/deploy/Caddyfile`.
@@ -122,7 +141,7 @@ chmod 600 .env.production
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env.production
 sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')|" .env.production
 sed -i "s|^PII_ENCRYPTION_KEY=.*|PII_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')|" .env.production
-nano .env.production   # isi CADDY_TLS (email operator), SMTP, rekening top-up manual
+nano .env.production   # isi CADDY_TLS (email operator), SMTP, CONTACT_RECIPIENT_EMAIL, rekening top-up manual
 ```
 
 - **Simpan `POSTGRES_PASSWORD`, `SECRET_KEY` dan `PII_ENCRYPTION_KEY` di password
