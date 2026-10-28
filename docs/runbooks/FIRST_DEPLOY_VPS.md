@@ -264,11 +264,21 @@ rclone check /srv/backups neo:umrovia-backups --include 'umrovia-*' --one-way   
 curl -s -o /dev/null -w '%{http_code}\n' https://nos.wjv-1.neo.id/umrovia-backups/   # 403 = privat
 ```
 
-Baris cron harian (backup lalu salin offsite; seluruh keluaran masuk log):
+Lalu jadwalkan `infra/backup/nightly.sh` (backup → salinan offsite → laporan Healthchecks)
+sebagai pengganti baris cron di atas. Tambahkan ke `/etc/umrovia/backup.env`:
 
 ```
-0 18 * * * cd /srv/umrovia && { set -a && . /etc/umrovia/backup.env && set +a && infra/backup/backup.sh && rclone copy /srv/backups neo:umrovia-backups --include "umrovia-*" && echo "offsite: tersalin ke neo:umrovia-backups"; } >> /srv/backups/backup.log 2>&1
+OFFSITE_REMOTE=neo:umrovia-backups
+HC_PING_URL=https://hc-ping.com/<uuid-dari-healthchecks.io>
 ```
+
+```
+0 18 * * * /srv/umrovia/infra/backup/nightly.sh >> /srv/backups/backup.log 2>&1
+```
+
+**Healthchecks.io** (gratis): buat check `umrovia-backup`, jadwal Cron `0 18 * * *` zona UTC,
+grace 1 jam, notifikasi email. Peringatan datang bila backup/salinan gagal (`/fail`) atau bila
+tidak ada laporan sama sekali (cron/VPS mati).
 
 Retensi 14 hari hanya berlaku di VPS; salinan di bucket tidak dihapus otomatis (ukuran kecil).
 Pasang aturan lifecycle bucket bila ukurannya membesar.
