@@ -6,3 +6,6 @@ class PlatformConfig(AppConfig):
     name = "modules.platform"
     label = "platform"
     verbose_name = "Platform control plane"
+
+    def ready(self):
+        from . import checks  # noqa: F401
