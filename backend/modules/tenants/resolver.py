@@ -11,11 +11,18 @@ import re
 
 from django.conf import settings
 
+from modules.tenants.constants import RESERVED_SLUGS
+
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def slug_from_host(host: str | None) -> str | None:
-    """Ambil slug tenant dari subdomain host. Bukan subdomain → None."""
+    """Ambil slug tenant dari subdomain host. Bukan subdomain → None.
+
+    Host layanan sendiri (`api.`, `app.`, `admin.`, … = RESERVED_SLUGS) bukan identitas
+    tenant: tanpa pengecualian ini setiap request ke `api.umrovia.com` dianggap
+    workspace bernama "api" sehingga context tenant selalu kosong (403).
+    """
     if not host:
         return None
     hostname = host.split(":")[0].lower()
@@ -23,6 +30,6 @@ def slug_from_host(host: str | None) -> str | None:
         suffix = "." + base
         if hostname.endswith(suffix):
             candidate = hostname[: -len(suffix)]
-            if candidate and SLUG_RE.match(candidate):
+            if candidate and SLUG_RE.match(candidate) and candidate not in RESERVED_SLUGS:
                 return candidate
     return None

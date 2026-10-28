@@ -83,6 +83,20 @@ def test_host_subdomain_resolves_tenant(client, user, owner_a, settings):
 
 
 @pytest.mark.django_db
+def test_service_hosts_are_not_tenant_slugs(client, user, owner_a, settings):
+    """`api.umrovia.com` (host API produksi) bukan workspace "api": resolusi lanjut ke
+    sesi/membership, bukan context kosong yang menolak semua endpoint tenant."""
+    from modules.tenants.resolver import slug_from_host
+
+    assert [slug_from_host(h) for h in ("api.umrovia.com", "app.umrovia.com:443", "admin.umrovia.com", "travel-a.umrovia.com")] == [None, None, None, "travel-a"]
+    settings.ALLOWED_HOSTS = [*settings.ALLOWED_HOSTS, "api.umrovia.com"]
+    client.force_login(user)
+    response = client.get("/api/v1/memberships", HTTP_HOST="api.umrovia.com")
+    assert response.status_code == 200
+    assert client.get("/api/v1/branches/mine", HTTP_HOST="api.umrovia.com").status_code == 200
+
+
+@pytest.mark.django_db
 def test_host_subdomain_without_membership_fails_closed(
     client, user, owner_a, tenant_b, settings
 ):
@@ -97,6 +111,8 @@ def test_host_subdomain_without_membership_fails_closed(
     response = client.get("/api/v1/memberships", HTTP_HOST="travel-b.localhost")
     assert response.status_code == 403
     assert response.json()["code"] == "TENANT_CONTEXT_REQUIRED"
+    mine = client.get("/api/v1/branches/mine", HTTP_HOST="travel-b.localhost")
+    assert mine.status_code == 403  # bukan 500 TenantContextMissingError
 
 
 @pytest.mark.django_db

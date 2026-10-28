@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from modules.audit.services import log_event
+from modules.tenants.exceptions import TenantContextRequired
 from modules.tenants.models import Branch, MembershipBranch, TenantMembership
 from modules.tenants.rbac import require_permission
 
@@ -149,6 +150,8 @@ class MyBranchesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if request.membership is None:
+            raise TenantContextRequired()
         scope = branch_scope(request)
         rows = Branch.objects.filter(active=True).order_by("code")
         if scope is not None:
