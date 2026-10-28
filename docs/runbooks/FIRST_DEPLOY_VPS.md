@@ -232,24 +232,46 @@ cd /srv/umrovia && (set -a; . /etc/umrovia/backup.env; set +a; infra/backup/back
 ls -lh /srv/backups
 ```
 
-Jadwalkan harian 01:00 WIB (18:00 UTC) dengan `crontab -e`:
+Jadwalkan harian 01:00 WIB (18:00 UTC) dengan `crontab -e` — sebelum offsite siap:
 
 ```
 0 18 * * * cd /srv/umrovia && set -a && . /etc/umrovia/backup.env && set +a && infra/backup/backup.sh >> /srv/backups/backup.log 2>&1
 ```
 
-**Offsite ke NEO Object Storage** (bucket privat; endpoint & access key dari portal Biznet Gio):
+Setelah offsite di bawah siap, ganti baris itu dengan versi yang juga menyalin ke bucket.
+
+**Offsite ke NEO Object Storage** (produk *NSS Multi Region 2*: primer `https://nos.wjv-1.neo.id`,
+replika `https://nos.jkt-1.neo.id`; bucket privat `umrovia-backups`). Simpan Access/Secret Key di
+password manager dan tulis ke konfigurasi rclone tanpa menampilkannya:
 
 ```bash
-rclone config create biznet s3 provider=Other endpoint=<endpoint-dari-portal> \
-  access_key_id=<access-key> secret_access_key=<secret-key>
-rclone mkdir biznet:umrovia-backups
-rclone copy /srv/backups biznet:umrovia-backups --include 'umrovia-*'
+read -rsp "Access Key: " AK; echo; read -rsp "Secret Key: " SK; echo
+umask 077; mkdir -p ~/.config/rclone
+cat > ~/.config/rclone/rclone.conf <<CONF
+[neo]
+type = s3
+provider = Other
+endpoint = https://nos.wjv-1.neo.id
+access_key_id = $AK
+secret_access_key = $SK
+acl = private
+bucket_acl = private
+CONF
+unset AK SK
+rclone mkdir neo:umrovia-backups
+rclone copy /srv/backups neo:umrovia-backups --include 'umrovia-*'
+rclone check /srv/backups neo:umrovia-backups --include 'umrovia-*' --one-way   # 0 differences
+curl -s -o /dev/null -w '%{http_code}\n' https://nos.wjv-1.neo.id/umrovia-backups/   # 403 = privat
 ```
 
-Lalu tambahkan `&& rclone copy /srv/backups biznet:umrovia-backups --include 'umrovia-*'`
-di akhir baris cron (sebelum `>>`). Simpan juga salinan berkala di lokasi kedua
-(penyedia lain) bila memungkinkan.
+Baris cron harian (backup lalu salin offsite; seluruh keluaran masuk log):
+
+```
+0 18 * * * cd /srv/umrovia && { set -a && . /etc/umrovia/backup.env && set +a && infra/backup/backup.sh && rclone copy /srv/backups neo:umrovia-backups --include "umrovia-*" && echo "offsite: tersalin ke neo:umrovia-backups"; } >> /srv/backups/backup.log 2>&1
+```
+
+Retensi 14 hari hanya berlaku di VPS; salinan di bucket tidak dihapus otomatis (ukuran kecil).
+Pasang aturan lifecycle bucket bila ukurannya membesar.
 
 **Drill restore bulanan** (BACKUP_RESTORE.md): unduh satu backup ke laptop dan jalankan
 `infra/backup/restore_drill.sh` terhadap Postgres lokal — host VPS sengaja tidak
