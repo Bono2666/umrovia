@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch, type UserPayload } from "@/lib/api";
 import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { BtnLink } from "@/components/workspace/ui";
+import { appUrl } from "@/lib/siteUrls";
 
 /**
  * Tautan nav dengan animasi teks "berguling" (roll) — pola yang sama dengan
@@ -139,15 +140,15 @@ export function MarketingHeader() {
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           {authed ? (
-            <BtnLink href="/dashboard" variant="solid">
+            <BtnLink href={appUrl("/dashboard")} variant="solid">
               Buka dashboard
             </BtnLink>
           ) : (
             <>
-              <BtnLink href="/login" variant="link">
+              <BtnLink href={appUrl("/login")} variant="link">
                 Masuk
               </BtnLink>
-              <BtnLink href="/register" variant="solid">
+              <BtnLink href={appUrl("/register")} variant="solid">
                 Daftar
               </BtnLink>
             </>

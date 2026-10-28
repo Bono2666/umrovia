@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { apiFetch, problemMessage } from "@/lib/api";
+import { siteUrl } from "@/lib/siteUrls";
 import { Btn, FormCheckbox, FormField } from "@/components/workspace/ui";
 
 type RegisterResponse = {
@@ -109,7 +110,7 @@ export default function RegisterPage() {
               label={
                 <>
                   Saya menyetujui Syarat Layanan dan{" "}
-                  <Link href="/kebijakan-privasi" target="_blank" rel="noreferrer" className="text-primary hover:text-primary-hover">Kebijakan Privasi Umrovia</Link>.
+                  <Link href={siteUrl("/kebijakan-privasi")} target="_blank" rel="noreferrer" className="text-primary hover:text-primary-hover">Kebijakan Privasi Umrovia</Link>.
                 </>
               }
             />

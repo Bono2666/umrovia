@@ -12,6 +12,7 @@ import {
   type MockKind,
 } from "@/components/marketing/MarketingBits";
 import { BtnLink } from "@/components/workspace/ui";
+import { appUrl } from "@/lib/siteUrls";
 
 type FiturSegmen = {
   n: string;
@@ -274,7 +275,7 @@ export default function Home() {
             </div>
 
             <div className="mt-14 border-t border-black/20 pt-8">
-              <BtnLink href="/register" variant="solid">
+              <BtnLink href={appUrl("/register")} variant="solid">
                 Mulai gratis
               </BtnLink>
             </div>
@@ -289,7 +290,7 @@ export default function Home() {
         >
           <div className="flex flex-wrap items-end justify-between gap-6">
             <RevealText as="h2" variant="title" className="text--h2">Cara mulai</RevealText>
-            <BtnLink href="/register" variant="tint">
+            <BtnLink href={appUrl("/register")} variant="tint">
               Daftar sekarang
             </BtnLink>
           </div>
