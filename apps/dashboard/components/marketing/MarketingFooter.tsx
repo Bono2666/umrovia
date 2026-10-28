@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { BtnLink } from "@/components/workspace/ui";
+import { appUrl } from "@/lib/siteUrls";
 
 const FOOTER_LINKS: Array<{ href: string; label: string }> = [
   { href: "#fitur", label: "Fitur" },
@@ -11,7 +12,7 @@ const FOOTER_LINKS: Array<{ href: string; label: string }> = [
   { href: "#mulai", label: "Cara mulai" },
   { href: "/pricing", label: "Pricing" },
   { href: "/kontak", label: "Kontak" },
-  { href: "/login", label: "Masuk" },
+  { href: appUrl("/login"), label: "Masuk" },
 ];
 
 /**
@@ -55,7 +56,7 @@ export function MarketingFooter() {
           </nav>
 
           <BtnLink
-            href="/register"
+            href={appUrl("/register")}
             variant="solid"
             className="md:col-span-3 md:col-start-10 md:justify-self-end"
           >

@@ -12,7 +12,7 @@ Estimasi waktu: 60–90 menit (build pertama 5–15 menit).
 | Butir | Cek |
 |---|---|
 | VPS NEO Lite MM 8.4, Ubuntu 24.04 LTS | IP publik diketahui |
-| DNS: record **A** `app`, `admin`, `api` → `103.87.66.228` | Lihat "Record DNS" di bawah |
+| DNS: record **A** `@`, `app`, `admin`, `api` → `103.87.66.228`, `www` → CNAME | Lihat "Record DNS" di bawah |
 | Security Group Biznet Gio: inbound TCP 22, 80, 443 | Port 80 wajib terbuka untuk penerbitan sertifikat |
 | Kunci SSH `umrovia.pem` dan user `bono2666` | Bagian 1 |
 | Akun SMTP email transaksional (host, port, user, password) | Untuk verifikasi email & notifikasi |
@@ -23,14 +23,16 @@ Estimasi waktu: 60–90 menit (build pertama 5–15 menit).
 
 | Nama | Tipe | Nilai | TTL |
 |---|---|---|---|
+| `@` (umrovia.com — situs marketing) | A | `103.87.66.228` | 300 |
+| `www` | CNAME | `umrovia.com.` | 300 |
 | `app` | A | `103.87.66.228` | 300 |
 | `admin` | A | `103.87.66.228` | 300 |
 | `api` | A | `103.87.66.228` | 300 |
 
-Cek dari laptop (ketiganya harus mengembalikan `103.87.66.228`):
+Cek dari laptop (semuanya harus berujung di `103.87.66.228`):
 
 ```bash
-for h in app admin api; do echo "$h: $(dig +short @satu.neodns.id $h.umrovia.com)"; done
+for h in umrovia.com www.umrovia.com app.umrovia.com admin.umrovia.com api.umrovia.com; do echo "$h: $(dig +short @satu.neodns.id $h | tr '\n' ' ')"; done
 ```
 
 Domain utama `umrovia.com` dan `www` (saat ini CNAME ke `umrovia.com`) belum dilayani
@@ -159,13 +161,18 @@ menunggu `api` sehat.
 
 ```bash
 cd /srv/umrovia
-APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_HOST=api.umrovia.com \
+SITE_HOST=umrovia.com APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_HOST=api.umrovia.com \
   PORT=443 HTTP_PORT=80 infra/deploy/smoke.sh
 docker compose exec api python manage.py verify_integrity
 ```
 
-Hasil yang diharapkan: `smoke: 15 lulus, 0 gagal` dan `verify_integrity` OK.
-Lalu buka `https://app.umrovia.com/login` di browser (gembok valid, tanpa peringatan).
+Hasil yang diharapkan: `smoke: 20 lulus, 0 gagal` dan `verify_integrity` OK.
+Lalu buka `https://umrovia.com` dan `https://app.umrovia.com/login` di browser (gembok valid,
+tanpa peringatan).
+
+Pembagian host: `umrovia.com` hanya melayani halaman marketing (`/`, `/pricing`, `/kontak`,
+`/kebijakan-privasi`); rute lain dialihkan ke `app.umrovia.com`. `www` dialihkan ke domain utama.
+`app.umrovia.com/` menuju `/login` dan halaman marketing di host app dialihkan ke `umrovia.com`.
 
 ## 7. Akun pertama
 
@@ -233,6 +240,7 @@ memasang klien Postgres.
 
 - NEO Sense (atau uptime checker lain), interval 1–5 menit:
   - `https://api.umrovia.com/api/v1/health/` → 200 dan `"database": "ok"`
+  - `https://umrovia.com/` → 200
   - `https://app.umrovia.com/login` → 200
 - Uji pemulihan otomatis sekali: `sudo reboot`, lalu pastikan `docker compose ps`
   kembali sehat tanpa campur tangan (Docker aktif saat boot, container `restart: unless-stopped`).
@@ -245,7 +253,7 @@ cd /srv/umrovia
 (set -a; . /etc/umrovia/backup.env; set +a; infra/backup/backup.sh)   # backup pra-deploy
 git pull --ff-only
 docker compose up -d --build
-APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_HOST=api.umrovia.com \
+SITE_HOST=umrovia.com APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_HOST=api.umrovia.com \
   PORT=443 HTTP_PORT=80 infra/deploy/smoke.sh
 ```
 
@@ -271,7 +279,7 @@ Rollback kode: `git checkout <commit-sebelumnya> && docker compose up -d --build
 | Sertifikat tidak terbit (log proxy: ACME/challenge) | DNS belum mengarah ke IP VPS, atau port 80 tertutup di Security Group |
 | Browser 502 | `api` belum sehat: `docker compose logs api` |
 | `PII_ENCRYPTION_KEY wajib` / `ALLOWED_HOSTS` error | `.env.production` belum lengkap atau `COMPOSE_ENV_FILES` tidak ter-set |
-| Error CORS di browser | `APP_HOST`/`API_HOST` tidak sama dengan domain yang dibuka; rebuild `web` setelah mengubah host |
+| Error CORS di browser | `SITE_HOST`/`APP_HOST`/`API_HOST` tidak sama dengan domain yang dibuka; rebuild `web` setelah mengubah host |
 | Build `web` terhenti (OOM) | Pastikan swap aktif (`swapon --show`), ulangi build |
 
 ## Masih terbuka sebelum go-live (GO_LIVE_CHECKLIST)

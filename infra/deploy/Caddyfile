@@ -19,10 +19,31 @@
 	}
 }
 
+# Situs marketing di domain utama: hanya halaman publik; rute aplikasi dialihkan ke host app.
+{$SITE_HOST} {
+	tls {$CADDY_TLS}
+	import security_headers
+	encode zstd gzip
+	@app not path / /pricing /kontak /kebijakan-privasi /_next/* /brand/* /favicon.ico /icon.png /apple-icon.png
+	redir @app https://{$APP_HOST}{$PUBLIC_PORT_SUFFIX}{uri} 308
+	reverse_proxy web:3000
+}
+
+www.{$SITE_HOST} {
+	tls {$CADDY_TLS}
+	import security_headers
+	redir https://{$SITE_HOST}{$PUBLIC_PORT_SUFFIX}{uri} 308
+}
+
+# Aplikasi travel & portal jamaah. Halaman marketing hanya ada di domain utama.
 {$APP_HOST} {
 	tls {$CADDY_TLS}
 	import security_headers
 	encode zstd gzip
+	@root path /
+	redir @root /login 302
+	@marketing path /pricing /kontak /kebijakan-privasi
+	redir @marketing https://{$SITE_HOST}{$PUBLIC_PORT_SUFFIX}{uri} 308
 	reverse_proxy web:3000
 }
 
