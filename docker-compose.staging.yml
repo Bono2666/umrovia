@@ -32,7 +32,8 @@ x-api-environment: &api-environment
   DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Umrovia Staging <no-reply@umrovia.com>}
   CONTACT_RECIPIENT_EMAIL: ${CONTACT_RECIPIENT_EMAIL:-}
   MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
-  MIDTRANS_IS_PRODUCTION: "False"  # staging tidak pernah memakai billing produksi (Spec §18.2)
+  # Bawaan sandbox; hanya .env.production VPS yang boleh mengisi True (staging tidak pernah billing produksi, Spec §18.2).
+  MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-False}
   WALLET_MANUAL_BANK_NAME: ${WALLET_MANUAL_BANK_NAME:-}
   WALLET_MANUAL_ACCOUNT_NAME: ${WALLET_MANUAL_ACCOUNT_NAME:-}
   WALLET_MANUAL_ACCOUNT_NUMBER: ${WALLET_MANUAL_ACCOUNT_NUMBER:-}

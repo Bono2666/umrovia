@@ -413,3 +413,14 @@ def test_demo_read_never_exposes_production_ledger(wallet_setup):
     assert ok(s["client"].get("/api/v1/wallet/ledger"))["count"] == 0
     assert ok(s["client"].get("/api/v1/wallet/topups"))["count"] == 0
     assert s["client"].get(f"/api/v1/wallet/topups/{t['id']}").status_code == 404
+
+
+@pytest.mark.parametrize(("key", "production", "expected"), [
+    ("", True, []), ("SB-Mid-server-abc", False, []), ("Mid-server-abc", True, []),
+    ("SB-Mid-server-abc", True, ["wallet.W002"]), ("Mid-server-abc", False, ["wallet.W001"]),
+])
+def test_midtrans_key_must_match_mode(settings, key, production, expected):
+    from modules.wallet.checks import midtrans_key_matches_mode
+
+    settings.MIDTRANS_SERVER_KEY, settings.MIDTRANS_IS_PRODUCTION = key, production
+    assert [m.id for m in midtrans_key_matches_mode(None)] == expected
