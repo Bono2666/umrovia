@@ -83,9 +83,15 @@ ssh umrovia-prod 'id; docker ps && echo docker-ok'
 Berhasil → tutup sesi lama. Bila skrip menyebut reboot diperlukan: `ssh umrovia-prod 'sudo reboot'`,
 tunggu 1 menit, login lagi.
 
-## 3. Ambil kode (deploy key read-only)
+## 3. Ambil kode
 
-Di VPS:
+Repo `Bono2666/umrovia` saat ini **publik**, jadi cukup:
+
+```bash
+git clone https://github.com/Bono2666/umrovia.git /srv/umrovia
+```
+
+Bila repo dijadikan privat, pakai deploy key read-only. Di VPS:
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/github_deploy -N "" -C "umrovia-prod"

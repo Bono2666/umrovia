@@ -106,6 +106,8 @@ ufw allow "$SSH_PORT/tcp" comment ssh >/dev/null
 ufw allow 80/tcp comment http >/dev/null
 ufw allow 443/tcp comment https >/dev/null
 ufw --force enable >/dev/null
+# Beberapa image cloud (mis. Biznet Gio) menonaktifkan ufw.service: tanpa ini firewall mati setelah reboot.
+systemctl enable ufw >/dev/null 2>&1
 ufw status verbose | sed 's/^/    /'
 note "Catatan: port yang dipublikasikan Docker melewati ufw. Stack Umrovia hanya memublikasikan 80/443 (Caddy);"
 note "Postgres & Redis tetap di jaringan internal Docker — jangan tambahkan 'ports:' untuk keduanya."
