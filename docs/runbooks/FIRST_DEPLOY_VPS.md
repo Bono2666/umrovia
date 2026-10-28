@@ -2,8 +2,8 @@
 
 Untuk: operator yang memasang Umrovia produksi pertama kali di satu VPS.
 Stack: `docker-compose.staging.yml` (setting **produksi**, di belakang Caddy +
-Let's Encrypt) dengan secret produksi di `.env.production`. Ganti
-`domain-anda.com` dan `<IP-VPS>` dengan nilai sebenarnya.
+Let's Encrypt) dengan secret produksi di `.env.production`.
+Domain `umrovia.com` (NEO DNS), VPS `103.87.66.228`, user `bono2666`.
 
 Estimasi waktu: 60–90 menit (build pertama 5–15 menit).
 
@@ -12,12 +12,30 @@ Estimasi waktu: 60–90 menit (build pertama 5–15 menit).
 | Butir | Cek |
 |---|---|
 | VPS NEO Lite MM 8.4, Ubuntu 24.04 LTS | IP publik diketahui |
-| DNS: record **A** `app`, `admin`, `api` → IP VPS | `dig +short app.domain-anda.com` (dan admin, api) mengembalikan IP VPS |
+| DNS: record **A** `app`, `admin`, `api` → `103.87.66.228` | Lihat "Record DNS" di bawah |
 | Security Group Biznet Gio: inbound TCP 22, 80, 443 | Port 80 wajib terbuka untuk penerbitan sertifikat |
 | Kunci SSH `umrovia.pem` dan user `bono2666` | Bagian 1 |
 | Akun SMTP email transaksional (host, port, user, password) | Untuk verifikasi email & notifikasi |
 | Akses baca repo `github.com/Bono2666/umrovia` | Bagian 3 (deploy key) |
 | Password manager untuk menyimpan secret | Bagian 4 & 8 |
+
+### Record DNS (portal Biznet Gio → NEO DNS → zona `umrovia.com`)
+
+| Nama | Tipe | Nilai | TTL |
+|---|---|---|---|
+| `app` | A | `103.87.66.228` | 300 |
+| `admin` | A | `103.87.66.228` | 300 |
+| `api` | A | `103.87.66.228` | 300 |
+
+Cek dari laptop (ketiganya harus mengembalikan `103.87.66.228`):
+
+```bash
+for h in app admin api; do echo "$h: $(dig +short @satu.neodns.id $h.umrovia.com)"; done
+```
+
+Domain utama `umrovia.com` dan `www` (saat ini CNAME ke `umrovia.com`) belum dilayani
+stack ini; halaman marketing ada di host `app`. Bila ingin `umrovia.com` ikut aktif,
+arahkan juga ke IP VPS lalu tambahkan blok pengalihan di `infra/deploy/Caddyfile`.
 
 ## 1. Kunci SSH di laptop (macOS)
 
@@ -30,7 +48,7 @@ chmod 600 ~/.ssh/umrovia.pem
 cat >> ~/.ssh/config <<'EOF'
 
 Host umrovia-prod
-  HostName <IP-VPS>
+  HostName 103.87.66.228
   User bono2666
   IdentityFile ~/.ssh/umrovia.pem
   IdentitiesOnly yes
@@ -96,7 +114,7 @@ chmod 600 .env.production
 sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env.production
 sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')|" .env.production
 sed -i "s|^PII_ENCRYPTION_KEY=.*|PII_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')|" .env.production
-nano .env.production   # isi host, CADDY_TLS (email), SMTP, rekening top-up manual
+nano .env.production   # isi CADDY_TLS (email operator), SMTP, rekening top-up manual
 ```
 
 - **Simpan `POSTGRES_PASSWORD`, `SECRET_KEY` dan `PII_ENCRYPTION_KEY` di password
@@ -135,27 +153,27 @@ menunggu `api` sehat.
 
 ```bash
 cd /srv/umrovia
-APP_HOST=app.domain-anda.com ADMIN_HOST=admin.domain-anda.com API_HOST=api.domain-anda.com \
+APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_HOST=api.umrovia.com \
   PORT=443 HTTP_PORT=80 infra/deploy/smoke.sh
 docker compose exec api python manage.py verify_integrity
 ```
 
 Hasil yang diharapkan: `smoke: 15 lulus, 0 gagal` dan `verify_integrity` OK.
-Lalu buka `https://app.domain-anda.com/login` di browser (gembok valid, tanpa peringatan).
+Lalu buka `https://app.umrovia.com/login` di browser (gembok valid, tanpa peringatan).
 
 ## 7. Akun pertama
 
-**Staf platform** (konsol `https://admin.domain-anda.com`), pakai email terpisah
+**Staf platform** (konsol `https://admin.umrovia.com`), pakai email terpisah
 dari akun travel:
 
 ```bash
-docker compose exec api python manage.py create_platform_staff ops@domain-anda.com \
+docker compose exec api python manage.py create_platform_staff ops@umrovia.com \
   --role "Platform Super Admin" --name "Nama Anda"
 ```
 
 Password diminta (minimal 12 karakter). Login di host admin, lalu daftarkan MFA.
 
-**Travel pertama**: daftar di `https://app.domain-anda.com/register` → verifikasi
+**Travel pertama**: daftar di `https://app.umrovia.com/register` → verifikasi
 email (memastikan SMTP bekerja) → Owner travel masuk ke Ringkasan.
 
 ## 8. Backup harian + salinan offsite
@@ -208,8 +226,8 @@ memasang klien Postgres.
 ## 9. Monitoring
 
 - NEO Sense (atau uptime checker lain), interval 1–5 menit:
-  - `https://api.domain-anda.com/api/v1/health/` → 200 dan `"database": "ok"`
-  - `https://app.domain-anda.com/login` → 200
+  - `https://api.umrovia.com/api/v1/health/` → 200 dan `"database": "ok"`
+  - `https://app.umrovia.com/login` → 200
 - Uji pemulihan otomatis sekali: `sudo reboot`, lalu pastikan `docker compose ps`
   kembali sehat tanpa campur tangan (Docker aktif saat boot, container `restart: unless-stopped`).
 - Ambang & respons insiden: MONITORING_INCIDENT.md.
@@ -221,7 +239,8 @@ cd /srv/umrovia
 (set -a; . /etc/umrovia/backup.env; set +a; infra/backup/backup.sh)   # backup pra-deploy
 git pull --ff-only
 docker compose up -d --build
-APP_HOST=… ADMIN_HOST=… API_HOST=… PORT=443 HTTP_PORT=80 infra/deploy/smoke.sh
+APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_HOST=api.umrovia.com \
+  PORT=443 HTTP_PORT=80 infra/deploy/smoke.sh
 ```
 
 Rollback kode: `git checkout <commit-sebelumnya> && docker compose up -d --build`
