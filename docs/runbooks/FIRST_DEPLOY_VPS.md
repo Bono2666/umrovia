@@ -149,9 +149,8 @@ nano .env.production   # isi CADDY_TLS (email operator), SMTP, CONTACT_RECIPIENT
   bisa dibaca, termasuk dari backup.
 - Jangan pernah mengubah `PII_ENCRYPTION_KEY` setelah data jamaah masuk.
 - Nama file compose `docker-compose.staging.yml`, tetapi isinya setting produksi
-  (`config.settings.production`). Midtrans di file ini selalu mode **sandbox**;
-  top-up SaaS Wallet memakai transfer manual sampai Midtrans produksi diaktifkan
-  (GO_LIVE_CHECKLIST).
+  (`config.settings.production`). Midtrans bawaan mode **sandbox**; mode produksi hanya
+  bila `.env.production` mengisi `MIDTRANS_IS_PRODUCTION=True` (bagian "Midtrans produksi").
 
 Agar perintah `docker compose` di folder ini otomatis memakai stack produksi:
 
@@ -286,6 +285,33 @@ Pasang aturan lifecycle bucket bila ukurannya membesar.
 **Drill restore bulanan** (BACKUP_RESTORE.md): unduh satu backup ke laptop dan jalankan
 `infra/backup/restore_drill.sh` terhadap Postgres lokal — host VPS sengaja tidak
 memasang klien Postgres.
+
+## 8b. Midtrans produksi (top-up SaaS Wallet online)
+
+Prasyarat: akun Midtrans sudah lolos aktivasi produksi (verifikasi bisnis).
+
+1. Dashboard Midtrans → pindah lingkungan ke **Production** (sakelar di kiri atas).
+2. **Settings → Access Keys**: salin **Server Key** (berawalan `Mid-server-`, bukan `SB-`).
+3. **Settings → Configuration** (Payment): isi
+   - Payment Notification URL: `https://api.umrovia.com/api/v1/payments/midtrans/notification`
+   - Finish Redirect URL: `https://app.umrovia.com/dashboard/wallet`
+4. Di VPS, isi key tanpa menampilkannya, lalu aktifkan mode produksi:
+
+```bash
+cd /srv/umrovia
+read -rsp "Server Key Midtrans Production: " K; echo
+K="$K" python3 -c 'import os,re;p=".env.production";s=open(p).read();s=re.sub(r"(?m)^MIDTRANS_SERVER_KEY=.*$",lambda m:"MIDTRANS_SERVER_KEY="+os.environ["K"],s);open(p,"w").write(s)'
+unset K
+sed -i 's/^MIDTRANS_IS_PRODUCTION=.*/MIDTRANS_IS_PRODUCTION=True/' .env.production
+grep -q '^MIDTRANS_IS_PRODUCTION=' .env.production || echo 'MIDTRANS_IS_PRODUCTION=True' >> .env.production
+docker compose up -d api worker
+docker compose exec api python manage.py check | grep -E 'wallet\.W00' || echo "key & mode cocok"
+```
+
+`wallet.W001`/`W002` = key dan mode tertukar (sandbox vs produksi). Uji dengan top-up kecil dari
+workspace travel berstatus ACTIVE (workspace TRIAL/demo tidak dapat top-up), pastikan saldo
+bertambah setelah notifikasi Midtrans masuk, lalu `docker compose exec api python manage.py reconcile_wallets`.
+Kembali ke sandbox: `MIDTRANS_IS_PRODUCTION=False` + key `SB-Mid-server-…`, lalu `docker compose up -d api worker`.
 
 ## 9. Monitoring
 
