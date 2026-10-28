@@ -18,9 +18,9 @@ x-api-environment: &api-environment
   SECRET_KEY: ${SECRET_KEY:?SECRET_KEY wajib}
   PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?PII_ENCRYPTION_KEY wajib}
   ALLOWED_HOSTS: ${API_HOST:-api.umrovia.localhost}
-  CORS_ALLOWED_ORIGINS: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443},https://${ADMIN_HOST:-admin.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
-  CSRF_TRUSTED_ORIGINS: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443},https://${ADMIN_HOST:-admin.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
-  TENANT_APP_URL: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+  CORS_ALLOWED_ORIGINS: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443},https://${ADMIN_HOST:-admin.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443}
+  CSRF_TRUSTED_ORIGINS: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443},https://${ADMIN_HOST:-admin.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443}
+  TENANT_APP_URL: https://${APP_HOST:-app.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443}
   SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-0}
   EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
   EMAIL_HOST: ${EMAIL_HOST:-localhost}
@@ -96,9 +96,9 @@ services:
       context: .
       dockerfile: infra/docker/web.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://${API_HOST:-api.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+        NEXT_PUBLIC_API_URL: https://${API_HOST:-api.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443}
     environment:
-      NEXT_PUBLIC_API_URL: https://${API_HOST:-api.umrovia.localhost}${PUBLIC_PORT_SUFFIX:-:8443}
+      NEXT_PUBLIC_API_URL: https://${API_HOST:-api.umrovia.localhost}${PUBLIC_PORT_SUFFIX-:8443}
     depends_on:
       api:
         condition: service_healthy
