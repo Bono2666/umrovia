@@ -334,6 +334,10 @@ SITE_HOST=umrovia.com APP_HOST=app.umrovia.com ADMIN_HOST=admin.umrovia.com API_
   PORT=443 HTTP_PORT=80 infra/deploy/smoke.sh
 ```
 
+Caddyfile berubah? `caddy reload` saja tidak cukup: Caddyfile di-mount sebagai berkas
+tunggal, dan `git pull` menggantinya dengan berkas baru, sehingga container tetap melihat
+versi lama. Jalankan `docker compose restart proxy` (putus beberapa detik), lalu smoke test.
+
 Rollback kode: `git checkout <commit-sebelumnya> && docker compose up -d --build`
 (aturan migrasi & restore: DEPLOY_ROLLBACK.md). Kembali ke cabang utama setelah selesai:
 `git checkout main`.
