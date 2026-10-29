@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from modules.platform import integrity
 
+from .pdf_fonts import assert_poppins_only
 from .test_payments import ok, post
 from .test_payments import patch as http_patch
 from .test_platform_console import platform_client
@@ -87,7 +88,9 @@ def test_mvp_end_to_end_flow():
         ok(post(owner, f"/api/v1/payments/{payment['id']}/verify"))  # verifikasi ulang: tidak ada biaya kedua
     wallet = ok(owner.get("/api/v1/wallet"))
     assert wallet["balance_idr"] == 0 and wallet["pending_charge_count"] == 0  # 2 × Rp50.000
-    assert owner.get(f"/api/v1/receipts/{verified['receipt']['id']}/pdf").content.startswith(b"%PDF-")
+    receipt_pdf = owner.get(f"/api/v1/receipts/{verified['receipt']['id']}/pdf").content
+    assert receipt_pdf.startswith(b"%PDF-")
+    assert_poppins_only(receipt_pdf)
 
     # 8. Portal jamaah: undangan → unggah paspor → disetujui petugas.
     ok(post(owner, f"/api/v1/pilgrims/{pilgrims[0]['id']}/portal", {"email": "fauzi@jamaah.test"}))
@@ -102,7 +105,9 @@ def test_mvp_end_to_end_flow():
     for target in ["CONFIRMED", "DOCUMENT_PROCESS", "READY_TO_DEPART"]:
         ok(post(owner, f"/api/v1/bookings/{booking['id']}/transition", {"target": target}))
     ok(post(owner, f"/api/v1/departures/{departure['id']}/manifest/publish"))
-    assert owner.get(f"/api/v1/departures/{departure['id']}/manifest/versions/1/pdf").content.startswith(b"%PDF-")
+    manifest_pdf = owner.get(f"/api/v1/departures/{departure['id']}/manifest/versions/1/pdf").content
+    assert manifest_pdf.startswith(b"%PDF-")
+    assert_poppins_only(manifest_pdf)
     for target in ["READY", "DEPARTED"]:
         ok(post(owner, f"/api/v1/departures/{departure['id']}/transition", {"target": target}))
     ok(post(owner, f"/api/v1/bookings/{booking['id']}/transition", {"target": "DEPARTED"}))

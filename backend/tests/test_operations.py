@@ -12,6 +12,7 @@ from modules.audit.models import AuditEvent
 from modules.departures.models import Departure
 from modules.manifest.models import ManifestVersion
 
+from .pdf_fonts import assert_poppins_only
 from .test_payment_security import staff
 from .test_payments import ok, post
 from .test_payments import scenario as scenario
@@ -96,6 +97,7 @@ def test_pii_exports_require_permission_and_are_audited(ops):
     assert AuditEvent.objects.filter(action="manifest.export_denied").count() == 1
     owner = ops["client"].get(url)
     assert owner.status_code == 200 and owner.content.startswith(b"%PDF-")
+    assert_poppins_only(owner.content)
     assert operations.get(f"/api/v1/departures/{ops['departure']['id']}/manifest/export?file=pdf").status_code == 200
     assert operations.get(f"/api/v1/departures/{ops['departure']['id']}/manifest/export?file=doc").status_code == 400
     assert staff(ops["tenant"], "Sales").get(url.replace("&pii=1", "")).status_code == 403
@@ -106,6 +108,7 @@ def test_published_version_pdf_from_verified_snapshot(ops):
     base = f"/api/v1/departures/{ops['departure']['id']}/manifest/versions"
     response = ops["client"].get(f"{base}/1/pdf")
     assert response.status_code == 200 and response.content.startswith(b"%PDF-")
+    assert_poppins_only(response.content)
     assert response["Content-Disposition"].endswith(f'-{ops["departure"]["code"]}-v1.pdf"')
     assert ops["client"].get(f"{base}/9/pdf").status_code == 404
     version = ManifestVersion.objects.without_tenant_guard().get()
@@ -120,6 +123,7 @@ def test_print_documents(ops, kind):
     url = f"/api/v1/departures/{ops['departure']['id']}/print/{kind}"
     response = ops["client"].get(url)
     assert response.status_code == 200 and response.content.startswith(b"%PDF-")
+    assert_poppins_only(response.content)
     assert ops["client"].get(f"{url}?booking={ops['booking']['id']}").status_code == 200
     event = AuditEvent.objects.filter(action="manifest.printed").latest("occurred_at")
     assert event.changes_json["kind"] == kind and event.changes_json["rows"] == 3
