@@ -1,6 +1,5 @@
 """S18: konsol platform — MFA staf, peran platform, tanpa kebocoran PII, lifecycle tenant, trial, tarif, dukungan."""
 import json
-import time
 from datetime import timedelta
 from uuid import uuid4
 
@@ -67,7 +66,11 @@ def test_totp_matches_rfc6238_vector():
     assert mfa.code_for(secret, now=59) == "287082" and mfa.code_for(secret, now=1111111109) == "081804"
 
 
-def test_mfa_enrollment_verify_replay_and_recovery(db, settings):
+def test_mfa_enrollment_verify_replay_and_recovery(db, settings, monkeypatch):
+    # Jam TOTP dikunci: bila langkah 30 detik berganti di tengah tes, "kode yang sama"
+    # untuk uji replay menjadi kode langkah berikutnya yang sah, dan tes gagal acak.
+    step = mfa.current_step()
+    monkeypatch.setattr(mfa, "current_step", lambda now=None: step if now is None else int(now // mfa.STEP))
     client, user = platform_client(mfa_done=False)
     me = ok(client.get("/api/v1/platform/me"))
     assert me["mfa"] == {"enrolled": False, "verified": False, "recovery_codes_left": 0} and "platform.tenant_manage" in me["permissions"]
@@ -91,7 +94,7 @@ def test_mfa_enrollment_verify_replay_and_recovery(db, settings):
     other = Client()
     other.force_login(user)
     assert post(other, "/api/v1/platform/mfa/verify", {"recovery_code": codes[0]}).status_code == 400  # sekali pakai
-    assert ok(post(other, "/api/v1/platform/mfa/verify", {"code": mfa.code_for(secret, now=time.time() + 30)}))["mfa"]["verified"]
+    assert ok(post(other, "/api/v1/platform/mfa/verify", {"code": mfa.code_for(secret, now=(step + 1) * mfa.STEP)}))["mfa"]["verified"]
     settings.PLATFORM_MFA_TTL_SECONDS = 0
     assert other.get("/api/v1/platform/overview").json()["code"] == "mfa_required"
     actions = set(AuditEvent.objects.filter(actor=user).values_list("action", flat=True))
