@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
+  BtnFile,
   EmptyState,
   ErrorState,
   FormField,
@@ -457,10 +458,9 @@ export default function JamaahPage() {
                 <FormSelect label="Unggah dokumen" htmlFor="staff-doc-kind" value={uploadKind} onChange={(event) => setUploadKind(event.target.value)}>
                   {Object.entries(DOC_KIND).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
                 </FormSelect>
-                <label className={`btn btn--primary btn--xs ${docBusy ? "pointer-events-none opacity-60" : "cursor-pointer"}`}>
+                <BtnFile size="xs" loading={docBusy} accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void uploadDocument(selected, file); }}>
                   Pilih berkas
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" disabled={docBusy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void uploadDocument(selected, file); }} />
-                </label>
+                </BtnFile>
               </div>
             ) : null}
 

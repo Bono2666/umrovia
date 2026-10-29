@@ -490,3 +490,39 @@ export function BtnLink({
     </Component>
   );
 }
+
+/**
+ * Tombol pilih berkas: `<label>` berstruktur Btn yang membungkus input file
+ * tersembunyi (input tetap bisa difokus keyboard; cincin fokus di label via :focus-within).
+ * `loading` menampilkan spinner dan menonaktifkan input.
+ */
+export function BtnFile({
+  variant = "tint",
+  size,
+  className,
+  children,
+  loading = false,
+  disabled,
+  ...input
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> & {
+  variant?: BtnVariant;
+  size?: BtnSize;
+  loading?: boolean;
+}) {
+  const off = disabled || loading;
+  return (
+    <label
+      className={btnClass(
+        variant,
+        size,
+        [loading ? "is-loading" : "", off ? "pointer-events-none" : "", className ?? ""]
+          .filter(Boolean)
+          .join(" "),
+      )}
+      aria-busy={loading || undefined}
+    >
+      <BtnInner>{children}</BtnInner>
+      <input type="file" className="sr-only" disabled={off} {...input} />
+    </label>
+  );
+}
