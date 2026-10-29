@@ -28,7 +28,13 @@ case "$TARGET" in
   *[!a-z0-9_]*) echo "nama database target hanya huruf kecil, angka, _"; exit 2 ;;
 esac
 
-if [ -f "$ARCHIVE.sha256" ]; then shasum -a 256 -c "$ARCHIVE.sha256" > /dev/null && echo "drill: checksum arsip OK"; fi
+# Bandingkan hash saja: .sha256 menyimpan path server (/srv/backups/…), sedangkan
+# drill bulanan berjalan di laptop dengan arsip hasil unduhan.
+if [ -f "$ARCHIVE.sha256" ]; then
+  [ "$(cut -d' ' -f1 "$ARCHIVE.sha256")" = "$(shasum -a 256 "$ARCHIVE" | cut -d' ' -f1)" ] \
+    || { echo "drill: checksum arsip TIDAK cocok"; exit 1; }
+  echo "drill: checksum arsip OK"
+fi
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in "$ARCHIVE" | tar xf - -C "$WORK"
 ( cd "$WORK" && shasum -a 256 -c SHA256SUMS > /dev/null ) && echo "drill: checksum isi OK"
 echo "drill: media $(tar tzf "$WORK/media.tgz" | grep -vc '/$') berkas"
