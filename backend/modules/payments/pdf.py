@@ -1,18 +1,15 @@
 """PDF lokal dari snapshot; teks di-escape, tidak mengambil URL/aset remote."""
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 from xml.sax.saxutils import escape
 from zoneinfo import ZoneInfo
 
-import reportlab
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from modules.documents.pdf_fonts import register_pdf_fonts
 from modules.documents.render import TEMPLATE_VERSION, format_idr
 
 MONTHS = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -27,8 +24,7 @@ def document_date(value, zone="Asia/Jakarta", *, with_time=False):
 
 
 def render_financial_pdf(snapshot, *, receipt=False):
-    if "Umrovia" not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont("Umrovia", str(Path(reportlab.__file__).parent / "fonts" / "Vera.ttf")))
+    register_pdf_fonts()
     styles = getSampleStyleSheet()
     normal = ParagraphStyle("UmroviaNormal", parent=styles["Normal"], fontName="Umrovia", fontSize=10, leading=15, spaceAfter=8)
     heading = ParagraphStyle("UmroviaHeading", parent=normal, fontSize=20, leading=26, textColor=colors.HexColor("#0e6b5c"))

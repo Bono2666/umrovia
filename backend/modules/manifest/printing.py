@@ -6,20 +6,17 @@ ada aset/URL remote. Dokumen demo selalu ber-watermark "DEMO".
 """
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 from xml.sax.saxutils import escape
 
-import reportlab
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from modules.documents.pdf_fonts import register_pdf_fonts
 from modules.documents.render import format_idr
 from modules.payments.pdf import document_date
 
@@ -38,18 +35,8 @@ ROOM = {"QUAD": "Quad", "TRIPLE": "Triple", "DOUBLE": "Double", "SINGLE": "Singl
 DL = (220 * mm, 110 * mm)
 
 
-def _fonts():
-    # Dicek per nama: modul invoice dapat sudah mendaftarkan "Umrovia" saja.
-    base = Path(reportlab.__file__).parent / "fonts"
-    registered = pdfmetrics.getRegisteredFontNames()
-    for name, file in [("Umrovia", "Vera.ttf"), ("Umrovia-Bold", "VeraBd.ttf")]:
-        if name not in registered:
-            pdfmetrics.registerFont(TTFont(name, str(base / file)))
-    pdfmetrics.registerFontFamily("Umrovia", normal="Umrovia", bold="Umrovia-Bold", italic="Umrovia", boldItalic="Umrovia-Bold")
-
-
 def _styles():
-    _fonts()
+    register_pdf_fonts()
     normal = ParagraphStyle("UmrNormal", fontName="Umrovia", fontSize=9, leading=12)
     return {
         "normal": normal,
@@ -148,12 +135,15 @@ def manifest_pdf(*, departure, rows, pii, meta, version=None) -> bytes:
              _p(f"{len(rows)} jamaah · {stamp}" + (" · BERISI DATA PRIBADI LENGKAP — rahasia" if pii else " · identitas tersamar"), s["small"]), Spacer(1, 8)]
     data = [[_p(h, s["head"]) for h in MANIFEST_HEADERS]]
     data += [[_p(value, s["cell"]) for value in _manifest_row(i, row, pii)] for i, row in enumerate(rows, 1)]
-    widths = [26, 114, 26, 60, 70, 44, 58, 58, 74, 62, 100, 94]
+    # Lebar diukur dengan Poppins 7,5 pt + padding 2×4: NIK 16 digit (ekspor PII), telepon
+    # 15 digit dan "Terkonfirmasi" muat satu baris; total = lebar A4 lanskap − margin (786).
+    widths = [20, 108, 22, 58, 62, 38, 76, 50, 80, 62, 104, 106]
     table = Table(data, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), TINT), ("LINEBELOW", (0, 0), (-1, 0), 0.75, GREEN),
         ("LINEBELOW", (0, 1), (-1, -1), 0.3, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(table if rows else _p("Belum ada jamaah aktif pada keberangkatan ini.", s["normal"]))
     decor = _page_decor(meta)
