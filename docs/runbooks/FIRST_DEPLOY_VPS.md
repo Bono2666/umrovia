@@ -349,7 +349,7 @@ Rollback kode: `git checkout <commit-sebelumnya> && docker compose up -d --build
 | Mingguan | `df -h /` (sisakan >20%), `cat /var/run/reboot-required 2>/dev/null` → reboot di jam sepi |
 | Mingguan | `tail -n 20 /srv/backups/backup.log`, pastikan backup terbaru ada di object storage |
 | Bulanan | Drill restore; `docker image prune -f` untuk image lama |
-| Setelah HTTPS stabil | Naikkan `SECURE_HSTS_SECONDS` bertahap (DEPLOY_ROLLBACK.md), lalu `docker compose up -d` |
+| Setelah HTTPS stabil | Naikkan `SECURE_HSTS_SECONDS` bertahap (DEPLOY_ROLLBACK.md), lalu `docker compose up -d api proxy` |
 
 ## 12. Masalah umum
 
