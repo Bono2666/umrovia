@@ -555,7 +555,8 @@
   }
 
   /* Fokus — persis template: ring 2px var(--t-text) */
-  .btn:focus-visible {
+  .btn:focus-visible,
+  label.btn:focus-within {
     outline: none;
     box-shadow: 0 0 0 2px var(--brand-ink);
   }
