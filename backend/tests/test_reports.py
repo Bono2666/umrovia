@@ -17,6 +17,7 @@ from modules.reports import export
 from modules.travel_finance.models import TravelExpense
 from modules.wallet.models import WalletLedger
 
+from .pdf_fonts import assert_poppins_only
 from .test_billing import billing as billing
 from .test_billing import fund
 from .test_payment_security import staff
@@ -152,6 +153,7 @@ def test_exports_pdf_xlsx_csv_are_audited(books):
     pdf = client.get(f"/api/v1/reports/finance{WIDE}&file=pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-") and pdf["Content-Disposition"].startswith('attachment; filename="laporan-finance-')
     assert "no-store" in pdf["Cache-Control"]
+    assert_poppins_only(pdf.content)
     xlsx = client.get(f"/api/v1/reports/finance{WIDE}&file=xlsx")
     book = load_workbook(BytesIO(xlsx.content))
     assert book.sheetnames[0] == "Ringkasan" and "Kas & bank per rekening" in book.sheetnames
@@ -159,7 +161,9 @@ def test_exports_pdf_xlsx_csv_are_audited(books):
     assert cash["A1"].value == "Rekening" and cash.cell(cash.max_row, 8).value == 11_500_000
     csv = client.get(f"/api/v1/reports/operational{WIDE}&file=csv")
     assert csv.status_code == 200 and "Kesiapan per keberangkatan" in csv.content.decode("utf-8-sig")
-    assert client.get(f"/api/v1/reports/saas{WIDE}&file=pdf").content.startswith(b"%PDF-")
+    saas_pdf = client.get(f"/api/v1/reports/saas{WIDE}&file=pdf").content
+    assert saas_pdf.startswith(b"%PDF-")
+    assert_poppins_only(saas_pdf)
     assert client.get(f"/api/v1/reports/finance{WIDE}&file=doc").status_code == 400
     assert AuditEvent.objects.filter(action="reports.exported").count() == 4
     assert export._csv_value("=HYPERLINK(1)") == "'=HYPERLINK(1)" and export._csv_value(-5) == -5

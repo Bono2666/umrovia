@@ -11,6 +11,8 @@ from modules.audit.models import AuditEvent
 from modules.payments.models import PaymentAllocation, PaymentEvent, TravelPayment, TravelReceipt
 from modules.tenants.models import TenantEnvironment, TenantSettings
 
+from .pdf_fonts import assert_poppins_only
+
 
 def post(client, url, body=None, key=None):
     csrf = client.get("/api/v1/auth/csrf").json()["csrfToken"]
@@ -76,6 +78,7 @@ def test_room_prices_mixed_booking_and_frozen_invoice(scenario):
     assert again == {key: value for key, value in invoice.items() if key not in {"revisions", "revisable"}}
     pdf = s["client"].get(f"/api/v1/invoices/{invoice['id']}/pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
+    assert_poppins_only(pdf.content)
     assert hashlib.sha256(pdf.content).hexdigest() == invoice["checksum"]
     assert s["client"].get(f"/api/v1/invoices/{invoice['id']}/pdf").content == pdf.content
     assert invoice["invoice_number"].startswith("DEMO-INV-")

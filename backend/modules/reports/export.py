@@ -89,7 +89,7 @@ def to_pdf(report, meta, labels) -> bytes:
     if report.get("checks"):
         story.append(_p("Rekonsiliasi terhadap catatan sumber", s["label"]))
         for check in report["checks"]:
-            story.append(_p(f"{'✓ Sesuai' if check['ok'] else '✗ Selisih'} — {check['label']} ({check['detail']})", s["small"]))
+            story.append(_p(f"{'Sesuai' if check['ok'] else 'Selisih'} — {check['label']} ({check['detail']})", s["small"]))
     decor = _page_decor(meta)
     doc.build(story, onFirstPage=decor, onLaterPages=decor)
     return output.getvalue()
