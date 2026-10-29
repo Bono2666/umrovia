@@ -262,7 +262,7 @@ export default function LeadsPage() {
               </FormSelect>
               <FormField label="Follow-up berikutnya (opsional)" htmlFor="activity-follow-up" type="datetime-local" value={activity.next_follow_up_at} onChange={(event) => setActivity({...activity, next_follow_up_at: event.target.value})} />
             </div>
-            <div className="mt-6"><FormTextarea label="Hasil/catatan" htmlFor="activity-body" rows={3} maxLength={2000} value={activity.body} onChange={(event) => setActivity({...activity, body: event.target.value})} /></div>
+            <FormTextarea label="Hasil/catatan" htmlFor="activity-body" rows={3} maxLength={2000} value={activity.body} onChange={(event) => setActivity({...activity, body: event.target.value})} />
             <Btn type="submit" size="xs" loading={busy} disabled={!activity.body.trim() && !activity.next_follow_up_at}>Simpan aktivitas</Btn>
           </form>
         </> : <p className="mt-5 text-sm text-muted">Workspace ini hanya-baca.</p>}

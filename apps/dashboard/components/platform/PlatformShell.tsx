@@ -129,7 +129,7 @@ function MfaEnroll({onDone}: {onDone: () => void}) {
       <p className="text-sm">Tambahkan akun baru di aplikasi autentikator dengan kunci berikut (jenis: berbasis waktu):</p>
       <p className="mt-2 break-all border border-border bg-surface p-3 font-mono text-sm tracking-wider">{secret.secret.match(/.{1,4}/g)?.join(" ")}</p>
       <a className="mt-2 inline-block text-xs text-primary underline" href={secret.otpauth_uri}>Buka di aplikasi autentikator (perangkat ini)</a>
-      <div className="mt-4"><FormField label="Kode 6 digit dari aplikasi" htmlFor="mfa-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))} required /></div>
+      <FormField label="Kode 6 digit dari aplikasi" htmlFor="mfa-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))} required />
       <Btn type="submit" loading={busy} disabled={code.length !== 6}>Aktifkan MFA</Btn>
     </form>}
   </Centered>;
