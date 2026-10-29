@@ -28,6 +28,7 @@ check "Cookie CSRF Secure" '"${CURL[@]}" -D - -o /dev/null "$API/api/v1/auth/csr
 check "Halaman login app 200" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code}" "$APP/login")" = 200 ]'
 check "Header keamanan app (X-Frame-Options)" '"${CURL[@]}" -D - -o /dev/null "$APP/login" | grep -qi "^x-frame-options: DENY"'
 check "Situs marketing (domain utama) 200" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code}" "$SITE/")" = 200 ]'
+check "Gambar marketing dilayani domain utama" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code} %{content_type}" "$SITE/marketing/ringkasan.webp")" = "200 image/webp" ]'
 check "www → domain utama" '"${CURL[@]}" -D - -o /dev/null "https://www.$SITE_HOST$SUFFIX/pricing" | grep -qi "^location: $SITE/pricing"'
 check "Rute aplikasi di domain utama → host app" '"${CURL[@]}" -D - -o /dev/null "$SITE/login" | grep -qi "^location: $APP/login"'
 check "Host app / → /login, marketing → domain utama" '"${CURL[@]}" -D - -o /dev/null "$APP/" | grep -qi "^location: /login" && "${CURL[@]}" -D - -o /dev/null "$APP/pricing" | grep -qi "^location: $SITE/pricing"'

@@ -24,7 +24,7 @@
 	tls {$CADDY_TLS}
 	import security_headers
 	encode zstd gzip
-	@app not path / /pricing /kontak /kebijakan-privasi /_next/* /brand/* /favicon.ico /icon.png /apple-icon.png
+	@app not path / /pricing /kontak /kebijakan-privasi /_next/* /brand/* /marketing/* /favicon.ico /icon.png /apple-icon.png
 	redir @app https://{$APP_HOST}{$PUBLIC_PORT_SUFFIX}{uri} 308
 	reverse_proxy web:3000
 }
