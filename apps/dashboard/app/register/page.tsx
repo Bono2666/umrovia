@@ -88,23 +88,21 @@ export default function RegisterPage() {
                 Buka link verifikasi (mode pengembangan)
               </a>
             )}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <BtnLink href="/login" size="md">
-                Masuk
-              </BtnLink>
-              <BtnLink href="/forgot-password" size="md" variant="tint">
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <BtnLink href="/login">Masuk</BtnLink>
+              <BtnLink href="/forgot-password" variant="tint">
                 Lupa password
               </BtnLink>
-              <Btn
-                size="md"
-                variant="link"
+              <button
+                type="button"
+                className="font-semibold text-primary hover:text-primary-hover"
                 onClick={() => {
                   setSentTo(null);
                   setDevUrl(null);
                 }}
               >
                 Ganti email
-              </Btn>
+              </button>
             </div>
           </div>
         ) : (
