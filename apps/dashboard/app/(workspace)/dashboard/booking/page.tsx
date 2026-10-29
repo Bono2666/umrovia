@@ -440,8 +440,8 @@ export default function BookingPage() {
             <ul className="mt-4 divide-y divide-border/60">
               {visible.map((booking) => (
                 <li key={booking.id} className="py-4 text-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                    <div className="min-w-0">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                    <div className="min-w-0 sm:flex-1">
                       <p className="flex flex-wrap items-center gap-2 font-semibold">
                         {booking.code}
                         <StatusBadge tone={STATUS_TONE[booking.status] ?? "neutral"}>
@@ -455,7 +455,7 @@ export default function BookingPage() {
                         {[booking.branch ? `Cabang ${booking.branch.code}` : "", booking.agent ? `Agen ${booking.agent.name}` : "", booking.payer_name ? `Pembayar ${booking.payer_name}` : ""].filter(Boolean).join(" · ")}
                       </p> : null}
                     </div>
-                    <p className="text-xs text-muted sm:text-right">
+                    <p className="text-xs text-muted sm:shrink-0 sm:text-right">
                       <strong className="text-sm text-foreground">{formatIdr(booking.total_amount)}</strong>
                       <br />
                       {booking.participant_count} peserta · {booking.available_seats} kursi tersisa
