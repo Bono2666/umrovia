@@ -17,6 +17,12 @@
 		Cross-Origin-Opener-Policy same-origin
 		-Server
 	}
+	# HSTS satu sumber untuk semua host (defer: menimpa header Django di API).
+	# Rollout bertahap lewat SECURE_HSTS_SECONDS; tanpa preload (DEPLOY_ROLLBACK.md).
+	header {
+		Strict-Transport-Security "max-age={$HSTS_SECONDS:0}; includeSubDomains"
+		defer
+	}
 }
 
 # Situs marketing di domain utama: hanya halaman publik; rute aplikasi dialihkan ke host app.
