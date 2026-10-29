@@ -281,6 +281,9 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
   const permissions = active.permissions;
   const environment = TENANT_STATE[active.tenant.state] ?? { label: active.tenant.state, tone: "neutral" as const };
+  // Pindah workspace atau konversi trial → banner & halaman dipasang ulang agar memuat data
+  // dari workspace/lingkungan baru (tanpa ini halaman tetap menampilkan data demo lama).
+  const contextKey = `${active.tenant.slug}:${active.tenant.state}`;
 
   async function onSwitch(slug: string) {
     if (!slug || slug === active?.tenant.slug) return;
@@ -451,6 +454,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
         {/* Konten halaman */}
         <main className="ml-16 min-w-0 flex-1 space-y-4 p-4 sm:ml-0 sm:p-6">
           <TrialBanner
+            key={`banner:${contextKey}`}
             canConvert={hasPermission(permissions, "trial.convert")}
             onConverted={loadMe}
           />
@@ -469,7 +473,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               <div className="mt-5"><BtnLink href="/dashboard/bantuan">Buka Bantuan</BtnLink></div>
             </section>
           ) : (
-            <WorkspaceReveal>{children}</WorkspaceReveal>
+            <WorkspaceReveal key={`page:${contextKey}`}>{children}</WorkspaceReveal>
           )}
         </main>
       </div>
