@@ -47,12 +47,53 @@ def test_register_creates_user_tenant_and_sends_email(client, settings):
 @pytest.mark.django_db
 def test_register_duplicate_email_is_generic(client):
     """Anti-enumeration: respons sama, tidak ada tenant/workspace baru."""
-    client.post("/api/v1/auth/register", REGISTER_PAYLOAD, content_type="application/json")
+    first = client.post("/api/v1/auth/register", REGISTER_PAYLOAD, content_type="application/json")
     tenants_before = Tenant.objects.count()
     response = client.post("/api/v1/auth/register", REGISTER_PAYLOAD, content_type="application/json")
-    assert response.status_code == 200
-    assert response.json()["status"] == "verification_sent"
+    assert response.status_code == first.status_code == 201
+    assert response.json() == first.json()
     assert Tenant.objects.count() == tenants_before
+
+
+@pytest.mark.django_db
+def test_register_existing_active_email_sends_account_notice(client, mailoutbox):
+    """Email aktif didaftarkan ulang → pemiliknya dapat link masuk & lupa password, maks 1×/jam."""
+    User.objects.create_user(email="lama@travelkita.id", password="kata-sandi-kuat", status=UserStatus.ACTIVE)
+    payload = {**REGISTER_PAYLOAD, "email": "Lama@TravelKita.id", "slug": "slug-lain"}
+
+    for _ in range(3):
+        response = client.post("/api/v1/auth/register", payload, content_type="application/json")
+        assert response.status_code == 201
+
+    assert len(mailoutbox) == 1
+    notice = mailoutbox[0]
+    assert notice.to == ["lama@travelkita.id"]
+    assert "/login" in notice.body and "/forgot-password" in notice.body
+    assert "token=" not in notice.body
+    assert not Tenant.objects.filter(slug="slug-lain").exists()
+
+
+@pytest.mark.django_db
+def test_register_existing_unverified_email_resends_verification(client, mailoutbox):
+    client.post("/api/v1/auth/register", REGISTER_PAYLOAD, content_type="application/json")
+    first_token = _extract_token(mailoutbox[0])
+
+    client.post("/api/v1/auth/register", REGISTER_PAYLOAD, content_type="application/json")
+    assert len(mailoutbox) == 2
+    new_token = _extract_token(mailoutbox[1])
+    assert new_token != first_token
+    verify = client.post("/api/v1/auth/verify-email", {"token": new_token}, content_type="application/json")
+    assert verify.status_code == 200
+
+
+@pytest.mark.django_db
+def test_register_suspended_email_sends_nothing(client, mailoutbox):
+    User.objects.create_user(email="lama@travelkita.id", password="kata-sandi-kuat", status=UserStatus.SUSPENDED)
+    response = client.post(
+        "/api/v1/auth/register", {**REGISTER_PAYLOAD, "email": "lama@travelkita.id"}, content_type="application/json"
+    )
+    assert response.status_code == 201
+    assert mailoutbox == []
 
 
 @pytest.mark.django_db

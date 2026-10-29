@@ -8,14 +8,17 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import models, transaction
 from django.utils import timezone
 
-from modules.identity.models import AuthToken, User, UserStatus
+from modules.identity.models import AuthToken, AuthTokenKind, User, UserStatus
 
 EMAIL_VERIFY_TTL = timedelta(hours=24)
 PASSWORD_RESET_TTL = timedelta(minutes=60)
+# Registrasi ulang dengan email terdaftar: maks satu email petunjuk per jam per akun
+SIGNUP_NOTICE_INTERVAL = timedelta(hours=1)
 
 
 class AuthTokenError(Exception):
@@ -99,6 +102,40 @@ def send_password_reset_email(user: User, raw_token: str) -> str:
         recipient_list=[user.email],
     )
     return url
+
+
+def send_account_exists_email(user: User) -> None:
+    app = settings.TENANT_APP_URL.rstrip("/")
+    send_mail(
+        subject="Umrovia — Anda sudah punya akun",
+        message=(
+            f"Halo,\n\nAda yang mencoba mendaftar Umrovia dengan email ini, padahal email ini "
+            f"sudah terdaftar. Bila itu Anda, langsung masuk saja:\n{app}/login\n\n"
+            f"Lupa password? Atur ulang di sini:\n{app}/forgot-password\n\n"
+            f"Jika bukan Anda, abaikan email ini — akun Anda tetap aman dan tidak ada yang "
+            f"berubah.\n\n— {settings.BRAND_NAME}"
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+    )
+
+
+def notify_existing_signup(user: User, *, ip: str | None = None) -> bool:
+    """Registrasi dengan email yang sudah terdaftar: beri petunjuk ke pemilik email.
+
+    Belum verifikasi → kirim ulang link verifikasi; sudah aktif → email "sudah punya
+    akun" (link masuk & lupa password). Respons API tetap generik (anti-enumeration),
+    dan email dibatasi per akun agar form tidak bisa dipakai membanjiri inbox orang.
+    """
+    if user.status not in (UserStatus.ACTIVE, UserStatus.PENDING_VERIFICATION):
+        return False
+    if not cache.add(f"signup-notice:{user.pk}", 1, int(SIGNUP_NOTICE_INTERVAL.total_seconds())):
+        return False
+    if user.status == UserStatus.PENDING_VERIFICATION:
+        send_verification_email(user, issue_token(user, AuthTokenKind.EMAIL_VERIFY, EMAIL_VERIFY_TTL, ip=ip))
+    else:
+        send_account_exists_email(user)
+    return True
 
 
 def mark_verified(user: User) -> User:
