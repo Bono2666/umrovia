@@ -188,6 +188,25 @@ def test_demo_never_emails_pilgrim_contacts(scenario):
     assert not NotificationJob.objects.exists()
 
 
+def test_demo_emails_only_accepted_portal_account(scenario):
+    """Demo: email hanya ke akun portal aktif (email terbukti lewat undangan), bukan ke kontak jamaah."""
+    s = scenario(environment="demo")
+    set_emails(s)
+    portal_client, access_id, _ = portal(s, 0)  # jamaah 0 menerima undangan di jamaah0@example.test
+    pilgrim_id = s["pilgrims"][0]["id"]
+    Pilgrim.objects.without_tenant_guard().filter(pk=pilgrim_id).update(email="kontak-lain@example.test")
+    pay(s, 0, 1_000_000)
+    pay(s, 1, 1_000_000)  # jamaah 1 punya email tetapi belum ber-portal → hanya portal
+    emails = rows(template_key="payment.verified", channel="EMAIL")
+    assert list(emails.values_list("recipient_email", flat=True)) == ["jamaah0@example.test"]
+    assert run_queue()["sent"] == 1
+    [sent] = [m for m in mail.outbox if "Pembayaran" in m.subject]
+    assert sent.to == ["jamaah0@example.test"] and sent.subject.startswith("[DEMO] ")
+    ok(post(s["client"], f"/api/v1/pilgrims/{pilgrim_id}/portal/revoke", {"access_id": access_id}))
+    pay(s, 0, 500_000)
+    assert rows(template_key="payment.verified", channel="EMAIL").count() == 1  # akses dicabut → tidak ada email baru
+
+
 def test_templates_custom_text_required_variables_and_versions(prod):
     client = prod["client"]
     listing = {t["key"]: t for t in ok(client.get("/api/v1/notification-templates"))["results"]}
