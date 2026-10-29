@@ -57,10 +57,13 @@ class RegisterView(APIView):
 
     def post(self, request):
         # Anti-enumeration: cek email dulu — form ulang (email+sama) selalu
-        # mendapat respons generik, bahkan bila field lain tidak valid.
+        # mendapat respons yang sama persis dengan registrasi baru, bahkan bila
+        # field lain tidak valid. Petunjuk untuk pemilik email dikirim lewat email.
         email = str(request.data.get("email", "")).strip().lower()
-        if email and User.objects.filter(email=email).exists():
-            return Response(GENERIC_VERIFICATION_STATUS, status=status.HTTP_200_OK)
+        existing = User.objects.filter(email=email).first() if email else None
+        if existing is not None:
+            services.notify_existing_signup(existing, ip=_client_ip(request))
+            return Response(GENERIC_VERIFICATION_STATUS, status=status.HTTP_201_CREATED)
 
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
