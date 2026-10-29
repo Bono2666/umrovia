@@ -19,8 +19,14 @@ script pihak ketiga di dashboard dan client key tidak diperlukan.
 ## Kepercayaan dan idempotensi
 
 - Notifikasi `POST /api/v1/payments/midtrans/notification` publik (tanpa sesi
-  atau CSRF). Tanda tangan `SHA512(order_id + status_code + gross_amount +
-  server_key)` diverifikasi dengan perbandingan waktu konstan.
+  atau CSRF) dan hanya **pemicu**. Midtrans menandatanganinya dengan Server Key
+  *utama* merchant, sehingga Server Key berizin terbatas (Snap Write + Core API
+  Read, yang dipakai produksi) tidak dapat memverifikasinya. Karena itu tanda
+  tangan `SHA512(order_id + status_code + gross_amount + server_key)` tidak
+  lagi menjadi syarat: hanya order top-up yang dikenal (`GatewayOrder`) yang
+  dibaca ulang dari Status API; notifikasi tanpa tanda tangan valid untuk
+  top-up yang sudah final dijawab tanpa panggilan keluar; order tak dikenal
+  tidak memicu panggilan apa pun; endpoint dibatasi 120 request/menit per IP.
 - Isi notifikasi **tidak** dipercaya untuk settlement: status dibaca ulang dari
   Status API Midtrans (`GET /v2/{order_id}/status`). `settlement`, atau
   `capture` dengan fraud `accept`, menjadi PAID. `pending`/`challenge` →
@@ -34,7 +40,7 @@ script pihak ketiga di dashboard dan client key tidak diperlukan.
 - Refund/chargeback setelah PAID tidak mendebit otomatis; dicatat untuk
   ditinjau billing. Settlement yang datang setelah top-up REJECTED/EXPIRED
   juga hanya menjadi alert.
-- Respons non-2xx (tanda tangan salah 403, Midtrans tak terjangkau 502)
+- Respons non-2xx (tanpa `order_id` 400, Midtrans tak terjangkau 502)
   membuat Midtrans mengulang notifikasi. Order tak dikenal (mis. notifikasi
   uji dashboard) dijawab 200.
 
