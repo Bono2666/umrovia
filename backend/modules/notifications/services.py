@@ -169,15 +169,29 @@ def _enqueue(*, tenant, environment, event_type, source_key, key, recipient_type
     return created_rows
 
 
+def _portal_email(pilgrim, environment):
+    """Email akun portal aktif jamaah — terbukti miliknya karena undangan portal sudah diterima."""
+    from modules.identity.models import UserStatus
+    from modules.portal.models import PortalAccess, PortalAccessStatus
+
+    access = (PortalAccess.objects.filter(tenant_id=pilgrim.tenant_id, pilgrim_id=pilgrim.pk, environment=environment,
+                                          status=PortalAccessStatus.ACTIVE, user__status=UserStatus.ACTIVE)
+              .select_related("user").order_by("created_at").first())
+    return access.user.email if access else ""
+
+
 def notify_pilgrim(*, pilgrim, environment, event_type, source_key, key, values):
-    """Portal selalu; email hanya produksi dan bila jamaah punya email (demo tidak mengirim ke kontak jamaah)."""
-    channels = [Channel.IN_APP]
-    if environment == "production" and pilgrim.email:
-        channels.append(Channel.EMAIL)
+    """Portal selalu; email ke jamaah yang punya email.
+
+    Produksi: email data jamaah. Demo: hanya ke akun portal aktif (email terbukti lewat
+    undangan), sehingga workspace trial tidak bisa mengirim email ke kontak sembarang.
+    """
+    email = pilgrim.email if environment == "production" else _portal_email(pilgrim, environment)
+    channels = [Channel.IN_APP, Channel.EMAIL] if email else [Channel.IN_APP]
     return _enqueue(
         tenant=pilgrim.tenant, environment=environment, event_type=event_type, source_key=source_key, key=key,
         recipient_type=RecipientType.PILGRIM, recipient_id=pilgrim.pk, recipient_name=pilgrim.name,
-        email=pilgrim.email, values={"nama_jamaah": pilgrim.name, **values}, channels=channels,
+        email=email, values={"nama_jamaah": pilgrim.name, **values}, channels=channels,
     )
 
 
