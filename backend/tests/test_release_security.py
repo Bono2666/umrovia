@@ -42,6 +42,13 @@ def test_production_settings_pass_deploy_check():
     assert security <= {"security.W004"}, security  # HSTS 0 = rollout bertahap (didokumentasikan)
 
 
+def test_hsts_rollout_never_enables_preload_implicitly():
+    """Menaikkan SECURE_HSTS_SECONDS tidak boleh ikut menyalakan preload (keputusan terpisah)."""
+    code = "from django.conf import settings as s; print(s.SECURE_HSTS_SECONDS, s.SECURE_HSTS_INCLUDE_SUBDOMAINS, s.SECURE_HSTS_PRELOAD)"
+    result = manage("shell", "-c", code, env=production_env(SECURE_HSTS_SECONDS="31536000"))
+    assert result.stdout.split()[-3:] == ["31536000", "True", "False"], result.stderr[-2000:]
+
+
 @pytest.mark.parametrize("missing", [{"SECRET_KEY": None}, {"PII_ENCRYPTION_KEY": None}, {"ALLOWED_HOSTS": "localhost,127.0.0.1"}])
 def test_production_settings_fail_fast_without_secrets(missing):
     result = manage("check", env=production_env(**missing))

@@ -17,7 +17,9 @@ if not env_bool("ALLOW_INSECURE", "False"):
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = int(env("SECURE_HSTS_SECONDS", "0") or "0")  # staged rollout dulu 0
     SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
-    SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
+    # Header HSTS untuk semua host dikirim Caddy (infra/deploy/Caddyfile); Django tetap sama untuk API.
+    # Preload praktis tak bisa dibatalkan cepat → hanya dengan keputusan tertulis (DEPLOY_ROLLBACK.md).
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", "False")
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
