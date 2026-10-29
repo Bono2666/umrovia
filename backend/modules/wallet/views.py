@@ -203,11 +203,12 @@ class TopupRefreshView(APIView):
 
 
 class MidtransNotificationView(APIView):
-    """Public Midtrans HTTP notification. No session/CSRF; trust comes from the
-    SHA-512 signature plus a status API re-read. Non-2xx makes Midtrans retry."""
+    """Public Midtrans HTTP notification. No session/CSRF; trust comes only from
+    re-reading the status API for known orders. Non-2xx makes Midtrans retry."""
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_scope = "midtrans-notify"
 
     @extend_schema(request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT, auth=[])
     def post(self, request):

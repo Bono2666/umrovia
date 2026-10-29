@@ -136,14 +136,31 @@ def test_forged_or_stale_notification_never_credits(gateway):
     s = gateway
     t = online(s)
     order = f"TOP-{t['id']}"
+    # Payload yang mengklaim settlement tidak dipercaya: Status API (truth) bilang pending.
+    s["fake"].set(order, "pending", gross="100000.00")
     bad = signed(order)
     bad["signature_key"] = "0" * 128
-    assert notify(bad).status_code == 403
-    assert notify({"order_id": order}).status_code == 403
-    # Valid signature claims settlement, but the status API (truth) says pending.
-    s["fake"].set(order, "pending", gross="100000.00")
-    assert notify(signed(order)).json()["status"] == "PENDING"
+    for body in (bad, {"order_id": order, "transaction_status": "settlement"}, signed(order)):
+        assert notify(body).json()["status"] == "PENDING"
+    assert notify({"transaction_status": "settlement"}).status_code == 400
     assert balance(s) == 0 and WalletLedger.objects.without_tenant_guard().count() == 0
+
+
+def test_unsigned_notification_settles_via_status_api(gateway):
+    """Key berizin terbatas tak bisa memverifikasi tanda tangan (Midtrans memakai Server Key utama):
+    notifikasi tetap memicu pembacaan Status API, dan top-up final tidak memicu panggilan keluar."""
+    s = gateway
+    t = online(s)
+    order = f"TOP-{t['id']}"
+    s["fake"].set(order, "settlement", txn="mid-txn-scoped")
+    unsigned = {"order_id": order, "status_code": "200", "gross_amount": "100000.00", "signature_key": "f" * 128}
+    assert notify(unsigned).json()["status"] == "PAID"
+    assert balance(s) == 100_000
+    s["fake"].unreachable = True  # top-up sudah PAID: tidak ada panggilan Status API lagi
+    assert notify(unsigned).json()["status"] == "PAID"
+    assert WalletLedger.objects.without_tenant_guard().count() == 1
+    unknown = notify({"order_id": f"TOP-{uuid4()}"})
+    assert unknown.status_code == 200 and unknown.json()["status"] is None
 
 
 def test_amount_mismatch_is_flagged_not_credited(gateway):

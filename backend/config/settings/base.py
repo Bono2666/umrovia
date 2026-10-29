@@ -146,6 +146,7 @@ REST_FRAMEWORK = {
         "auth-forgot": "5/hour",
         "anon": "60/min",
         "contact-submit": "5/hour",
+        "midtrans-notify": "120/min",
         "portal-invite": "30/hour",
         "portal-upload": "60/hour",
         "platform-mfa": "10/min",

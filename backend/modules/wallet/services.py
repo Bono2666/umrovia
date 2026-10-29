@@ -371,14 +371,26 @@ def _fetch(order):
 
 
 def handle_gateway_notification(payload):
-    """Webhook: signature first, then the status API as source of truth."""
-    if not isinstance(payload, dict) or not midtrans.valid_signature(payload):
-        raise PermissionDenied("Tanda tangan notifikasi tidak valid.")
-    mapping = GatewayOrder.objects.filter(order_id=payload["order_id"]).first()
+    """Webhook = trigger only; the status API (our own key) is the source of truth.
+
+    Midtrans signs notifications with the merchant's primary Server Key, so a
+    scoped key cannot verify them. A notification therefore never credits by
+    itself: only known orders are re-read from the status API, and an unsigned
+    one for a finished top-up is acknowledged without any outbound call.
+    """
+    order = payload.get("order_id") if isinstance(payload, dict) else None
+    if not isinstance(order, str) or not order:
+        raise ValidationError({"order_id": "Wajib diisi."})
+    mapping = GatewayOrder.objects.filter(order_id=order).first()
     if mapping is None:
         # E.g. the dashboard's test notification; acknowledge so it stops retrying.
         logger.info("midtrans_unknown_order")
         return None
+    if not midtrans.valid_signature(payload):
+        with platform_tenant_context(mapping.tenant_id):
+            current = WalletTopup.objects.filter(pk=mapping.topup_id).values_list("status", flat=True).first()
+        if current in TERMINAL_TOPUP:
+            return current
     status = _fetch(mapping.order_id)
     with platform_tenant_context(mapping.tenant_id):
         return apply_gateway_status(topup_id=mapping.topup_id, status=status).status
