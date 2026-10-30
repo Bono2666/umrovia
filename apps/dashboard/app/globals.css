@@ -1308,6 +1308,10 @@
   letter-spacing: -0.01em;
   line-height: 1.4;
 }
+/* Ringkasan error form tepat di atas tombol simpan: beri jarak agar tidak menempel. */
+.workspace-shell .error-message + .form-submit {
+  margin-top: 16px;
+}
 .workspace-shell .form-control__suffix {
   font-size: 12px;
 }
