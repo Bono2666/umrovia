@@ -60,14 +60,29 @@ export function FloatingNotice({
 
 /**
  * Gulir halus ke baris data `[data-record="<id>"]` lalu sorot sebentar, agar pengguna melihat
- * data yang baru dibuat/diubah. Daftar biasanya dimuat ulang setelah simpan, jadi baris
- * ditunggu hingga 5 detik dan baru dipakai setelah stabil (simpul yang sama dua kali
- * berturut-turut, bukan baris lama yang segera diganti saat daftar dirender ulang).
- * Bila baris tidak tampil (mis. tersaring filter atau di halaman lain), tidak terjadi apa-apa.
+ * data yang baru dibuat/diubah. Bila baris tidak tampil (mis. tersaring filter atau di
+ * halaman lain), tidak terjadi apa-apa.
  */
 export function focusRecord(id: string | number | null | undefined) {
-  if (id === null || id === undefined || typeof document === "undefined") return;
-  const selector = `[data-record="${CSS.escape(String(id))}"]`;
+  if (id === null || id === undefined) return;
+  reveal(`[data-record="${CSS.escape(String(id))}"]`, "center", true);
+}
+
+/**
+ * Gulir halus ke panel detail `[data-detail]` yang baru dibuka (mis. tombol Detail jamaah),
+ * sehingga panel yang muncul di bawah daftar atau di kolom lain langsung terlihat.
+ */
+export function focusDetail() {
+  reveal("[data-detail]", "start", false);
+}
+
+/**
+ * Elemen biasanya baru dirender setelah data dimuat, jadi ditunggu hingga 5 detik dan baru
+ * dipakai setelah stabil (simpul yang sama dua kali berturut-turut, bukan elemen lama yang
+ * segera diganti saat daftar dirender ulang). Tidak menggulir bila elemen sudah terlihat.
+ */
+function reveal(selector: string, block: "start" | "center", highlight: boolean) {
+  if (typeof document === "undefined") return;
   const deadline = Date.now() + 5000;
   let previous: Element | null = null;
   const poll = () => {
@@ -75,18 +90,29 @@ export function focusRecord(id: string | number | null | undefined) {
     if (element && element === previous) {
       const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
       const box = element.getBoundingClientRect();
-      const visible = box.top >= 72 && box.bottom <= window.innerHeight;
+      const visible = block === "start"
+        ? box.top >= 72 && box.top <= window.innerHeight * 0.6
+        : box.top >= 72 && box.bottom <= window.innerHeight;
+      const done = () => { if (highlight) flash(element); };
       if (visible) {
-        flash(element);
+        done();
         return;
       }
-      element.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+      // Hitung sendiri (bukan scrollIntoView) agar elemen tidak berhenti di balik header sticky 56px.
+      const top = block === "start"
+        ? box.top - 80
+        : box.top - (window.innerHeight - Math.min(box.height, window.innerHeight - 160)) / 2;
+      window.scrollBy({ top, behavior: reduce ? "auto" : "smooth" });
       // Sorot setelah guliran selesai, bukan saat mulai bergulir (guliran jauh butuh ±1 detik).
-      let done = false;
+      let finished = false;
       const finish = () => {
-        if (done) return;
-        done = true;
-        flash(element);
+        if (finished) return;
+        finished = true;
+        // Panel detail bisa bertambah tinggi saat datanya menyusul (dokumen, keluarga), sehingga
+        // guliran pertama mentok di batas bawah halaman lama: koreksi sekali ke posisi semestinya.
+        const rest = element.getBoundingClientRect().top - 80;
+        if (block === "start" && Math.abs(rest) > 24) window.scrollBy({ top: rest, behavior: reduce ? "auto" : "smooth" });
+        done();
       };
       window.addEventListener("scrollend", finish, { once: true });
       setTimeout(finish, reduce ? 0 : 1200); // browser tanpa event scrollend
