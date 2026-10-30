@@ -325,7 +325,7 @@ def record_payment(*, invoice_id, actor, data):
                 simulated=simulated, created_by=actor,
             )
     except IntegrityError:
-        raise Conflict("Referensi pembayaran sudah pernah dicatat.") from None
+        raise Conflict({"reference": "Referensi pembayaran sudah pernah dicatat."}) from None
     for row in allocations:
         PaymentAllocation.objects.create(
             tenant=booking.tenant, environment=booking.environment, payment=payment,

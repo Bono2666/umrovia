@@ -194,7 +194,7 @@ class PaymentDetailView(APIView):
             with transaction.atomic():
                 payment.save(update_fields=[*serializer.validated_data, "updated_at"])
         except IntegrityError:
-            raise services.Conflict("Referensi pembayaran sudah pernah dicatat.") from None
+            raise services.Conflict({"reference": "Referensi pembayaran sudah pernah dicatat."}) from None
         log_event(action="payments.evidence.updated", request=request, object_type="payment", object_id=payment.pk)
         return Response(payment_payload(payment))
 
