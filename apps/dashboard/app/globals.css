@@ -744,6 +744,20 @@
       background-color 1ms ease-in-out 5000s !important;
   }
 
+  /* Nilai isian otomatis sebelum ada interaksi: Chrome merendernya dengan font sistem dan
+     warna hitam (nilai belum boleh dibaca halaman), mengabaikan font input. ::first-line
+     tetap dihormati — samakan tipografi & warna dengan nilai yang diketik. */
+  .form-control--input input:-webkit-autofill {
+    -webkit-text-fill-color: var(--form-text);
+    caret-color: var(--form-text);
+  }
+  .form-control--input input:-webkit-autofill::first-line {
+    font-family: var(--font-poppins), system-ui, sans-serif;
+    font-size: calc(var(--scale-rem) * 1.8);
+    font-weight: 400;
+    letter-spacing: -0.05em;
+  }
+
   /* Label — tipografi identik input (rule gabungan template), versi float
      absolut di kiri-atas; dihover/fokus/terisi naik + mengecil */
   .form-label {
@@ -1283,6 +1297,10 @@
 .workspace-shell .form-control--float input:autofill ~ .form-label {
   transform: translateY(-16px) scale(0.857143);
 }
+.workspace-shell .form-control--input input:-webkit-autofill::first-line {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
 .workspace-shell .form-control__hint,
 .workspace-shell .error-message {
   margin-top: 8px;
@@ -1301,6 +1319,9 @@
   .workspace-shell .form-control--input input,
   .workspace-shell .form-control--select select,
   .workspace-shell .form-control--textarea textarea {
+    font-size: 16px;
+  }
+  .workspace-shell .form-control--input input:-webkit-autofill::first-line {
     font-size: 16px;
   }
 }
