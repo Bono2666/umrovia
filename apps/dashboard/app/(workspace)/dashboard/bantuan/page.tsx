@@ -5,7 +5,7 @@ import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, Loadi
 import { TICKET_TONE, TicketThread } from "@/components/support/TicketThread";
 import { apiFetch, problemMessage, type Paginated, type SupportTicket } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusDetail, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const CATEGORIES = [["TECHNICAL", "Kendala teknis"], ["BILLING", "SaaS Wallet & tagihan"], ["ACCOUNT", "Akun & akses"], ["DATA", "Data & privasi"], ["OTHER", "Lainnya"]];
 const EMPTY = {subject: "", category: "TECHNICAL", body: ""};
@@ -28,7 +28,7 @@ export default function SupportPage() {
   async function open(id: string) {
     setCreating(false); setError(null); setMessage(null);
     const result = await apiFetch<SupportTicket>(`/support/tickets/${id}`);
-    if (result.ok) setSelected(result.data); else setError(problemMessage(result.error));
+    if (result.ok) {setSelected(result.data); focusDetail();} else setError(problemMessage(result.error));
   }
 
   async function create(event: React.FormEvent) {

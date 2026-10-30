@@ -16,7 +16,7 @@ export function TicketThread({ticket, platform = false, busy, onReply, actions}:
 }) {
   const [body, setBody] = useState("");
   const [internal, setInternal] = useState(false);
-  return <section className="card min-w-0 p-6">
+  return <section data-detail className="card min-w-0 p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="text-xs text-muted">{ticket.number} · {ticket.category_label}{platform && ticket.tenant ? ` · ${ticket.tenant.display_name}` : ""}</p>

@@ -27,7 +27,7 @@ import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/for
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
 import { PilgrimExtras } from "@/components/workspace/PilgrimExtras";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusDetail, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const DOC_KIND: Record<string, string> = { ktp: "KTP", passport: "Paspor", photo: "Foto", kk: "Kartu Keluarga", other: "Dokumen lain" };
 const DOC_STATUS: Record<string, string> = { UPLOADED: "Menunggu review", UNDER_REVIEW: "Ditinjau", APPROVED: "Disetujui", REJECTED: "Ditolak" };
@@ -104,6 +104,7 @@ export default function JamaahPage() {
 
   function openDetail(pilgrim: Pilgrim) {
     setSelected(pilgrim);
+    focusDetail();
     setDocuments([]);
     setPortal(null);
     setInviteEmail(pilgrim.email || "");
@@ -375,7 +376,7 @@ export default function JamaahPage() {
         )}
 
         {selected ? (
-          <div className="mt-6 border-t border-border/60 pt-4">
+          <div data-detail className="mt-6 border-t border-border/60 pt-4">
             <h3 className="font-semibold">
               {selected.name}{" "}
               <code className="ml-2 border border-border bg-background px-2 py-0.5 text-xs">

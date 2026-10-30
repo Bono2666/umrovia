@@ -5,6 +5,7 @@ import { TICKET_TONE, TicketThread } from "@/components/support/TicketThread";
 import { Btn, EmptyState, ErrorState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Paginated, type SupportTicket } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
+import { focusDetail } from "@/components/workspace/FloatingNotice";
 
 const STATUSES = [["OPEN", "Terbuka"], ["IN_PROGRESS", "Diproses"], ["WAITING_TENANT", "Menunggu travel"], ["RESOLVED", "Selesai"]];
 
@@ -19,7 +20,7 @@ export default function PlatformSupportPage() {
 
   async function open(id: string) {
     const r = await apiFetch<SupportTicket>(`/platform/support/tickets/${id}`);
-    if (r.ok) setTicket(r.data); else setError(problemMessage(r.error));
+    if (r.ok) {setTicket(r.data); focusDetail();} else setError(problemMessage(r.error));
   }
   async function reply(body: string, internal: boolean) {
     if (!ticket) return false;
