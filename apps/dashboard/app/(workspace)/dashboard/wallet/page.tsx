@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, BtnLink, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, BtnLink, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasCharge, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
@@ -152,7 +152,7 @@ export default function WalletPage() {
   return <div className="workspace-page">
     <div className="flex flex-wrap items-center justify-between gap-3"><RevealText as="h1" variant="title" className="text-2xl font-bold">SaaS Wallet</RevealText><Btn variant="solid" onClick={() => {setError(null); void load();}}>Perbarui</Btn></div>
     <p className="mt-1 text-sm text-muted">Saldo prabayar untuk biaya layanan Umrovia. Dana DP dan pembayaran jamaah tercatat terpisah pada Pembayaran.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     {!wallet ? (error ? null : <div className="mt-6"><LoadingState /></div>) : <>
       {wallet.environment === "demo" ? <p className="mt-4 border border-border p-4 text-sm text-muted">Mode demo tidak memakai saldo atau transaksi wallet nyata. Top-up tersedia setelah travel beralih ke produksi.</p> : null}

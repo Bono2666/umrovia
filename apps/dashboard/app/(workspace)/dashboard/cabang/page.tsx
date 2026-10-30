@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Branch, type MembershipRow } from "@/lib/api";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -67,7 +67,7 @@ export default function BranchesPage() {
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Cabang</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Kantor cabang atau unit kerja. Booking, lead, pengeluaran dan transfer kas ditandai per cabang. Peran berakses “cabang sendiri” (default: Sales, Operations, Document Reviewer) hanya melihat cabang yang ditugaskan; Owner, Admin dan Finance melihat semua cabang. Atur cakupan peran di Pengguna & Role.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">

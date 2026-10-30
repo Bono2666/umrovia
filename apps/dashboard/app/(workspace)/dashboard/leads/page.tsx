@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, BtnLink, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, BtnLink, EmptyState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Departure, type Lead, type LeadStage, type LeadSummary, type Paginated, type TravelPackage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
@@ -141,7 +141,7 @@ export default function LeadsPage() {
       {writable ? <Btn onClick={startCreate}>Tambah lead</Btn> : null}
     </div>
     <p className="mt-1 max-w-3xl text-sm text-muted">Kelola calon jamaah dari pertama menghubungi hingga terdaftar. Lead gratis — biaya layanan hanya untuk jamaah dengan DP terverifikasi.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     {summary ? <>

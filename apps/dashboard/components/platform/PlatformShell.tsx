@@ -7,8 +7,9 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { UmroviaMark } from "@/components/UmroviaMark";
 import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
-import { Btn, ErrorState, FormField, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, FormField, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type PlatformSession, type UserPayload } from "@/lib/api";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 type Ctx = {session: PlatformSession; can: (perm: string) => boolean; refresh: () => void};
 const PlatformContext = createContext<Ctx | null>(null);
@@ -121,7 +122,7 @@ function MfaEnroll({onDone}: {onDone: () => void}) {
   </Centered>;
   return <Centered title="Aktifkan MFA konsol platform">
     <p className="mt-2 text-sm text-muted">Konsol platform wajib memakai aplikasi autentikator (Google Authenticator, Microsoft Authenticator, 1Password, dsb.).</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     {!secret ? <form className="mt-5" onSubmit={start}>
       <FormField label="Konfirmasi password" htmlFor="mfa-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
       <Btn type="submit" loading={busy} disabled={!password}>Mulai pendaftaran</Btn>
@@ -148,7 +149,7 @@ function MfaVerify({email, onDone}: {email: string; onDone: () => void}) {
   }
   return <Centered title="Verifikasi MFA">
     <p className="mt-2 text-sm text-muted">Masuk sebagai {email}. Masukkan {recovery ? "salah satu kode pemulihan" : "kode 6 digit dari aplikasi autentikator"} untuk membuka konsol.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <form className="mt-5" onSubmit={submit}>
       <FormField label={recovery ? "Kode pemulihan" : "Kode autentikator"} htmlFor="mfa-verify" inputMode={recovery ? "text" : "numeric"} autoComplete="one-time-code" maxLength={recovery ? 20 : 6} value={code}
         onChange={(event) => setCode(recovery ? event.target.value : event.target.value.replace(/\D/g, ""))} required />

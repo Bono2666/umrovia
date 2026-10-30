@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { API_BASE, apiFetch, apiUpload, problemMessage, type Departure, type Paginated, type TravelExpense } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
@@ -114,7 +114,7 @@ export default function ExpensesPage() {
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Pengeluaran</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Catat biaya perjalanan dan operasional travel agar laporan kas/bank dan margin estimasi per keberangkatan lengkap. Pengeluaran tidak diedit; batalkan lalu catat ulang bila perlu koreksi.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">

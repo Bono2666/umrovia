@@ -5,7 +5,6 @@ import {
   Btn,
   BtnFile,
   EmptyState,
-  ErrorState,
   FormField,
   FormCheckbox,
   FormSelect,
@@ -27,7 +26,7 @@ import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/for
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
 import { PilgrimExtras } from "@/components/workspace/PilgrimExtras";
-import { FloatingNotice, focusDetail, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusDetail, focusError, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const DOC_KIND: Record<string, string> = { ktp: "KTP", passport: "Paspor", photo: "Foto", kk: "Kartu Keluarga", other: "Dokumen lain" };
 const DOC_STATUS: Record<string, string> = { UPLOADED: "Menunggu review", UNDER_REVIEW: "Ditinjau", APPROVED: "Disetujui", REJECTED: "Ditolak" };
@@ -237,7 +236,7 @@ export default function JamaahPage() {
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors(apiFormErrors(result.error));
+      setFormErrors(apiFormErrors(result.error)); focusError();
       return;
     }
     if (editing) setSelected(result.data);
@@ -312,11 +311,7 @@ export default function JamaahPage() {
       </p>
 
       <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-      {error ? (
-        <div className="mt-4">
-          <ErrorState message={error} />
-        </div>
-      ) : null}
+      <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
 
       <div className="workspace-columns mt-6">
       <section className="card p-6">

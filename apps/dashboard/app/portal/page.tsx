@@ -13,6 +13,7 @@ import {
 import { formatDate, formatIdr, formatMasked } from "@/lib/format";
 import { ROOM_LABELS } from "@/lib/rooms";
 import type { RoomType } from "@/lib/api";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 const STEPS = ["Terdaftar", "Menunggu DP", "DP diterima", "Terkonfirmasi", "Siap berangkat", "Berangkat", "Selesai"];
 const DOC_STATUS: Record<string, { label: string; tone: "neutral" | "success" | "warning" | "danger" }> = {
@@ -290,8 +291,8 @@ function DocumentsPanel({ accessId }: { accessId: string }) {
       <h2 className="font-semibold">Dokumen perjalanan</h2>
       <p className="mt-1 text-sm text-muted">Unggah PDF, JPG atau PNG (maks. 10 MB). Travel akan meninjau setiap dokumen.</p>
       <input ref={input} type="file" accept={ACCEPT} className="hidden" onChange={onFile} aria-label="Pilih berkas dokumen" />
-      {message ? <p className="mt-3 text-sm text-success" role="status">{message}</p> : null}
-      {error ? <p className="mt-3 text-sm text-danger" role="alert">{error}</p> : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
+      <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
       {items === null ? <div className="mt-4"><LoadingState /></div> : (
         <ul className="mt-4 divide-y divide-border/60">
           {items.length === 0 ? <li className="py-3 text-sm text-muted">Travel belum menetapkan dokumen wajib. Anda tetap dapat mengunggah dokumen di bawah.</li> : null}
@@ -366,8 +367,8 @@ function ProfileCard({ accessId, profile, onSaved }: { accessId: string; profile
         <FormTextarea label="Alamat" htmlFor={`p-address-${accessId}`} value={form.address} maxLength={500} onChange={(event) => setForm({ ...form, address: event.target.value })} />
         <FormField label="Kontak darurat" htmlFor={`p-ec-${accessId}`} value={form.emergency_contact_name} maxLength={160} onChange={(event) => setForm({ ...form, emergency_contact_name: event.target.value })} />
         <FormField label="HP kontak darurat" htmlFor={`p-ecp-${accessId}`} inputMode="tel" value={form.emergency_contact_phone} onChange={(event) => setForm({ ...form, emergency_contact_phone: event.target.value })} />
-        {error ? <p className="error-message" role="alert">{error}</p> : null}
-        {message ? <p className="mb-3 text-sm text-success" role="status">{message}</p> : null}
+        <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
+        <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
         <Btn type="submit" loading={busy} disabled={!changed.length}>Simpan kontak</Btn>
       </form>
     </section>
@@ -408,7 +409,7 @@ function IdentityCorrection({ accessId, requests, onSent }: { accessId: string; 
       {pending ? <p className="mt-4 text-sm text-muted">Permintaan Anda sedang diverifikasi. Anda dapat mengajukan koreksi lain setelah diputuskan.</p> : <form className="mt-5" onSubmit={submit}>
         <div className="grid gap-x-4 sm:grid-cols-2">{IDENTITY_FIELDS.map(([key, label, type]) => <FormField key={key} label={label} htmlFor={`idc-${key}-${accessId}`} type={type} value={values[key] ?? ""} onChange={(event) => setValues({ ...values, [key]: event.target.value })} />)}</div>
         <FormTextarea label="Alasan koreksi" htmlFor={`idc-reason-${accessId}`} value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} />
-        {error ? <p className="error-message" role="alert">{error}</p> : null}
+        <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
         <Btn type="submit" loading={busy} disabled={!reason.trim() || !Object.values(values).some((v) => v.trim())}>Ajukan koreksi</Btn>
       </form>}
     </section>

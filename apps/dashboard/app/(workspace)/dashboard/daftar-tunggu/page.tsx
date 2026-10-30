@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Departure, type Pilgrim, type RoomType, type WaitlistEntry } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { ROOM_LABELS } from "@/lib/rooms";
@@ -86,7 +86,7 @@ export default function WaitlistPage() {
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Daftar tunggu</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Calon jamaah untuk keberangkatan yang kursinya penuh. Daftar tunggu tidak menahan kursi; saat ada pembatalan, proses dari urutan teratas menjadi booking draf lalu reservasi kursi di halaman Booking.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">

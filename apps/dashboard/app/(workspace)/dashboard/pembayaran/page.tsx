@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormCheckbox, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { API_BASE, apiFetch, problemMessage, type ChargePreview, type Paginated, type TravelInvoice, type TravelPayment } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
+import { formErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
 import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
@@ -52,6 +53,7 @@ export default function PaymentsPage() {
   const [allocations,setAllocations] = useState<Record<string,string>>({});
   const [simulate,setSimulate] = useState(false);
   const [error,setError] = useState<string|null>(null);
+  const [fieldErrors,setFieldErrors] = useState<Record<string,string>>({});
   const [message,setMessage] = useState<string|null>(null);
   const [busy,setBusy] = useState(false);
   const keys = useRef(new Map<string,{signature:string;key:string}>());
@@ -94,14 +96,15 @@ export default function PaymentsPage() {
   }
 
   async function create(event:React.FormEvent){
-    event.preventDefault();setError(null);setMessage(null);
+    event.preventDefault();setError(null);setMessage(null);setFieldErrors({});
     if(!invoice||!receivedAt)return;
     const entries=Object.entries(allocations).filter(([,value])=>Number(value)>0).map(([booking_participant_id,value])=>({booking_participant_id,amount_idr:Number(value)}));
     const body={invoice:invoice.id,amount_idr:Number(amount),kind,method,received_at:new Date(receivedAt).toISOString(),bank_account:accountId||null,reference,evidence_ref:evidence,allocations:entries,simulate:invoice.environment==="demo"&&simulate};
     setBusy(true);
     const result=await apiFetch<TravelPayment>("/payments",{method:"POST",headers:{"Idempotency-Key":operationKey("record",body)},body:JSON.stringify(body)});
     setBusy(false);
-    if(!result.ok){setError(problemMessage(result.error));return;}
+    // Error per field (mis. referensi ganda) ditandai di field-nya; FloatingNotice danger menggulir ke sana.
+    if(!result.ok){setFieldErrors(formErrors(result.error));setError(problemMessage(result.error));return;}
     focusRecord(result.data.id);
     setMessage("Pembayaran tercatat dan diajukan untuk verifikasi.");
     resetForm();load();
@@ -109,7 +112,7 @@ export default function PaymentsPage() {
 
   // Form kembali kosong setelah dicatat agar pembayaran yang sama tidak terajukan dua kali.
   function resetForm(){
-    keys.current.delete("record");
+    keys.current.delete("record");setFieldErrors({});
     setInvoiceSearch("");setInvoiceId("");setAmount("");setKind("DP");setMethod("TRANSFER");setReceivedAt("");
     setAccountId("");setReference("");setEvidence("");setAllocations({});setSimulate(false);
     // ?invoice= dari tautan "Lihat pembayaran" akan memilih ulang invoice saat daftar dimuat ulang.
@@ -151,7 +154,7 @@ export default function PaymentsPage() {
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Pembayaran</RevealText>
     <p className="mt-1 text-sm text-muted">Catat DP, cicilan, atau pelunasan dan alokasikan nominal ke masing-masing jamaah. Kuitansi diterbitkan setelah dana diverifikasi.</p>
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-    {error?<div className="mt-4"><ErrorState message={error}/></div>:null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <div className="workspace-columns mt-6">
       <section className="card p-6"><h2 className="font-semibold">Riwayat pembayaran</h2>
         {visiblePayments===null?<LoadingState/>:visiblePayments.length===0?<div className="mt-4"><EmptyState title="Belum ada pembayaran"/></div>:<ul className="mt-4 divide-y divide-border">{visiblePayments.map((payment)=><li key={payment.id} data-record={payment.id} className="py-4 text-sm">
@@ -176,13 +179,13 @@ export default function PaymentsPage() {
         <form onSubmit={create} className="mt-6">
           <FormField label="Cari invoice (nomor, kode booking, pelanggan)" htmlFor="payment-invoice-search" value={invoiceSearch} onChange={(event)=>setInvoiceSearch(event.target.value)} hint="Daftar menampilkan hingga 200 invoice terbuka terbaru."/>
           <FormSelect label="Invoice" htmlFor="payment-invoice" value={invoiceId} required onChange={(event)=>{setInvoiceId(event.target.value);setPage(1);setAllocations({});setSimulate(false);}}><option value="">— pilih invoice —</option>{invoices.map((row)=><option key={row.id} value={row.id} disabled={["VOIDED","PAID"].includes(row.status)}>{row.invoice_number} · sisa {formatIdr(row.balance_idr)}</option>)}</FormSelect>
-          <FormField label="Nominal diterima (Rp)" htmlFor="payment-amount" inputMode="numeric" value={amount} required onChange={(event)=>setAmount(event.target.value)}/>
+          <FormField label="Nominal diterima (Rp)" htmlFor="payment-amount" inputMode="numeric" value={amount} required error={fieldErrors.amount_idr} onChange={(event)=>setAmount(event.target.value)}/>
           <FormSelect label="Jenis pembayaran" htmlFor="payment-kind" value={kind} onChange={(event)=>setKind(event.target.value)}><option value="DP">DP</option><option value="INSTALLMENT">Cicilan</option><option value="BALANCE">Pelunasan</option></FormSelect>
-          <FormField label="Tanggal penerimaan" htmlFor="payment-received" type="datetime-local" value={receivedAt} required onChange={(event)=>setReceivedAt(event.target.value)}/>
+          <FormField label="Tanggal penerimaan" htmlFor="payment-received" type="datetime-local" value={receivedAt} required error={fieldErrors.received_at} onChange={(event)=>setReceivedAt(event.target.value)}/>
           <FormSelect label="Metode" htmlFor="payment-method" value={method} onChange={(event)=>setMethod(event.target.value)}><option value="TRANSFER">Transfer bank</option><option value="CASH">Tunai</option></FormSelect>
-          {method==="TRANSFER"?<FormSelect label="Rekening tujuan" htmlFor="payment-account" value={accountId} required onChange={(event)=>setAccountId(event.target.value)}><option value="">— pilih rekening —</option>{accounts.map((account)=><option key={account.id} value={account.id}>{account.bank_name} · {account.account_name} · {account.account_masked}</option>)}</FormSelect>:null}
-          <FormField label="Referensi penerimaan" htmlFor="payment-reference" value={reference} onChange={(event)=>setReference(event.target.value)} hint="Nomor transfer atau referensi penerimaan tunai."/>
-          <FormField label="Referensi bukti" htmlFor="payment-evidence" value={evidence} onChange={(event)=>setEvidence(event.target.value)} hint="Salah satu referensi penerimaan atau bukti wajib diisi."/>
+          {method==="TRANSFER"?<FormSelect label="Rekening tujuan" htmlFor="payment-account" value={accountId} required error={fieldErrors.bank_account} onChange={(event)=>setAccountId(event.target.value)}><option value="">— pilih rekening —</option>{accounts.map((account)=><option key={account.id} value={account.id}>{account.bank_name} · {account.account_name} · {account.account_masked}</option>)}</FormSelect>:null}
+          <FormField label="Referensi penerimaan" htmlFor="payment-reference" value={reference} error={fieldErrors.reference} onChange={(event)=>{setReference(event.target.value);setFieldErrors((prev)=>{const next={...prev};delete next.reference;return next;});}} hint="Nomor transfer atau referensi penerimaan tunai."/>
+          <FormField label="Referensi bukti" htmlFor="payment-evidence" value={evidence} error={fieldErrors.evidence_ref} onChange={(event)=>setEvidence(event.target.value)} hint="Salah satu referensi penerimaan atau bukti wajib diisi."/>
           {invoice?<fieldset className="my-6 border-t border-border pt-6"><legend className="text-sm font-semibold">Alokasi per jamaah</legend>{invoice.lines.map((line)=><FormField key={line.participant_id} label={`Alokasi ${line.pilgrim_name}`} htmlFor={`allocation-${line.participant_id}`} inputMode="numeric" value={allocations[line.participant_id]??""} onChange={(event)=>setAllocations((prev)=>({...prev,[line.participant_id]:event.target.value}))} hint={`Nilai tagihan ${formatIdr(line.amount_idr)}`}/>)}<p className={`text-sm ${totalAllocated===Number(amount)&&totalAllocated>0?"text-success":"text-muted"}`}>Total alokasi {formatIdr(Math.max(0,totalAllocated))} dari {formatIdr(Math.max(0,Number(amount)||0))}</p></fieldset>:null}
           {invoice?.environment==="demo"?<div className="mb-6"><FormCheckbox id="payment-simulate" label="Simulasikan pembayaran DEMO tanpa dana nyata" checked={simulate} onChange={setSimulate}/></div>:null}
           <Btn type="submit" disabled={busy||!invoice||["VOIDED","PAID"].includes(invoice.status)||Number(amount)<=0||totalAllocated!==Number(amount)||(invoice.environment==="demo"&&!simulate)}>{busy?"Memproses…":"Catat & ajukan"}</Btn>

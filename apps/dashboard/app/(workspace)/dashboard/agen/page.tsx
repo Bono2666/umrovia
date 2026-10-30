@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Agent, type CommissionPolicy, type Paginated } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
@@ -119,7 +119,7 @@ export default function AgentsPage() {
       {([["agents", "Daftar agen"], ["policies", "Kebijakan komisi"]] as const).map(([key, label]) =>
         <Btn key={key} role="tab" aria-selected={tab === key} variant={tab === key ? "solid" : "tint"} onClick={() => {setTab(key); setError(null); setMessage(null);}}>{label}</Btn>)}
     </div> : null}
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     {tab === "agents" ? <div className="workspace-columns mt-6">

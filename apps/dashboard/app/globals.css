@@ -109,9 +109,16 @@
   0%, 45% { background-color: rgb(14 107 92 / 0.1); box-shadow: 0 0 0 10px rgb(14 107 92 / 0.1); }
   100% { background-color: transparent; box-shadow: 0 0 0 10px transparent; }
 }
+.error-flash {
+  animation: error-flash 3s ease-out;
+}
+@keyframes error-flash {
+  0%, 45% { background-color: rgb(180 35 24 / 0.1); box-shadow: 0 0 0 10px rgb(180 35 24 / 0.1); }
+  100% { background-color: transparent; box-shadow: 0 0 0 10px transparent; }
+}
 @media (prefers-reduced-motion: reduce) {
   .floating-notice { animation: none; }
-  .record-flash { animation-timing-function: steps(1, end); }
+  .record-flash, .error-flash { animation-timing-function: steps(1, end); }
 }
 
 /* ==========================================================================

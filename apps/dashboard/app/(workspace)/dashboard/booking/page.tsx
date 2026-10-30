@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
   EmptyState,
-  ErrorState,
   FormField,
   FormSelect,
   FormTextarea,
@@ -28,7 +27,7 @@ import { ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusError, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Booking end-to-end (S09, UI-07; MOD-07; Spec §5.2/§6.2/§8.3): daftar booking
@@ -308,7 +307,7 @@ export default function BookingPage() {
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors(apiFormErrors(result.error));
+      setFormErrors(apiFormErrors(result.error)); focusError();
       return;
     }
     focusRecord(result.data.id);
@@ -393,11 +392,7 @@ export default function BookingPage() {
       </p>
 
       <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-      {error ? (
-        <div className="mt-4">
-          <ErrorState message={error} />
-        </div>
-      ) : null}
+      <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
 
       <div className="workspace-columns mt-6">
         <section className="card p-6">

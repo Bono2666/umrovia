@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Btn, ErrorState, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type MembershipRow } from "@/lib/api";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 export type LoginRow = {action: string; label: string; occurred_at: string; ip: string | null; user_agent: string; reason: string};
 
@@ -46,7 +47,7 @@ export function MemberSecurity({member, self, onChanged, onClose}: {member: Memb
       <h2 className="font-semibold">Keamanan akun · {who}</h2>
       <Btn size="xs" variant="tint" onClick={onClose}>Tutup</Btn>
     </div>
-    {error ? <div className="mt-3"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     {!self ? <div className="mt-4 flex flex-wrap gap-2">
       {member.status === "ACTIVE" ? <Btn size="xs" variant="danger" disabled={busy} onClick={() => void act("suspend", `Tangguhkan ${who}? Ia tidak dapat membuka workspace ini sampai diaktifkan kembali.`, `${who} ditangguhkan.`)}>Tangguhkan</Btn> : null}
       {member.status === "SUSPENDED" ? <Btn size="xs" disabled={busy} onClick={() => void act("reactivate", `Aktifkan kembali ${who}?`, `${who} aktif kembali.`)}>Aktifkan kembali</Btn> : null}

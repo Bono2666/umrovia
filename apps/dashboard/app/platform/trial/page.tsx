@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { STATE_TONE } from "@/components/platform/tone";
-import { EmptyState, ErrorState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { EmptyState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type PlatformTrial } from "@/lib/api";
 import { formatDate, formatRemaining } from "@/lib/format";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 type Row = PlatformTrial & {tenant_id: string; slug: string; display_name: string; tenant_state: string};
 
@@ -19,7 +20,7 @@ export default function PlatformTrialsPage() {
   return <div>
     <h1 className="text-2xl font-bold">Trial</h1>
     <p className="mt-1 text-sm text-muted">Trial 30 hari tanpa tagihan; berakhir otomatis menjadi aktif. Perpanjangan dilakukan dari detail tenant dan wajib beralasan.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <section className="card mt-6 p-6">
       <div className="notification-filters grid max-w-xs"><FormSelect label="Status trial" htmlFor="trial-status" value={status} onChange={(event) => setStatus(event.target.value)}>
         <option value="">Semua</option><option value="RUNNING">Berjalan</option><option value="EXTENDED">Diperpanjang</option><option value="CONVERTED_EARLY">Konversi dini</option><option value="EXPIRED_CONVERTED">Berakhir → aktif</option>

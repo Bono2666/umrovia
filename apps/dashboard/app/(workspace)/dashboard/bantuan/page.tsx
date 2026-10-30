@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, FormSelect, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { TICKET_TONE, TicketThread } from "@/components/support/TicketThread";
 import { apiFetch, problemMessage, type Paginated, type SupportTicket } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -66,7 +66,7 @@ export default function SupportPage() {
       <Btn onClick={() => {setCreating(true); setSelected(null); setMessage(null);}}>Buat tiket</Btn>
     </div>
     <p className="mt-1 max-w-3xl text-sm text-muted">Hubungi tim Umrovia untuk kendala akun, SaaS Wallet atau teknis. Tim dukungan hanya melihat isi tiket dan ringkasan workspace, bukan data jamaah Anda.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6"><h2 className="font-semibold">Tiket travel</h2>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormCheckbox, FormField, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Paginated, type PlatformAuditRow } from "@/lib/api";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 export default function PlatformAuditPage() {
   const [draft, setDraft] = useState({tenant: "", action: ""});
@@ -26,7 +27,7 @@ export default function PlatformAuditPage() {
   return <div>
     <h1 className="text-2xl font-bold">Audit</h1>
     <p className="mt-1 text-sm text-muted">Jejak aksi seluruh platform. Pelaku tersamar dan rincian perubahan dibatasi ke kolom aman (tanpa teks bebas dari travel).</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <section className="card mt-6 p-6">
       <form className="notification-filters grid items-end gap-x-4 gap-y-8 md:grid-cols-4" onSubmit={(event) => {event.preventDefault(); setPage(1); setFilters({...filters, ...draft});}}>
         <FormField label="Slug travel" htmlFor="audit-tenant" value={draft.tenant} onChange={(event) => setDraft({...draft, tenant: event.target.value.trim()})} />

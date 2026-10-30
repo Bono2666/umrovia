@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormCheckbox, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { API_BASE, apiFetch, problemMessage, type Booking, type Paginated, type PaymentRules, type TravelInvoice } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
@@ -108,7 +108,7 @@ export default function InvoicePage() {
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Invoice</RevealText>
     <p className="mt-1 text-sm text-muted">Tagihan dari harga booking yang sudah tersimpan. Pembayaran terverifikasi memperbarui sisa tagihan.</p>
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <div className="workspace-columns mt-6">
       <section className="card p-6">
         <h2 className="font-semibold">Daftar invoice</h2>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Agent, type Commission, type CommissionStatus, type Paginated } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
@@ -80,7 +80,7 @@ export default function CommissionsPage() {
         <p className="mt-1 text-lg font-semibold tabular-nums">{formatIdr(row.total_idr)}</p>
         <p className="text-xs text-muted">{row.count} komisi</p>
       </button>)}</div> : null}
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <section className="card mt-6 min-w-0 p-6">
       <div className="expense-form grid items-end gap-x-4 gap-y-8 sm:grid-cols-3">

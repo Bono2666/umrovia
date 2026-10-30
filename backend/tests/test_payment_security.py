@@ -189,7 +189,9 @@ def test_recording_idempotency_and_unique_reference(scenario):
     first = ok(post(s["client"], "/api/v1/payments", body, key="record-once"))
     assert ok(post(s["client"], "/api/v1/payments", body, key="record-once")) == first
     assert post(s["client"], "/api/v1/payments", {**body, "reference": "DIFFERENT"}, key="record-once").status_code == 409
-    assert post(s["client"], "/api/v1/payments", body).status_code == 409
+    duplicate = post(s["client"], "/api/v1/payments", body)
+    assert duplicate.status_code == 409
+    assert duplicate.json()["field_errors"] == {"reference": ["Referensi pembayaran sudah pernah dicatat."]}  # form menandai field Referensi
     assert TravelPayment.objects.without_tenant_guard().count() == 1
 
 
