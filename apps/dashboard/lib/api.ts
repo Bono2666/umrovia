@@ -536,6 +536,7 @@ export async function apiUpload<T>(path: string, form: FormData): Promise<{ ok: 
       signal: AbortSignal.timeout(60_000),
     });
     const data = await response.json().catch(() => ({}));
+    if (!response.ok) signalSessionExpired(data as ProblemDetail);
     return response.ok ? { ok: true, data: data as T } : { ok: false, error: data as ProblemDetail };
   } catch (err) {
     return { ok: false, error: { type: "https://umrovia.com/problems/network", title: "Network error", status: 0, code: "network_error", detail: `Unggahan gagal: ${String(err)}` } };
@@ -550,6 +551,17 @@ export function downloadFromApi(path: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+/**
+ * Sesi berakhir (idle/absolut habis, atau keluar dari tab lain): API menjawab 403
+ * `not_authenticated`. Shell yang sedang tampil mengarahkan ke login lewat event ini,
+ * supaya halaman tidak salah menampilkan "belum diberi akses".
+ */
+export const SESSION_EXPIRED_EVENT = "umrovia-session-expired";
+
+function signalSessionExpired(error: ProblemDetail) {
+  if (error?.code === "not_authenticated" && typeof window !== "undefined") window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 }
 
 export function problemMessage(error: ProblemDetail): string {
@@ -585,6 +597,7 @@ export async function apiFetch<T>(
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
+      signalSessionExpired(data as ProblemDetail);
       return { ok: false, error: data as ProblemDetail };
     }
     return { ok: true, data: data as T };

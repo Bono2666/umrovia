@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { Btn, FormField, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type PlatformSession, type UserPayload } from "@/lib/api";
 import { FloatingNotice } from "@/components/workspace/FloatingNotice";
+import { useSessionExpiry } from "@/lib/useSessionExpiry";
 
 type Ctx = {session: PlatformSession; can: (perm: string) => boolean; refresh: () => void};
 const PlatformContext = createContext<Ctx | null>(null);
@@ -39,6 +40,7 @@ export function PlatformShell({children}: {children: React.ReactNode}) {
   const pathname = usePathname();
   const [session, setSession] = useState<PlatformSession | null>(null);
   const [state, setState] = useState<"loading" | "denied" | "ok">("loading");
+  useSessionExpiry();
 
   const refresh = useCallback(() => {
     void apiFetch<UserPayload>("/me").then((me) => {

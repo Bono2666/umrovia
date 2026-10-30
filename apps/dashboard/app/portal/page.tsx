@@ -10,6 +10,7 @@ import {
   API_BASE, apiFetch, apiUpload, downloadFromApi, problemMessage,
   type ChangeRequest, type PortalAccessView, type PortalBooking, type PortalDocumentItem, type PortalNotification, type PortalProfile, type UserPayload,
 } from "@/lib/api";
+import { useSessionExpiry } from "@/lib/useSessionExpiry";
 import { formatDate, formatIdr, formatMasked } from "@/lib/format";
 import { ROOM_LABELS } from "@/lib/rooms";
 import type { RoomType } from "@/lib/api";
@@ -32,6 +33,7 @@ const ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
 export default function PortalPage() {
   const router = useRouter();
   const [me, setMe] = useState<UserPayload | null>(null);
+  useSessionExpiry();
   const [accesses, setAccesses] = useState<PortalAccessView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
