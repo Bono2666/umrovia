@@ -36,6 +36,14 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  // cacheComponents menyimpan halaman yang ditinggalkan beserta state-nya (React Activity).
+  // Tombol sengaja tetap "loading" sampai pindah halaman setelah login sukses; tanpa reset ini,
+  // kembali ke /login (mis. keluar dari portal) menampilkan tombol Masuk yang loading terus.
+  useEffect(() => () => {
+    setBusy(false);
+    setPassword("");
+  }, []);
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);

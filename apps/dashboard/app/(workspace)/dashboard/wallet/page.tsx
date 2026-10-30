@@ -75,6 +75,8 @@ export default function WalletPage() {
     if (!result.ok) {setBusy(false); setError(problemMessage(result.error)); return;}
     attempt.current = null;
     if (method === "midtrans" && result.data.payment_url) {
+      // Tombol Kembali dari Midtrans memulihkan halaman dari bfcache: jangan biarkan tombol loading.
+      window.addEventListener("pageshow", (event) => {if (event.persisted) {setBusy(false); setMessage(null);}}, {once: true});
       setMessage("Mengarahkan ke halaman pembayaran Midtrans…");
       window.location.assign(result.data.payment_url);
       return;
