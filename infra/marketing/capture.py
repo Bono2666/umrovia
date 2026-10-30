@@ -75,9 +75,8 @@ with sync_playwright() as p:
         pg.click("button[type=submit]")
     time.sleep(3)
 
-    # Hero: Ringkasan (header + sidebar + KPI + tindak lanjut + keberangkatan terdekat)
+    # Hero pita gelap = video tur (record_tour.py); di sini hanya kartu fitur.
     go(pg, "")
-    save("ringkasan", pg.screenshot(clip={"x": 0, "y": 0, "width": 1440, "height": 740}), width=2400)
     kuota = box_of(pg, "return e.classList.contains('card') && e.textContent.startsWith('Keberangkatan terdekat')")
     shot(pg, "kuota-jadwal", kuota, height=kuota["h"])
 
