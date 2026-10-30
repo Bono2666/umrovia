@@ -30,7 +30,7 @@ from modules.payments.models import (
     TravelPayment,
     TravelReceipt,
 )
-from modules.payments.pdf import render_financial_pdf
+from modules.payments.pdf import PAYMENT_KIND, render_financial_pdf
 from modules.payments.policy import eligibility_policy, payment_rules, required_dp
 from modules.tenants.environment import assert_environment_writable
 from modules.tenants.models import Tenant, TenantSettings
@@ -397,7 +397,7 @@ def _receipt(payment, actor):
     if existing:
         return existing
     invoice = payment.invoice
-    lines = [{"description": f"{a.participant.pilgrim.name} · {payment.kind}", "amount_idr": a.amount_idr} for a in payment.allocations.select_related("participant__pilgrim").order_by("participant_id")]
+    lines = [{"description": f"{a.participant.pilgrim.name} · {PAYMENT_KIND.get(payment.kind, payment.kind)}", "amount_idr": a.amount_idr} for a in payment.allocations.select_related("participant__pilgrim").order_by("participant_id")]
     snapshot = {
         "number": document_number(payment.tenant, payment.environment, "KWT"),
         "environment": payment.environment, "issued_at": payment.verified_at.isoformat(),

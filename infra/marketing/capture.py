@@ -107,6 +107,9 @@ with sync_playwright() as p:
     payments = pg.request.get(API + "/payments").json()
     pick = next(r for r in payments.get("results", payments) if r.get("kind") == "BALANCE" and r.get("receipt"))
     page = fitz.open(stream=pg.request.get(f"{API}/receipts/{pick['receipt']['id']}/pdf").body(), filetype="pdf")[0]
-    pix = page.get_pixmap(dpi=220, clip=fitz.Rect(0, 20, page.rect.width * 0.72, 20 + page.rect.width * 0.72 * RATIO))
+    # Kop sampai tabel "Total diterima" (364 pt), 16:10 di tengah halaman
+    height = 364
+    left = (page.rect.width - height / RATIO) / 2
+    pix = page.get_pixmap(dpi=220, clip=fitz.Rect(left, 0, left + height / RATIO, height))
     save("kuitansi", pix.tobytes("png"))
     b.close()
