@@ -9,6 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Spacer
 from modules.documents import pdf_theme as theme
 from modules.documents.render import TEMPLATE_VERSION, format_idr
 
+PAYMENT_KIND = {"DP": "DP", "INSTALLMENT": "Cicilan", "BALANCE": "Pelunasan"}
 MONTHS = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 
@@ -93,7 +94,7 @@ def _invoice_body(snapshot, s, width, zone):
 
 def _receipt_body(snapshot, s, width, zone):
     method = {"CASH": "Tunai", "TRANSFER": "Transfer bank"}.get(snapshot["method"], snapshot["method"])
-    kind = {"DP": "DP", "INSTALLMENT": "Cicilan", "BALANCE": "Pelunasan"}.get(snapshot["kind"], snapshot["kind"])
+    kind = PAYMENT_KIND.get(snapshot["kind"], snapshot["kind"])
     received, received_time = _split_time(snapshot["received_at"], zone)
     verified, verified_time = _split_time(snapshot["issued_at"], zone)
     hero = theme.info_grid(s, [("Jumlah diterima", theme.p(format_idr(snapshot["amount_idr"]), s["amount"]), f"Untuk {kind} · {method}"),

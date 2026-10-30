@@ -128,6 +128,15 @@ def test_verification_idempotency_and_exactly_one_receipt(scenario):
     assert AuditEvent.objects.filter(action="payment.verified").count() == 1
 
 
+
+def test_receipt_lines_use_payment_kind_label(scenario):
+    s = scenario()
+    payment = ok(record(s, kind="INSTALLMENT"))
+    ok(post(s["client"], f"/api/v1/payments/{payment['id']}/verify"))
+    lines = TravelReceipt.objects.without_tenant_guard().get().snapshot_json["lines"]
+    assert lines[0]["description"].endswith(" · Cicilan")
+
+
 def test_payment_limits_and_trace_validation(scenario):
     s = scenario()
     assert record(s, amount=99_000_000).status_code == 400
