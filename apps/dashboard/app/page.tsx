@@ -6,8 +6,8 @@ import { SectionScroller } from "@/components/marketing/SectionScroller";
 import { MarketingSection } from "@/components/marketing/MarketingSection";
 import { ModuleAccordion } from "@/components/marketing/ModuleAccordion";
 import { RevealText } from "@/components/marketing/RevealText";
-import Image from "next/image";
 import { NumberBadge, ScreenCard } from "@/components/marketing/MarketingBits";
+import { ProductVideo } from "@/components/marketing/ProductVideo";
 import { BtnLink } from "@/components/workspace/ui";
 import { appUrl } from "@/lib/siteUrls";
 
@@ -83,19 +83,11 @@ const LANGKAH: Array<{ time: string; tag: string; title: string }> = [
   },
 ];
 
-/** Tangkapan layar Ringkasan workspace (data demo fiktif) dalam bingkai tipis. */
+/** Video tur aplikasi (data demo fiktif) dalam bingkai tipis. */
 function ProductScreen() {
   return (
     <div className="overflow-hidden rounded-[8px] border border-white/15 bg-white shadow-[0_24px_60px_-20px_rgb(0_0_0/0.45)]">
-      <Image
-        src="/marketing/ringkasan.webp"
-        alt="Ringkasan workspace Umrovia: jamaah terdaftar, booking, tagihan, pembayaran masuk, dan kuota keberangkatan terdekat"
-        width={2400}
-        height={1233}
-        unoptimized
-        priority
-        className="block h-auto w-full"
-      />
+      <ProductVideo />
     </div>
   );
 }
