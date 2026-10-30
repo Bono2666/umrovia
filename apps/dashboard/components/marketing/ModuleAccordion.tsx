@@ -25,7 +25,15 @@ const MODULES = [
     title: "Tim & peran",
     description: "Struktur cabang, peran, dan izin akses yang bisa diatur sendiri oleh Anda.",
   },
+  {
+    id: "portal",
+    title: "Portal jamaah",
+    description: "Jamaah memantau tagihan, mengunggah dokumen, dan membaca pengumuman dari ponselnya.",
+  },
 ] as const;
+
+/* Lingkaran bertumpuk mengisi kanvas 380 × 260 (r ≈ 130): pusat pertama 130, terakhir 250. */
+const CIRCLE_STEP = 120 / (MODULES.length - 1);
 
 /** Accordion and linked circle artwork from web_template's capabilities section. */
 export function ModuleAccordion() {
@@ -42,7 +50,7 @@ export function ModuleAccordion() {
           fill="none"
           role="img"
           aria-label={active === null
-            ? "Empat modul operasional Umrovia"
+            ? "Lima modul operasional Umrovia"
             : `Modul aktif: ${MODULES[active].title}`}
           data-active-module={active === null ? "" : MODULES[active].id}
           className="module-capabilities__art"
@@ -50,7 +58,7 @@ export function ModuleAccordion() {
           {MODULES.map((module, index) => (
             <circle
               key={module.id}
-              cx={130 + index * 40}
+              cx={130 + index * CIRCLE_STEP}
               cy="130"
               r="129.5"
               stroke="currentColor"
