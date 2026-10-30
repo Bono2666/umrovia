@@ -201,7 +201,7 @@ export default function WalletPage() {
           </section> : null}
         </div>
       </div>
-      <section className="card mt-6 p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Biaya SaaS per jamaah</h2>
+      <section className="card mt-6 p-6"><div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-6"><h2 className="font-semibold">Biaya SaaS per jamaah</h2>
           <FormSelect label="Status" htmlFor="charge-status" value={chargeStatus} onChange={(event) => {setChargePage(1); setChargeStatus(event.target.value);}}><option value="">Semua</option><option value="POSTED">Terpotong</option><option value="PENDING">Menunggu saldo</option><option value="REFUNDED">Direfund</option><option value="VOID">Dibatalkan</option></FormSelect></div>
         <p className="mt-1 text-sm text-muted">Satu biaya {formatIdr(wallet.standard_rate_idr)} per booking-jamaah setelah DP terverifikasi. Pembatalan tidak mengembalikan biaya otomatis; refund diajukan untuk ditinjau platform.</p>
         {charges === null ? <LoadingState /> : charges.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada biaya layanan" /></div> : <>
