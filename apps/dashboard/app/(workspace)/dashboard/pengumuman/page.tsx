@@ -6,6 +6,7 @@ import { apiFetch, problemMessage, type Departure } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 type Announcement = {id: string; title: string; body: string; published_at: string | null; expires_at: string | null; status: "DRAFT" | "PUBLISHED" | "EXPIRED"; departure: {id: string; code: string} | null; created_by: string | null; created_at: string};
 const STATUS = {DRAFT: {label: "Draf", tone: "neutral"}, PUBLISHED: {label: "Tayang", tone: "success"}, EXPIRED: {label: "Selesai", tone: "warning"}} as const;
@@ -34,6 +35,7 @@ export default function AnnouncementsPage() {
     })});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(result.data.id);
     setMessage(publish ? `"${result.data.title}" tayang di portal jamaah.` : `"${result.data.title}" disimpan sebagai draf.`);
     setForm(EMPTY); void load();
   }
@@ -42,6 +44,7 @@ export default function AnnouncementsPage() {
     setError(null); setMessage(null);
     const result = await apiFetch<Announcement>(`/announcements/${row.id}`, {method: "PATCH", body: JSON.stringify({action})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(row.id);
     setMessage({publish: "Pengumuman ditayangkan.", unpublish: "Pengumuman ditarik ke draf.", archive: "Pengumuman diakhiri."}[action]); void load();
   }
 
@@ -52,12 +55,12 @@ export default function AnnouncementsPage() {
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Pengumuman Portal</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Informasi untuk jamaah di portal: jadwal manasik, perlengkapan, perubahan jadwal. Pilih keberangkatan agar hanya jamaah rombongan tersebut yang melihat.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <h2 className="font-semibold">Daftar pengumuman</h2>
         {rows === null ? <LoadingState /> : rows.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada pengumuman" /></div> :
-          <ul className="mt-4 divide-y divide-border">{rows.map((row) => <li key={row.id} className="py-4 text-sm">
+          <ul className="mt-4 divide-y divide-border">{rows.map((row) => <li key={row.id} data-record={row.id} className="py-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{row.title}</span><StatusBadge tone={STATUS[row.status].tone}>{STATUS[row.status].label}</StatusBadge></p>

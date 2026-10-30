@@ -5,6 +5,7 @@ import { Btn, EmptyState, ErrorState, FormCheckbox, FormField, FormSelect, Loadi
 import { apiFetch, problemMessage, type BankAccount } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 type BookRow = {key: string; account: string; opening_idr: number; inflow_idr: number; reversal_idr: number; expense_idr: number; transfer_in_idr: number; transfer_out_idr: number; closing_idr: number; opening_as_of: string | null};
 type Book = {from: string; to: string; rows: BookRow[]; totals: Omit<BookRow, "key" | "account" | "opening_as_of">; rules: {maker_checker: boolean}};
@@ -58,7 +59,7 @@ export function CashPanel({accounts}: {accounts: BankAccount[]}) {
       </div>
     </div>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     {tab === "book" ? <>
       <div className="expense-form mt-5 grid items-end gap-x-4 gap-y-8 sm:grid-cols-3">
@@ -84,7 +85,7 @@ export function CashPanel({accounts}: {accounts: BankAccount[]}) {
     {tab === "opening" ? <div className="workspace-columns mt-5">
       <div className="min-w-0">
         {openings === null ? <LoadingState /> : openings.length === 0 ? <EmptyState title="Belum ada saldo awal" description="Saldo awal pertama per rekening langsung berlaku; koreksi berikutnya perlu persetujuan." /> :
-          <ul className="divide-y divide-border">{openings.map((row) => <li key={row.id} className="py-3 text-sm">
+          <ul className="divide-y divide-border">{openings.map((row) => <li key={row.id} data-record={row.id} className="py-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{row.account}</span><StatusBadge tone={row.status === "APPROVED" ? "success" : row.status === "PENDING" ? "warning" : "neutral"}>{row.status_label}</StatusBadge></p>
@@ -113,7 +114,7 @@ export function CashPanel({accounts}: {accounts: BankAccount[]}) {
     {tab === "transfers" ? <div className="workspace-columns mt-5">
       <div className="min-w-0">
         {transfers === null ? <LoadingState /> : transfers.length === 0 ? <EmptyState title="Belum ada transfer" description="Catat setoran tunai ke bank atau pemindahan dana antarrekening." /> :
-          <ul className="divide-y divide-border">{transfers.map((row) => <li key={row.id} className="py-3 text-sm">
+          <ul className="divide-y divide-border">{transfers.map((row) => <li key={row.id} data-record={row.id} className="py-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{row.from_account} → {row.to_account}</span>{row.status === "VOIDED" ? <StatusBadge tone="danger">Dibatalkan</StatusBadge> : null}</p>

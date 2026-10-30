@@ -24,6 +24,7 @@ import {
   type ManifestReadiness,
 } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 /**
  * Manifest keberangkatan & checklist operasional (S10; Spec §5.2/§7.6/§8.3,
@@ -304,14 +305,7 @@ export default function ManifestPage() {
         tercatat. Setiap publikasi disimpan sebagai versi baru.
       </p>
 
-      {message ? (
-        <p
-          className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success"
-          role="status"
-        >
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />

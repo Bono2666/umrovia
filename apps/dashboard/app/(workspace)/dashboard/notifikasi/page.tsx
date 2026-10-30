@@ -5,6 +5,7 @@ import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, Loadi
 import { apiFetch, problemMessage, type NotificationDelivery, type NotificationLog, type NotificationStatus, type NotificationTemplate } from "@/lib/api";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 const STATUS: Record<NotificationStatus, {label: string; tone: "neutral" | "success" | "warning" | "danger"; hint: string}> = {
   PENDING: {label: "Menunggu", tone: "neutral", hint: "Dalam antrean kirim"},
@@ -40,7 +41,7 @@ export default function NotificationsPage() {
       ))}
     </div>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     {tab === "log"
       ? <DeliveryLog canManage={canManage} onError={setError} onMessage={setMessage} />
       : <TemplateEditor canManage={canManage} onError={setError} onMessage={setMessage} />}

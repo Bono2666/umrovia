@@ -27,6 +27,7 @@ import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/for
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
 import { PilgrimExtras } from "@/components/workspace/PilgrimExtras";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const DOC_KIND: Record<string, string> = { ktp: "KTP", passport: "Paspor", photo: "Foto", kk: "Kartu Keluarga", other: "Dokumen lain" };
 const DOC_STATUS: Record<string, string> = { UPLOADED: "Menunggu review", UNDER_REVIEW: "Ditinjau", APPROVED: "Disetujui", REJECTED: "Ditolak" };
@@ -173,6 +174,7 @@ export default function JamaahPage() {
     const result = await apiFetch<PilgrimDocument>(`/pilgrims/${pilgrim.id}/documents/${doc.id}`, { method: "PATCH", body: JSON.stringify(status === "REJECTED" ? { status, reason } : { status, ...(expiresAt ? { expires_at: expiresAt } : {}) }) });
     setDocBusy(false);
     if (!result.ok) { setError(problemMessage(result.error)); return; }
+    focusRecord(doc.id);
     setMessage(`${DOC_KIND[doc.kind] ?? doc.kind} ${status === "APPROVED" ? "disetujui" : "ditolak"}.`);
     void reloadDocuments(pilgrim.id);
   }
@@ -185,6 +187,7 @@ export default function JamaahPage() {
     const result = await apiUpload<PilgrimDocument>(`/pilgrims/${pilgrim.id}/documents/upload`, form);
     setDocBusy(false);
     if (!result.ok) { setError(problemMessage(result.error)); return; }
+    focusRecord(result.data.id);
     setMessage(`${DOC_KIND[uploadKind] ?? uploadKind} terunggah dan menunggu review.`);
     void reloadDocuments(pilgrim.id);
   }
@@ -239,6 +242,7 @@ export default function JamaahPage() {
     if (editing) setSelected(result.data);
     resetForm();
     const created = result.data;
+    focusRecord(created.id);
     setMessage(
       created.possible_duplicate_of
         ? `Jamaah ${created.code} tersimpan — identitas serupa terdeteksi dan ditandai sebagai potensi duplikat.`
@@ -306,11 +310,7 @@ export default function JamaahPage() {
         ditandai sebagai kemungkinan duplikat agar dapat Anda periksa.
       </p>
 
-      {message ? (
-        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />
@@ -349,7 +349,7 @@ export default function JamaahPage() {
         ) : (
           <ul className="mt-4 divide-y divide-border/60">
             {rows.map((pilgrim) => (
-              <li key={pilgrim.id} className="py-4 text-sm">
+              <li key={pilgrim.id} data-record={pilgrim.id} className="py-4 text-sm">
                 <p className="flex flex-wrap items-center gap-2 font-semibold">
                   {pilgrim.name}
                   <StatusBadge tone={pilgrim.status === "ACTIVE" ? "success" : "neutral"}>
@@ -433,7 +433,7 @@ export default function JamaahPage() {
                   const latest = !documents.some((other) => other.kind === doc.kind && other.version > doc.version);
                   const reviewable = latest && can("documents.review") && canEditEnvironment(selected.environment) && (doc.status === "UPLOADED" || doc.status === "UNDER_REVIEW");
                   return (
-                    <li key={doc.id} className="py-3 text-sm">
+                    <li key={doc.id} data-record={doc.id} className="py-3 text-sm">
                       <p className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{DOC_KIND[doc.kind] ?? doc.kind}</span>
                         <span className="text-xs text-muted">v{doc.version} · {formatDate(doc.uploaded_at)}</span>

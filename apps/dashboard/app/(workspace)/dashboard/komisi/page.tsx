@@ -6,6 +6,7 @@ import { apiFetch, problemMessage, type Agent, type Commission, type CommissionS
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 type BankAccount = {id: string; bank_name: string; account_masked: string; active: boolean};
 type Summary = {statuses: {status: CommissionStatus; label: string; count: number; total_idr: number}[]};
@@ -62,6 +63,7 @@ export default function CommissionsPage() {
     const result = await apiFetch<Commission>(`/commissions/${row.id}/${action}`, {method: "POST", body: JSON.stringify(body)});
     setBusy(null);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(row.id);
     setMessage(action === "approve" ? `Komisi ${row.booking.code} disetujui.` : action === "pay" ? `Komisi ${row.booking.code} dibayar dan tercatat di Pengeluaran.` : `Komisi ${row.booking.code} dibatalkan.`);
     void load();
   }
@@ -79,7 +81,7 @@ export default function CommissionsPage() {
         <p className="text-xs text-muted">{row.count} komisi</p>
       </button>)}</div> : null}
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <section className="card mt-6 min-w-0 p-6">
       <div className="expense-form grid items-end gap-x-4 gap-y-8 sm:grid-cols-3">
         <FormSelect label="Status" htmlFor="commission-status" value={filters.status} onChange={(event) => {setPage(1); setFilters({...filters, status: event.target.value});}}>
@@ -93,7 +95,7 @@ export default function CommissionsPage() {
         </FormSelect> : null}
       </div>
       {list === null ? <LoadingState /> : list.results.length === 0 ? <div className="mt-4"><EmptyState title="Tidak ada komisi" description="Komisi muncul setelah booking beragen direservasi dan ada kebijakan komisi yang berlaku." /></div> : <>
-        <ul className="mt-4 divide-y divide-border">{list.results.map((row) => <li key={row.id} className="py-4 text-sm">
+        <ul className="mt-4 divide-y divide-border">{list.results.map((row) => <li key={row.id} data-record={row.id} className="py-4 text-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{row.agent.name}</span><span className="text-xs text-muted">{row.booking.code} · {row.booking.package_name} · {row.booking.departure_code}</span><StatusBadge tone={TONE[row.status]}>{row.status_label}</StatusBadge></p>

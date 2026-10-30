@@ -28,6 +28,7 @@ import { ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Booking end-to-end (S09, UI-07; MOD-07; Spec §5.2/§6.2/§8.3): daftar booking
@@ -228,6 +229,7 @@ export default function BookingPage() {
       setError(problemMessage(result.error));
       return;
     }
+    focusRecord(booking.id);
     setMessage(`${booking.code}: status → ${STATUS_LABEL[target] ?? target}.`);
     load(query);
   }
@@ -239,6 +241,7 @@ export default function BookingPage() {
     setBusyId(null);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
     setAgentEdit(null);
+    focusRecord(booking.id);
     setMessage(`${booking.code}: agen diperbarui; komisi agen sebelumnya dibatalkan dan dihitung ulang untuk agen baru.`);
     load(query);
   }
@@ -308,6 +311,7 @@ export default function BookingPage() {
       setFormErrors(apiFormErrors(result.error));
       return;
     }
+    focusRecord(result.data.id);
     setMessage(editing ? `Booking ${result.data.code} diperbarui.` : `Booking ${result.data.code} dibuat (draf) untuk ${result.data.participant_count} peserta. Reservasi kursi setelah data sesuai.`);
     resetForm(); load(query);
   }
@@ -388,11 +392,7 @@ export default function BookingPage() {
         memengaruhinya. Invoice terbit otomatis saat kursi direservasi.
       </p>
 
-      {message ? (
-        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />
@@ -439,7 +439,7 @@ export default function BookingPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
               {visible.map((booking) => (
-                <li key={booking.id} className="py-4 text-sm">
+                <li key={booking.id} data-record={booking.id} className="py-4 text-sm">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                     <div className="min-w-0 sm:flex-1">
                       <p className="flex flex-wrap items-center gap-2 font-semibold">
@@ -464,7 +464,7 @@ export default function BookingPage() {
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {booking.participants.map((p) => (
                       <li
-                        key={p.id}
+                        key={p.id} data-record={p.id}
                         className="inline-flex items-center gap-1 border border-border/60 px-1.5 py-0.5 text-[0.7rem]"
                       >
                         {p.pilgrim_name}
@@ -575,7 +575,7 @@ export default function BookingPage() {
             {searchable.length > 0 ? (
               <ul className="mb-2 divide-y divide-border/60 border border-border/60">
                 {searchable.map((p) => (
-                  <li key={p.id}>
+                  <li key={p.id} data-record={p.id}>
                     <button
                       type="button"
                       className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-tint/40"
@@ -594,7 +594,7 @@ export default function BookingPage() {
               <ul className="mb-2 flex flex-wrap gap-1.5">
                 {picked.map((p) => (
                   <li
-                    key={p.id}
+                    key={p.id} data-record={p.id}
                     className="inline-flex items-center gap-1 border border-success/40 bg-success/10 px-1.5 py-0.5 text-[0.7rem]"
                   >
                     {p.name}

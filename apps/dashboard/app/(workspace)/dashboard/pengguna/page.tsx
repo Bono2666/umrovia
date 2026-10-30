@@ -21,6 +21,7 @@ import {
 } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
 import { MemberSecurity } from "@/components/workspace/MemberSecurity";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Pengguna & Role (S06, §4.1): daftar membership + undang staf
@@ -132,6 +133,7 @@ export default function PenggunaPage() {
       return;
     }
     setEditingMember(null);
+    focusRecord(row.id);
     setMessage(`Peran ${row.user.email} diubah.`);
     load();
   }
@@ -187,11 +189,7 @@ export default function PenggunaPage() {
         mencabut akses; audit tercatat).
       </p>
 
-      {message ? (
-        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />
@@ -222,7 +220,7 @@ export default function PenggunaPage() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="border-b border-border/60">
+                  <tr key={row.id} data-record={row.id} className="border-b border-border/60">
                     <td className="py-3 pr-4">
                       <p className="font-medium">
                         {row.user.full_name || row.user.email}
@@ -337,11 +335,12 @@ export default function PenggunaPage() {
             const result = editingRole ? await apiFetch(`/roles/${editingRole.id}`, {method:"PATCH", body}) : await apiFetch("/roles", {method:"POST", body});
             setRoleBusy(false);
             if (!result.ok) {setError(problemMessage(result.error)); return;}
+            focusRecord(editingRole?.id);
             setMessage(editingRole ? "Definisi peran tersimpan." : `Peran ${roleName.trim()} ditambahkan.`); setEditingRole(null); setCreatingRole(false); load();
           }}><fieldset className="min-w-0" disabled={roleBusy}><FormField label="Nama peran" htmlFor="role-name" value={roleName} onChange={(event) => setRoleName(event.target.value)} required maxLength={64} /><FormTextarea label="Izin peran" htmlFor="role-permissions" value={rolePermissions} onChange={(event) => setRolePermissions(event.target.value)} hint="Satu izin per baris. Perubahan berlaku untuk semua anggota yang memakai peran ini." /><FormSelect label="Cakupan cabang" htmlFor="role-scope" value={roleScope} onChange={(event) => setRoleScope(event.target.value as "ALL" | "OWN")} hint="Cabang sendiri: hanya booking, invoice, lead, pengeluaran dan komisi cabang yang ditugaskan (atur di menu Cabang), ditambah data tanpa cabang."><option value="OWN">Cabang sendiri</option><option value="ALL">Semua cabang</option></FormSelect><div className="flex flex-wrap gap-2"><Btn type="submit">{editingRole ? "Simpan perubahan" : "Tambah peran"}</Btn><Btn type="button" variant="tint" onClick={() => {setEditingRole(null); setCreatingRole(false);}}>{editingRole ? "Batal ubah" : "Batal"}</Btn></div></fieldset></form> : null}
           <ul className="mt-3 space-y-3">
             {roles.map((role) => (
-              <li key={role.id}>
+              <li key={role.id} data-record={role.id}>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{role.name}</span>
                   {canWriteRoles && !role.is_system && role.name !== "Owner" ? <Btn variant="link" size="xs" disabled={roleBusy} onClick={() => {setCreatingRole(false); setEditingRole(role); setRoleName(role.name); setRolePermissions(role.permissions.join("\n")); setRoleScope(role.branch_scope ?? "ALL"); setError(null);}}>Ubah definisi peran</Btn> : null}

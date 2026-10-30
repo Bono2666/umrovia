@@ -23,6 +23,7 @@ import {
   type TravelPackage,
 } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Keberangkatan & kuota (S08, UI-05; MOD-06; Spec §5.2/§6.5/§8.3): daftar
@@ -122,6 +123,7 @@ export default function KeberangkatanPage() {
       setError(problemMessage(result.error));
       return;
     }
+    focusRecord(dep.id);
     setMessage(`${dep.code}: status → ${STATUS_LABEL[target] ?? target}.`);
     load(query);
   }
@@ -168,6 +170,7 @@ export default function KeberangkatanPage() {
       setError(problemMessage(result.error));
       return;
     }
+    focusRecord(dep.id);
     setMessage(`${dep.code}: kuota blokir → ${value}.`);
     load(query);
   }
@@ -222,6 +225,7 @@ export default function KeberangkatanPage() {
       setFormErrors(apiFormErrors(result.error));
       return;
     }
+    focusRecord(result.data.id);
     setMessage(`Keberangkatan ${result.data.code} ${editing ? "diperbarui" : "dibuat"} — ${result.data.available_seats} kursi tersedia.`);
     resetForm(); load(query);
   }
@@ -284,11 +288,7 @@ export default function KeberangkatanPage() {
         berangkat → Berangkat → Selesai (atau Dibatalkan dengan alasan).
       </p>
 
-      {message ? (
-        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />
@@ -335,7 +335,7 @@ export default function KeberangkatanPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
               {visible.map((dep) => (
-                <li key={dep.id} className="py-4 text-sm">
+                <li key={dep.id} data-record={dep.id} className="py-4 text-sm">
                   <p className="flex flex-wrap items-center gap-2 font-semibold">
                     {dep.package_name}
                     <StatusBadge tone={STATUS_TONE[dep.status] ?? "neutral"}>

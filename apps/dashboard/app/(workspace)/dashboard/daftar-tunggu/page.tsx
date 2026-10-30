@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { ROOM_LABELS } from "@/lib/rooms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * MOD-06 daftar tunggu: hanya untuk keberangkatan yang kursinya habis. Tidak
@@ -53,6 +54,7 @@ export default function WaitlistPage() {
     const result = await apiFetch<WaitlistEntry>("/waitlist", {method: "POST", body: JSON.stringify({...form, pilgrim: pilgrim.id})});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(result.data.id);
     setMessage(`${result.data.pilgrim.name} masuk daftar tunggu ${result.data.departure.code} di urutan ${result.data.position}.`);
     setPilgrim(null); setForm({...form, notes: ""}); void load();
   }
@@ -62,6 +64,7 @@ export default function WaitlistPage() {
     const result = await apiFetch<WaitlistEntry>(`/waitlist/${entry.id}/book`, {method: "POST", body: "{}"});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(entry.id);
     setMessage(`Booking draf ${result.data.booking?.code} dibuat untuk ${entry.pilgrim.name}. Buka Booking untuk mereservasi kursi.`);
     void load();
   }
@@ -84,7 +87,7 @@ export default function WaitlistPage() {
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Daftar tunggu</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Calon jamaah untuk keberangkatan yang kursinya penuh. Daftar tunggu tidak menahan kursi; saat ada pembatalan, proses dari urutan teratas menjadi booking draf lalu reservasi kursi di halaman Booking.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <div className="expense-form grid items-end gap-x-4 gap-y-8 sm:grid-cols-2">
@@ -96,7 +99,7 @@ export default function WaitlistPage() {
           </FormSelect>
         </div>
         {rows === null ? <LoadingState /> : rows.length === 0 ? <div className="mt-4"><EmptyState title="Daftar tunggu kosong" description="Calon jamaah untuk keberangkatan penuh akan tampil di sini." /></div> :
-          <ul className="mt-4 divide-y divide-border">{rows.map((entry) => <li key={entry.id} className="py-4 text-sm">
+          <ul className="mt-4 divide-y divide-border">{rows.map((entry) => <li key={entry.id} data-record={entry.id} className="py-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2">
@@ -126,7 +129,7 @@ export default function WaitlistPage() {
             </FormSelect>
             {pilgrim ? <p className="mb-4 text-sm">Jamaah: <strong>{pilgrim.name}</strong> <Btn size="xs" variant="link" type="button" onClick={() => setPilgrim(null)}>Ganti</Btn></p> : <>
               <FormField label="Cari jamaah" htmlFor="waitlist-pilgrim" value={pilgrimQuery} onChange={(event) => {setPilgrimQuery(event.target.value); if (!event.target.value.trim()) setPilgrimResults([]);}} placeholder="Nama atau kode jamaah" />
-              {pilgrimResults.length > 0 ? <ul className="mb-4 divide-y divide-border/60 border border-border/60">{pilgrimResults.map((p) => <li key={p.id}>
+              {pilgrimResults.length > 0 ? <ul className="mb-4 divide-y divide-border/60 border border-border/60">{pilgrimResults.map((p) => <li key={p.id} data-record={p.id}>
                 <button type="button" className="flex w-full justify-between px-2 py-1.5 text-left text-xs hover:bg-tint/40" onClick={() => {setPilgrim(p); setPilgrimQuery(""); setPilgrimResults([]);}}><span>{p.name} <span className="text-muted">· {p.code}</span></span><span className="text-muted">pilih</span></button>
               </li>)}</ul> : null}
             </>}

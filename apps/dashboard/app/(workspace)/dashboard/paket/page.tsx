@@ -17,6 +17,7 @@ import { EMPTY_ROOM_PRICES, ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Master Paket (S08, UI-04; MOD-05; Spec §5.2/§8.3): daftar + CRUD draft/
@@ -103,6 +104,7 @@ export default function PaketPage() {
       setError(problemMessage(result.error));
       return;
     }
+    focusRecord(pkg.id);
     setMessage(`${pkg.code}: ${label}.`);
     load(query);
   }
@@ -166,6 +168,7 @@ export default function PaketPage() {
     setDescription("");
     setInclusions("");
     setExclusions(""); setCancellationPolicy(""); setPaymentTerms(""); setChildPrice(""); setInfantPrice(""); setAddonsText(""); setCostsText("");
+    focusRecord(result.data.id);
     setMessage(`Paket ${result.data.code} tersimpan${editing ? "; harga booking yang sudah ada tetap" : " sebagai draf"}.`);
     load(query);
   }
@@ -216,11 +219,7 @@ export default function PaketPage() {
         dan invoice yang sudah ada tidak berubah.
       </p>
 
-      {message ? (
-        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />
@@ -253,7 +252,7 @@ export default function PaketPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border/60">
               {rows.map((pkg) => (
-                <li key={pkg.id} className="py-4 text-sm">
+                <li key={pkg.id} data-record={pkg.id} className="py-4 text-sm">
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 font-semibold">
                       {pkg.name}

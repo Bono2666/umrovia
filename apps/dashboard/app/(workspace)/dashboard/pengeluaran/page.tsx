@@ -6,6 +6,7 @@ import { API_BASE, apiFetch, apiUpload, problemMessage, type Departure, type Pag
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const CATEGORIES = [
   ["TICKET", "Tiket pesawat"], ["HOTEL", "Hotel"], ["VISA", "Visa & dokumen"], ["TRANSPORT", "Transportasi darat"], ["CATERING", "Konsumsi"],
@@ -66,6 +67,7 @@ export default function ExpensesPage() {
       note = uploaded.ok ? " Bukti terlampir." : ` Bukti gagal diunggah: ${problemMessage(uploaded.error)}`;
     }
     setBusy(false); setEvidence(null);
+    focusRecord(result.data.id);
     setMessage(`Pengeluaran ${formatIdr(result.data.amount_idr)} (${result.data.category_label}) tercatat${result.data.approval_status === "PENDING" ? " dan menunggu persetujuan" : ""}.${note}`);
     setForm({...EMPTY, category: form.category, bank_account: form.bank_account});
     setPage(1); void load();
@@ -81,6 +83,7 @@ export default function ExpensesPage() {
     setError(null); setMessage(null);
     const result = await apiFetch<TravelExpense>(`/expenses/${row.id}/${approve ? "approve" : "reject"}`, {method: "POST", body: JSON.stringify({reason})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(row.id);
     setMessage(approve ? "Pengeluaran disetujui dan masuk laporan kas." : "Pengeluaran ditolak."); void load();
   }
 
@@ -90,6 +93,7 @@ export default function ExpensesPage() {
     const upload = new FormData(); upload.append("file", file);
     const result = await apiUpload<TravelExpense>(`/expenses/${row.id}/evidence`, upload);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(row.id);
     setMessage("Bukti pengeluaran terlampir."); void load();
   }
 
@@ -100,6 +104,7 @@ export default function ExpensesPage() {
     setError(null); setMessage(null);
     const result = await apiFetch<TravelExpense>(`/expenses/${row.id}/void`, {method: "POST", body: JSON.stringify({reason: reason.trim()})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(row.id);
     setMessage("Pengeluaran dibatalkan. Catat ulang bila nominal atau datanya perlu dikoreksi."); void load();
   }
 
@@ -110,7 +115,7 @@ export default function ExpensesPage() {
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Pengeluaran</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Catat biaya perjalanan dan operasional travel agar laporan kas/bank dan margin estimasi per keberangkatan lengkap. Pengeluaran tidak diedit; batalkan lalu catat ulang bila perlu koreksi.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -132,7 +137,7 @@ export default function ExpensesPage() {
           </FormSelect>
         </div>
         {list === null ? <LoadingState /> : list.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada pengeluaran" description="Pengeluaran yang dicatat muncul di sini dan di laporan keuangan." /></div> : <>
-          <ul className="mt-4 divide-y divide-border">{list.results.map((row) => <li key={row.id} className="py-4 text-sm">
+          <ul className="mt-4 divide-y divide-border">{list.results.map((row) => <li key={row.id} data-record={row.id} className="py-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{row.description}</span>{row.status === "VOIDED" ? <StatusBadge tone="danger">Dibatalkan</StatusBadge> : row.approval_status !== "APPROVED" ? <StatusBadge tone={APPROVAL[row.approval_status].tone}>{APPROVAL[row.approval_status].label}</StatusBadge> : null}</p>

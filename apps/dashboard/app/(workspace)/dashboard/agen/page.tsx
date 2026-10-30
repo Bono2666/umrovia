@@ -6,6 +6,7 @@ import { apiFetch, problemMessage, type Agent, type CommissionPolicy, type Pagin
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 type Package = {id: string; name: string};
 const EMPTY_AGENT = {code: "", name: "", phone: "", email: "", business_id: "", area: "", level: "", bank_name: "", bank_account_name: "", bank_account_number: "", notes: ""};
@@ -68,6 +69,7 @@ export default function AgentsPage() {
     const result = await apiFetch<Agent>(editing ? `/agents/${editing.id}` : "/agents", {method: editing ? "PATCH" : "POST", body: JSON.stringify(body)});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(result.data.id);
     setMessage(editing ? `Data agen ${result.data.name} diperbarui.` : `Agen ${result.data.name} (${result.data.code}) ditambahkan.`);
     setEditing(null); setForm(EMPTY_AGENT); void load();
   }
@@ -76,6 +78,7 @@ export default function AgentsPage() {
     setError(null); setMessage(null);
     const result = await apiFetch<Agent>(`/agents/${agent.id}`, {method: "PATCH", body: JSON.stringify({active: !agent.active})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(agent.id);
     setMessage(result.data.active ? `${agent.name} diaktifkan kembali.` : `${agent.name} dinonaktifkan; booking lama tetap tercatat atas namanya.`);
     void load();
   }
@@ -90,6 +93,7 @@ export default function AgentsPage() {
     })});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(result.data.id);
     setMessage(`Kebijakan "${result.data.name}" berlaku untuk booking yang direservasi berikutnya.`);
     setPolicyForm(EMPTY_POLICY); void loadPolicies();
   }
@@ -116,7 +120,7 @@ export default function AgentsPage() {
         <Btn key={key} role="tab" aria-selected={tab === key} variant={tab === key ? "solid" : "tint"} onClick={() => {setTab(key); setError(null); setMessage(null);}}>{label}</Btn>)}
     </div> : null}
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     {tab === "agents" ? <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
@@ -128,7 +132,7 @@ export default function AgentsPage() {
           </FormSelect>
         </div>
         {list === null ? <LoadingState /> : list.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada agen" description="Tambahkan agen agar booking dapat dikreditkan dan komisinya dihitung." /></div> : <>
-          <ul className="mt-4 divide-y divide-border">{list.results.map((agent) => <li key={agent.id} className="py-4 text-sm">
+          <ul className="mt-4 divide-y divide-border">{list.results.map((agent) => <li key={agent.id} data-record={agent.id} className="py-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{agent.name}</span><span className="text-xs text-muted">{agent.code}</span>{agent.active ? null : <StatusBadge tone="neutral">Nonaktif</StatusBadge>}</p>
@@ -169,7 +173,7 @@ export default function AgentsPage() {
         <h2 className="font-semibold">Kebijakan komisi</h2>
         <p className="mt-1 text-sm text-muted">Bila beberapa kebijakan cocok, yang paling spesifik dipakai: agen + paket, lalu agen, lalu paket, lalu umum. Perubahan tidak mengubah komisi yang sudah tercatat.</p>
         {policies === null ? <LoadingState /> : policies.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada kebijakan komisi" description="Tanpa kebijakan, booking beragen tidak menghasilkan komisi." /></div> :
-          <ul className="mt-4 divide-y divide-border">{policies.map((policy) => <li key={policy.id} className="py-4 text-sm">
+          <ul className="mt-4 divide-y divide-border">{policies.map((policy) => <li key={policy.id} data-record={policy.id} className="py-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{policy.name}</span>{policy.active ? <StatusBadge tone="success">Aktif</StatusBadge> : <StatusBadge tone="neutral">Nonaktif</StatusBadge>}</p>
