@@ -28,7 +28,9 @@ check "Cookie CSRF Secure" '"${CURL[@]}" -D - -o /dev/null "$API/api/v1/auth/csr
 check "Halaman login app 200" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code}" "$APP/login")" = 200 ]'
 check "Header keamanan app (X-Frame-Options)" '"${CURL[@]}" -D - -o /dev/null "$APP/login" | grep -qi "^x-frame-options: DENY"'
 check "Situs marketing (domain utama) 200" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code}" "$SITE/")" = 200 ]'
-check "Gambar marketing dilayani domain utama" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code} %{content_type}" "$SITE/marketing/ringkasan.webp")" = "200 image/webp" ]'
+check "Gambar marketing dilayani domain utama" '[ "$("${CURL[@]}" -o /dev/null -w "%{http_code} %{content_type}" "$SITE/marketing/tur-aplikasi-poster.webp")" = "200 image/webp" ]'
+# Safari hanya memutar MP4 bila server mendukung Range (206 Partial Content)
+check "Video tur marketing mendukung Range" '[ "$("${CURL[@]}" -o /dev/null -r 0-1023 -w "%{http_code} %{content_type}" "$SITE/marketing/tur-aplikasi.mp4")" = "206 video/mp4" ]'
 check "HSTS seragam di semua host, tanpa preload" 'v=$(for u in "$SITE/" "$APP/login" "$ADMIN/" "$API/api/v1/health/"; do "${CURL[@]}" -D - -o /dev/null "$u" | grep -i "^strict-transport-security:" | tr -d "\r"; done | sort -u); [ "$(printf "%s\n" "$v" | wc -l)" -eq 1 ] && ! printf "%s" "$v" | grep -qi preload'
 check "www → domain utama" '"${CURL[@]}" -D - -o /dev/null "https://www.$SITE_HOST$SUFFIX/pricing" | grep -qi "^location: $SITE/pricing"'
 check "Rute aplikasi di domain utama → host app" '"${CURL[@]}" -D - -o /dev/null "$SITE/login" | grep -qi "^location: $APP/login"'
