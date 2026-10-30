@@ -1,0 +1,106 @@
+"use client";
+
+import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+/**
+ * Notifikasi sukses melayang di bawah header (bukan di atas halaman), sehingga tetap terlihat
+ * di posisi gulir mana pun. Hilang sendiri setelah `duration` ms; jeda selama kursor/fokus
+ * berada di atasnya agar pesan panjang sempat dibaca. Dipasang lewat portal ke <body>
+ * supaya `position: fixed` tidak terpengaruh transform leluhur.
+ */
+export function FloatingNotice({
+  message,
+  onDismiss,
+  duration = 6000,
+}: {
+  message: string | null;
+  onDismiss: () => void;
+  duration?: number;
+}) {
+  const [held, setHeld] = useState(false);
+  const dismiss = useRef(onDismiss);
+  useEffect(() => {
+    dismiss.current = onDismiss;
+  });
+
+  useEffect(() => {
+    if (!message || held) return;
+    const timer = setTimeout(() => dismiss.current(), duration);
+    return () => clearTimeout(timer);
+  }, [message, held, duration]);
+
+  if (!message) return null;
+  return createPortal(
+    <div
+      role="status"
+      aria-live="polite"
+      className="floating-notice fixed inset-x-4 top-[4.5rem] z-50 sm:left-auto sm:right-6 sm:w-[26rem]"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
+    >
+      <div className="flex items-start gap-3 border border-success/30 border-l-[3px] border-l-success bg-[color-mix(in_srgb,var(--status-success)_10%,var(--surface))] py-3 pl-3 pr-2 text-sm text-success shadow-[0_12px_32px_-16px_rgb(0_0_0/0.35)]">
+        <p className="min-w-0 flex-1">{message}</p>
+        <button
+          type="button"
+          onClick={() => dismiss.current()}
+          aria-label="Tutup notifikasi"
+          className="-my-1 shrink-0 p-1 text-success/70 hover:text-success focus-visible:outline-2 focus-visible:outline-success"
+        >
+          <X aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Gulir halus ke baris data `[data-record="<id>"]` lalu sorot sebentar, agar pengguna melihat
+ * data yang baru dibuat/diubah. Daftar biasanya dimuat ulang setelah simpan, jadi baris
+ * ditunggu hingga 5 detik dan baru dipakai setelah stabil (simpul yang sama dua kali
+ * berturut-turut, bukan baris lama yang segera diganti saat daftar dirender ulang).
+ * Bila baris tidak tampil (mis. tersaring filter atau di halaman lain), tidak terjadi apa-apa.
+ */
+export function focusRecord(id: string | number | null | undefined) {
+  if (id === null || id === undefined || typeof document === "undefined") return;
+  const selector = `[data-record="${CSS.escape(String(id))}"]`;
+  const deadline = Date.now() + 5000;
+  let previous: Element | null = null;
+  const poll = () => {
+    const element = document.querySelector(selector);
+    if (element && element === previous) {
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const box = element.getBoundingClientRect();
+      const visible = box.top >= 72 && box.bottom <= window.innerHeight;
+      if (visible) {
+        flash(element);
+        return;
+      }
+      element.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+      // Sorot setelah guliran selesai, bukan saat mulai bergulir (guliran jauh butuh ±1 detik).
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        flash(element);
+      };
+      window.addEventListener("scrollend", finish, { once: true });
+      setTimeout(finish, reduce ? 0 : 1200); // browser tanpa event scrollend
+      return;
+    }
+    previous = element;
+    if (Date.now() < deadline) setTimeout(poll, 120);
+  };
+  setTimeout(poll, 120);
+}
+
+function flash(element: Element) {
+  element.classList.remove("record-flash");
+  void (element as HTMLElement).offsetWidth; // mulai ulang animasi bila baris yang sama disorot lagi
+  element.classList.add("record-flash");
+  element.addEventListener("animationend", () => element.classList.remove("record-flash"), { once: true });
+}
