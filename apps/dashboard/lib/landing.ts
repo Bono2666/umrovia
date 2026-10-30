@@ -10,6 +10,11 @@ export function landingPath(me: UserPayload, next?: string | null): string {
   return "/dashboard";
 }
 
+/** Login dibuka dari portal jamaah (`?next=/portal…`): akun portal hanya lewat undangan travel. */
+export function isPortalNext(next: string | null): boolean {
+  return !!next && /^\/portal(\/|\?|$)/.test(next);
+}
+
 export function nextParam(): string | null {
   return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
 }

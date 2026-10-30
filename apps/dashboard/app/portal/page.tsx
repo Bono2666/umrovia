@@ -58,7 +58,7 @@ export default function PortalPage() {
         <span className="flex items-center gap-3"><UmroviaLogo /><span className="border-l border-border pl-3 text-sm font-semibold text-ink">Portal Jamaah</span></span>
         <span className="flex items-center gap-3 text-sm text-muted">
           <span className="hidden truncate sm:inline">{me?.email}</span>
-          <LogoutButton />
+          <LogoutButton onLoggedOut={() => router.push("/login?next=/portal")} />
         </span>
       </header>
       <main className="mx-auto w-full max-w-5xl space-y-8 p-4 sm:p-6">
