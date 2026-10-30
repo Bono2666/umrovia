@@ -798,6 +798,17 @@
     color: var(--form-small);
     transform: translateY(-20px) scale(0.63636);
   }
+  /* Isian otomatis browser (password tersimpan): Chrome mengisi tanpa event input sebelum
+     ada interaksi, sehingga `is-not-empty` belum terpasang — label naik lewat pseudo-class.
+     Rule terpisah: selektor vendor tak dikenal menggugurkan seluruh daftar selektor. */
+  .form-control--float input:-webkit-autofill ~ .form-label {
+    color: var(--form-small);
+    transform: translateY(-20px) scale(0.63636);
+  }
+  .form-control--float input:autofill ~ .form-label {
+    color: var(--form-small);
+    transform: translateY(-20px) scale(0.63636);
+  }
   /* Select: label ikut terangkat lewat is-not-empty (fokus tak berpengaruh,
      persis selector :not(.form-control--select) di sumber) */
 
@@ -1264,6 +1275,12 @@
 .workspace-shell .form-control--float:is(.is-focused, .is-not-empty) .form-label,
 .workspace-shell .form-control--float input:focus ~ .form-label,
 .workspace-shell .form-control--float textarea:focus ~ .form-label {
+  transform: translateY(-16px) scale(0.857143);
+}
+.workspace-shell .form-control--float input:-webkit-autofill ~ .form-label {
+  transform: translateY(-16px) scale(0.857143);
+}
+.workspace-shell .form-control--float input:autofill ~ .form-label {
   transform: translateY(-16px) scale(0.857143);
 }
 .workspace-shell .form-control__hint,
