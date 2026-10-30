@@ -34,6 +34,7 @@ import { WorkspaceReveal } from "@/components/workspace/WorkspaceReveal";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { Btn, BtnLink, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, hasPermission, type UserPayload } from "@/lib/api";
+import { loginReturningHere, useSessionExpiry } from "@/lib/useSessionExpiry";
 
 type Phase = "loading" | "unauth" | "no-workspace" | "ok";
 
@@ -186,6 +187,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   // mencegah panah ikut berputar saat hydration (sidebar tersimpan
   // collapsed di localStorage, server snapshot = expanded).
   const [arrowReady, setArrowReady] = useState(false);
+  useSessionExpiry();
 
   // Sidebar collapse: localStorage sebagai store eksternal (useSyncExternalStore
   // — aman untuk hydration; server snapshot = expanded). Toggle memancarkan
@@ -221,7 +223,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
       if (!result.ok) {
         if (result.error.status === 401 || result.error.status === 403) {
           setPhase("unauth");
-          router.replace("/login");
+          router.replace(loginReturningHere());
           return;
         }
         setPhase("unauth");
