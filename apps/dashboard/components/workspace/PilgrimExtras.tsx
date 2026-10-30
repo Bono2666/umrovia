@@ -81,7 +81,7 @@ export function PilgrimExtras({pilgrim, canWrite, onChanged, notify}: {pilgrim: 
       <ul className="mt-1 space-y-0.5 text-xs text-muted">{history.family.members.map((m) => <li key={m.id}>{m.name} · {m.relation || "-"}{m.id === pilgrim.id ? " (jamaah ini)" : ""}</li>)}</ul>
       {canWrite ? <Btn size="xs" variant="link" disabled={busy} onClick={() => void leave()}>Keluarkan dari keluarga</Btn> : null}
     </div> : <p className="mt-2 text-sm text-muted">Belum masuk kelompok keluarga.</p>}
-    {canWrite && !history.family ? <form className="mt-2" onSubmit={join}>
+    {canWrite && !history.family ? <form className="mt-6" onSubmit={join}>
       <FormSelect label="Keluarga" htmlFor={`family-${pilgrim.id}`} value={familyId} onChange={(e) => setFamilyId(e.target.value)}>
         <option value="">+ Keluarga baru</option>{families.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.members.length} anggota)</option>)}
       </FormSelect>

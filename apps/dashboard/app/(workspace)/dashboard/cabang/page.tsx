@@ -109,7 +109,7 @@ export default function BranchesPage() {
         </> : null}
       </section>
       {canManage ? <section className="card min-w-0 p-6"><h2 className="font-semibold">{editing ? `Ubah ${editing.code}` : "Tambah cabang"}</h2>
-        <form className="mt-5" onSubmit={save}>
+        <form className="mt-6" onSubmit={save}>
           <FormField label="Kode" htmlFor="branch-code" maxLength={16} value={form.code} onChange={(event) => setForm({...form, code: event.target.value.toUpperCase()})} required hint="2–16 huruf/angka, mis. JKT, BKS-01." />
           <FormField label="Nama cabang" htmlFor="branch-name" maxLength={120} value={form.name} onChange={(event) => setForm({...form, name: event.target.value})} required />
           <FormField label="Penanggung jawab" htmlFor="branch-manager" maxLength={160} value={form.manager_name} onChange={(event) => setForm({...form, manager_name: event.target.value})} />

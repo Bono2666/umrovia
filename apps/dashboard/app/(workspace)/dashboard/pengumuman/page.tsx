@@ -75,7 +75,7 @@ export default function AnnouncementsPage() {
           </li>)}</ul>}
       </section>
       <section className="card min-w-0 p-6"><h2 className="font-semibold">Buat pengumuman</h2>
-        <form className="mt-5" onSubmit={(e) => {e.preventDefault(); void create(true);}}>
+        <form className="mt-6" onSubmit={(e) => {e.preventDefault(); void create(true);}}>
           <FormField label="Judul" htmlFor="announcement-title" maxLength={160} value={form.title} onChange={(e) => setForm({...form, title: e.target.value})} required />
           <FormTextarea label="Isi" htmlFor="announcement-body" rows={5} maxLength={5000} value={form.body} onChange={(e) => setForm({...form, body: e.target.value})} required />
           <FormSelect label="Untuk" htmlFor="announcement-departure" value={form.departure} onChange={(e) => setForm({...form, departure: e.target.value})}>

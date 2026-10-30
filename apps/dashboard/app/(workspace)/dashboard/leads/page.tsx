@@ -165,7 +165,8 @@ export default function LeadsPage() {
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <form className="notification-filters grid items-end gap-x-4 gap-y-8 sm:grid-cols-2" onSubmit={(event) => {event.preventDefault(); filter({q: search.trim()});}}>
-          <FormField label="Cari nama, kode, telepon, kota" htmlFor="lead-q" value={search} onChange={(event) => setSearch(event.target.value)} onBlur={() => filter({q: search.trim()})} />
+          {/* Selebar baris: label panjang ini bertabrakan dengan label "Tahap" bila berbagi kolom sempit */}
+          <div className="sm:col-span-2"><FormField label="Cari nama, kode, telepon, kota" htmlFor="lead-q" value={search} onChange={(event) => setSearch(event.target.value)} onBlur={() => filter({q: search.trim()})} /></div>
           <FormSelect label="Tahap" htmlFor="lead-stage" value={filters.stage} onChange={(event) => filter({stage: event.target.value})}>
             <option value="open">Masih berjalan</option><option value="">Semua</option>
             {STAGES.map((s) => <option key={s.stage} value={s.stage}>{s.label}</option>)}
@@ -257,7 +258,7 @@ export default function LeadsPage() {
             if (await act("/activities", {kind: activity.kind, body: activity.body, next_follow_up_at: fromLocalInput(activity.next_follow_up_at)}, "Aktivitas tercatat.")) setActivity({kind: activity.kind, body: "", next_follow_up_at: ""});
           }}>
             <p className="text-sm font-medium">Catat aktivitas</p>
-            <div className="notification-filters mt-3 grid items-end gap-x-4 gap-y-8 sm:grid-cols-2">
+            <div className="notification-filters mt-6 grid items-end gap-x-4 gap-y-8 sm:grid-cols-2">
               <FormSelect label="Jenis" htmlFor="activity-kind" value={activity.kind} onChange={(event) => setActivity({...activity, kind: event.target.value})}>
                 {ACTIVITY_KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </FormSelect>

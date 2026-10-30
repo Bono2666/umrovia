@@ -176,7 +176,7 @@ export default function WalletPage() {
         </section>
         <div className="min-w-0 space-y-6">
           {can("wallet.topup") ? <section className="card p-6"><h2 className="font-semibold">Top-up saldo SaaS</h2>
-            {wallet.topup_available ? <form className="mt-5" onSubmit={(event) => {event.preventDefault(); void create(wallet.topup_methods.midtrans ? "midtrans" : "manual");}}>
+            {wallet.topup_available ? <form className="mt-6" onSubmit={(event) => {event.preventDefault(); void create(wallet.topup_methods.midtrans ? "midtrans" : "manual");}}>
               <FormField label="Nominal top-up (Rp)" htmlFor="wallet-amount" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} required hint={wallet.topup_methods.midtrans ? "Bayar online lewat Midtrans (virtual account, e-wallet, kartu); saldo masuk otomatis setelah pembayaran dikonfirmasi." : "Tidak ada minimum top-up yang ditetapkan. Saldo masuk setelah verifikasi dana oleh platform."} />
               <div className="flex flex-wrap items-center gap-2">
                 {wallet.topup_methods.midtrans ? <Btn type="submit" disabled={busy || !amount}>Bayar online</Btn> : null}
@@ -217,7 +217,7 @@ export default function WalletPage() {
         </>}
       </section>
       <section className="card mt-6 p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">Mutasi wallet</h2>{can("wallet.export") ? <a className="text-sm text-primary underline" href={`${API_BASE}/api/v1/wallet/ledger/export?${query}`}>Unduh CSV</a> : null}</div>
-        <form className="wallet-filters mt-6 grid items-end gap-4 sm:grid-cols-4" onSubmit={(event) => {event.preventDefault(); setLedgerPage(1); setFilters(draftFilters);}}>
+        <form className="wallet-filters mt-6 grid items-end gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(event) => {event.preventDefault(); setLedgerPage(1); setFilters(draftFilters);}}>
           <FormField label="Dari tanggal (UTC)" htmlFor="ledger-from" type="date" value={draftFilters.from} onChange={(event) => setDraftFilters({...draftFilters,from:event.target.value})} />
           <FormField label="Sampai tanggal (UTC)" htmlFor="ledger-to" type="date" value={draftFilters.to} onChange={(event) => setDraftFilters({...draftFilters,to:event.target.value})} />
           <FormSelect label="Jenis mutasi" htmlFor="ledger-kind" value={draftFilters.kind} onChange={(event) => setDraftFilters({...draftFilters,kind:event.target.value})}><option value="">Semua</option><option value="TOPUP">Top-up</option><option value="DEBIT">Biaya SaaS</option><option value="REFUND">Refund SaaS</option></FormSelect>
