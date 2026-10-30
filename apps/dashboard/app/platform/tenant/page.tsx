@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Paginated, type PlatformTenant } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { STATE_TONE } from "@/components/platform/tone";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 export default function PlatformTenantsPage() {
   const [state, setState] = useState("");
@@ -32,7 +33,7 @@ export default function PlatformTenantsPage() {
   return <div>
     <h1 className="text-2xl font-bold">Tenant</h1>
     <p className="mt-1 text-sm text-muted">Metadata usaha, status, kuota dan hitungan. Email pemilik tersamar; data jamaah tidak ditampilkan. Membuka detail tercatat di audit.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <section className="card mt-6 p-6">
       <form className="notification-filters grid items-end gap-x-4 gap-y-8 md:grid-cols-3" onSubmit={(event) => {event.preventDefault(); setPage(1); setSearch(q.trim());}}>
         <FormField label="Cari nama atau slug" htmlFor="tenant-q" value={q} onChange={(event) => setQ(event.target.value)} onBlur={() => {setPage(1); setSearch(q.trim());}} />

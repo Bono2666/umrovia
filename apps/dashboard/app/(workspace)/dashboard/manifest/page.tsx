@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
   EmptyState,
-  ErrorState,
   FormCheckbox,
   FormField,
   FormSelect,
@@ -306,11 +305,7 @@ export default function ManifestPage() {
       </p>
 
       <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-      {error ? (
-        <div className="mt-4">
-          <ErrorState message={error} />
-        </div>
-      ) : null}
+      <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
 
       <section className="card mt-6 p-6">
         <div className="manifest-filters grid gap-x-3 gap-y-8 md:grid-cols-2 xl:grid-cols-4">

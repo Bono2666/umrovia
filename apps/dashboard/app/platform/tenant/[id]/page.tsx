@@ -61,7 +61,7 @@ export default function PlatformTenantDetailPage() {
     <div className="mt-3 flex flex-wrap items-center gap-3"><h1 className="text-2xl font-bold">{tenant.display_name}</h1><StatusBadge tone={STATE_TONE[tenant.state] ?? "neutral"}>{tenant.state_label}</StatusBadge></div>
     <p className="mt-1 text-sm text-muted">{tenant.legal_name} · {tenant.slug} · dibuat {formatDate(tenant.created_at)} · lingkungan {tenant.environments.join(", ") || "—"}</p>
     {tenant.suspended_at ? <p className="mt-3 border border-danger/30 bg-danger/10 p-3 text-sm text-danger">Ditangguhkan {when(tenant.suspended_at)} — {tenant.suspension_reason}</p> : null}
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

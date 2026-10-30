@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Btn,
   EmptyState,
-  ErrorState,
   FormField,
   FormSelect,
   FormTextarea,
@@ -17,7 +16,7 @@ import { EMPTY_ROOM_PRICES, ROOM_LABELS } from "@/lib/rooms";
 import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/forms";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusError, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Master Paket (S08, UI-04; MOD-05; Spec §5.2/§8.3): daftar + CRUD draft/
@@ -156,7 +155,7 @@ export default function PaketPage() {
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors(apiFormErrors(result.error));
+      setFormErrors(apiFormErrors(result.error)); focusError();
       return;
     }
     setName("");
@@ -220,11 +219,7 @@ export default function PaketPage() {
       </p>
 
       <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-      {error ? (
-        <div className="mt-4">
-          <ErrorState message={error} />
-        </div>
-      ) : null}
+      <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
 
       <div className="workspace-columns mt-6">
         <section className="card p-6">

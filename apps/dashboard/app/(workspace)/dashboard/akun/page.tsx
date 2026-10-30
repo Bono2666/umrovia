@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Btn, ErrorState, LoadingState } from "@/components/workspace/ui";
+import { Btn, LoadingState } from "@/components/workspace/ui";
 import { LoginHistory, type LoginRow } from "@/components/workspace/MemberSecurity";
 import { apiFetch, problemMessage } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 /** AUTH-02/03: riwayat masuk akun sendiri dan keluar dari semua perangkat. */
 export default function AccountPage() {
@@ -31,7 +32,7 @@ export default function AccountPage() {
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Akun Saya</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Sesi berakhir otomatis setelah 2 jam tanpa aktivitas dan paling lama 12 jam sejak masuk. Bila ada aktivitas masuk yang tidak Anda kenali, keluarkan semua perangkat lalu ganti sandi.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <h2 className="font-semibold">Riwayat masuk</h2>

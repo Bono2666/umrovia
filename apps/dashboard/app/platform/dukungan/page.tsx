@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { TICKET_TONE, TicketThread } from "@/components/support/TicketThread";
-import { Btn, EmptyState, ErrorState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type Paginated, type SupportTicket } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
-import { focusDetail } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusDetail } from "@/components/workspace/FloatingNotice";
 
 const STATUSES = [["OPEN", "Terbuka"], ["IN_PROGRESS", "Diproses"], ["WAITING_TENANT", "Menunggu travel"], ["RESOLVED", "Selesai"]];
 
@@ -42,7 +42,7 @@ export default function PlatformSupportPage() {
   return <div>
     <h1 className="text-2xl font-bold">Dukungan</h1>
     <p className="mt-1 text-sm text-muted">Tiket dari travel. Diagnosis hanya berisi metadata dan hitungan workspace; data jamaah tidak dapat diakses dari konsol.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <div className="notification-filters grid max-w-xs"><FormSelect label="Tampilkan" htmlFor="ticket-filter" value={filter} onChange={(event) => {setFilter(event.target.value); setTicket(null);}}>

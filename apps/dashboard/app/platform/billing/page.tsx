@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "@/components/platform/PlatformShell";
-import { Btn, EmptyState, ErrorState, FormField, LoadingState } from "@/components/workspace/ui";
+import { Btn, EmptyState, FormField, LoadingState } from "@/components/workspace/ui";
 import { apiFetch, problemMessage } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
 import { FloatingNotice } from "@/components/workspace/FloatingNotice";
@@ -33,7 +33,7 @@ export default function PlatformBillingPage() {
   return <div>
     <h1 className="text-2xl font-bold">Billing</h1>
     <p className="mt-1 text-sm text-muted">Verifikasi top-up SaaS Wallet terhadap mutasi rekening platform dan putuskan refund biaya layanan. Petugas tidak dapat memproses permintaan miliknya sendiri.</p>
-    {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
+    <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     {queue === null ? <div className="mt-6"><LoadingState /></div> : <>
       <section className="card mt-6 p-6"><h2 className="font-semibold">Top-up menunggu settlement ({queue.topups.length})</h2>

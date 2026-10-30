@@ -5,7 +5,6 @@ import {
   Btn,
   BtnLink,
   EmptyState,
-  ErrorState,
   FormField,
   FormSelect,
   FormTextarea,
@@ -23,7 +22,7 @@ import {
   type TravelPackage,
 } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusError, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Keberangkatan & kuota (S08, UI-05; MOD-06; Spec §5.2/§6.5/§8.3): daftar
@@ -222,7 +221,7 @@ export default function KeberangkatanPage() {
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors(apiFormErrors(result.error));
+      setFormErrors(apiFormErrors(result.error)); focusError();
       return;
     }
     focusRecord(result.data.id);
@@ -289,11 +288,7 @@ export default function KeberangkatanPage() {
       </p>
 
       <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
-      {error ? (
-        <div className="mt-4">
-          <ErrorState message={error} />
-        </div>
-      ) : null}
+      <FloatingNotice tone="danger" message={error} onDismiss={() => setError(null)} />
 
       <div className="workspace-columns mt-6">
         <section className="card p-6">
