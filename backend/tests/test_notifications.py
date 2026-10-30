@@ -96,6 +96,39 @@ def test_booking_and_invoice_notify_each_pilgrim_once(scenario):
     assert NotificationJob.objects.count() == 0
 
 
+
+def test_invoice_revision_notifies_new_bill_not_reissue(prod):
+    s = prod
+    issued = rows(template_key="invoice.issued").count()
+    participant = s["invoice"]["lines"][0]["participant_id"]
+    ok(post(s["client"], f"/api/v1/invoices/{s['invoice']['id']}/revise", {
+        "reason": "Catatan internal: diskon rahasia", "adjustments": [{"participant_id": participant, "discount_idr": 1_000_000, "note": "x"}],
+    }))
+    assert rows(template_key="invoice.issued").count() == issued  # bukan "invoice terbit" ulang
+    revised = rows(template_key="invoice.revised", channel="IN_APP")
+    assert revised.count() == 3 and rows(template_key="invoice.revised", channel="EMAIL").count() == 3
+    own = revised.get(recipient_id=s["pilgrims"][0]["id"])
+    assert "diperbarui" in own.subject and "versi 2" in own.body and "Rp27.000.000" in own.body
+    assert "rahasia" not in own.body  # alasan revisi bisa internal
+
+
+def test_canceling_reserved_booking_notifies_generic_message(prod):
+    s = prod
+    ok(post(s["client"], f"/api/v1/bookings/{s['booking']['id']}/transition", {"target": "CANCELED", "reason": "Alasan internal: kuota agen"}))
+    canceled = rows(template_key="booking.canceled", channel="IN_APP")
+    assert canceled.count() == 3 and rows(template_key="booking.canceled", channel="EMAIL").count() == 3
+    row = canceled.first()
+    assert s["booking"]["code"] in row.subject and "dibatalkan" in row.subject
+    assert "hubungi" in row.body and "internal" not in row.body  # pesan umum, tanpa alasan
+
+
+def test_canceling_draft_booking_sends_nothing(prod):
+    s = prod
+    pilgrim = ok(post(s["client"], "/api/v1/pilgrims", {"name": "Jamaah Draf"}))
+    draft = ok(post(s["client"], "/api/v1/bookings", {"departure": s["departure"]["id"], "participants": [pilgrim["id"]], "room_types": {pilgrim["id"]: "QUAD"}}))
+    ok(post(s["client"], f"/api/v1/bookings/{draft['id']}/transition", {"target": "CANCELED", "reason": "Salah input"}))
+    assert not rows(template_key="booking.canceled").exists()  # draf belum pernah diumumkan ke jamaah
+
 def test_payment_verified_queues_email_once_and_worker_sends(prod):
     line = prod["invoice"]["lines"][0]
     payment, _ = pay(prod, 0, line["amount_idr"])

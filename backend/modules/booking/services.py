@@ -782,6 +782,11 @@ def transition_booking(
         from modules.payments.services import cancel_booking_invoice
 
         cancel_booking_invoice(booking, reason or "Booking kedaluwarsa")
+        if target == BookingStatus.CANCELED and current != BookingStatus.DRAFT:
+            # Draf belum pernah diumumkan ke jamaah (booking.reserved terbit saat reservasi).
+            from modules.notifications.services import booking_canceled
+
+            booking_canceled(booking)
         if booking.environment == "production":
             # Charge POSTED tidak direfund otomatis (PAY09); hanya PENDING di-VOID.
             void_pending_for_booking(booking, reason or "Booking kedaluwarsa")

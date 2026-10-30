@@ -41,6 +41,15 @@ TEMPLATES = {t.key: t for t in [
         ("kode_booking", "tanggal_berangkat"),
     ),
     TemplateDef(
+        "booking.canceled", "Booking dibatalkan", "pilgrim",
+        "Booking {{ kode_booking }} dibatalkan — {{ nama_travel }}",
+        "Assalamu'alaikum {{ nama_jamaah }},\n\n"
+        "Booking {{ kode_booking }} untuk paket {{ paket }} (keberangkatan {{ tanggal_berangkat }}) telah dibatalkan oleh {{ nama_travel }}.\n\n"
+        "Untuk informasi lebih lanjut, termasuk pembayaran yang sudah Anda lakukan, silakan hubungi {{ nama_travel }}.",
+        _vars(kode_booking="Kode booking", paket="Nama paket", tanggal_berangkat="Tanggal berangkat"),
+        ("kode_booking",),
+    ),
+    TemplateDef(
         "invoice.issued", "Invoice terbit", "pilgrim",
         "Invoice {{ nomor_invoice }} — {{ nama_travel }}",
         "Assalamu'alaikum {{ nama_jamaah }},\n\n"
@@ -48,6 +57,16 @@ TEMPLATES = {t.key: t for t in [
         "Tagihan Anda: {{ tagihan }}\nJatuh tempo: {{ jatuh_tempo }}\n\n"
         "Rincian dan cara pembayaran tersedia di portal jamaah:\n{{ tautan_portal }}",
         _vars(nomor_invoice="Nomor invoice", kode_booking="Kode booking", tagihan="Tagihan jamaah", jatuh_tempo="Tanggal jatuh tempo"),
+        ("nomor_invoice", "tagihan", "jatuh_tempo"),
+    ),
+    TemplateDef(
+        "invoice.revised", "Invoice diperbarui", "pilgrim",
+        "Invoice {{ nomor_invoice }} diperbarui — {{ nama_travel }}",
+        "Assalamu'alaikum {{ nama_jamaah }},\n\n"
+        "Invoice {{ nomor_invoice }} untuk booking {{ kode_booking }} telah diperbarui (versi {{ versi }}) dan menggantikan versi sebelumnya.\n"
+        "Tagihan Anda kini: {{ tagihan }}\nJatuh tempo: {{ jatuh_tempo }}\n\n"
+        "Rincian dan cara pembayaran tersedia di portal jamaah:\n{{ tautan_portal }}",
+        _vars(nomor_invoice="Nomor invoice", kode_booking="Kode booking", versi="Versi invoice", tagihan="Tagihan jamaah", jatuh_tempo="Tanggal jatuh tempo"),
         ("nomor_invoice", "tagihan", "jatuh_tempo"),
     ),
     TemplateDef(
