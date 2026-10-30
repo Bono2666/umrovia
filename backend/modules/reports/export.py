@@ -6,10 +6,10 @@ from io import BytesIO, StringIO
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle
 
+from modules.documents import pdf_theme as theme
 from modules.documents.render import format_idr
-from modules.manifest.printing import GREEN, LINE, TINT, _p, _page_decor, _styles
 from modules.payments.pdf import document_date
 
 MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -51,48 +51,65 @@ def filename(report, ext):
 
 
 def to_pdf(report, meta, labels) -> bytes:
-    s = _styles()
+    s = theme.styles()
     output = BytesIO()
-    doc = SimpleDocTemplate(output, pagesize=landscape(A4), leftMargin=28, rightMargin=28, topMargin=30, bottomMargin=40, title=report["title"], author=report["travel"])
-    aligned = {(name, r): s[name].clone(f"{name}-{int(r)}", alignment=2 if r else 0) for name in ("head", "cell") for r in (False, True)}
-    story = [_p(report["title"], s["title"]), Spacer(1, 4), *[_p(line, s["small"]) for line in header_lines(report, labels)], Spacer(1, 10)]
+    doc = SimpleDocTemplate(output, pagesize=landscape(A4), leftMargin=28, rightMargin=28, topMargin=30, bottomMargin=42, title=report["title"], author=report["travel"])
+    width = doc.width
+    lines = [f"Periode {period_text(report)}", *header_lines(report, labels)[1:]]  # nama travel sudah di kop
+    badges = [("Demo", "danger")] if meta.get("demo") else []
+    story = [theme.kop(s, width=width, name=report["travel"], lines=lines[:2], kind="Laporan", number=report["title"], badges=badges, split=0.55), Spacer(1, 12)]
+    if lines[2:]:
+        story += [theme.notice(s, "\n".join(lines[2:]), width), Spacer(1, 12)]
     if report["kpis"]:
-        cells = [[Paragraph(f"<font size=7 color='#555b5e'>{kpi['label']}</font><br/><b>{format_value(kpi['value'], kpi['type'])}</b>", s["normal"]) for kpi in report["kpis"]]]
-        kpis = Table(cells, colWidths=[(doc.width) / len(report["kpis"])] * len(report["kpis"]))
-        kpis.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
-        story += [kpis, Spacer(1, 12)]
+        story += [_kpi_cards(report["kpis"], s, width), Spacer(1, 16)]
     for section in report["sections"]:
-        story.append(_p(section["title"], s["label"]))
+        story.append(theme.p(section["title"], s["h2"]))
         if section.get("description"):
-            story.append(_p(section["description"], s["small"]))
-        story.append(Spacer(1, 4))
+            story.append(theme.p(section["description"], s["small"]))
+        story.append(Spacer(1, 6))
         columns = section["columns"]
         if not section["rows"]:
-            story += [_p("Tidak ada data pada periode ini.", s["small"]), Spacer(1, 10)]
+            story += [theme.notice(s, "Tidak ada data pada periode ini.", width), Spacer(1, 16)]
             continue
-        right = [col["type"] in {"money", "int", "percent"} for col in columns]
-        data = [[_p(col["label"], aligned[("head", r)]) for col, r in zip(columns, right, strict=True)]]
-        data += [[_p(format_value(row.get(col["key"]), col["type"]), aligned[("cell", r)]) for col, r in zip(columns, right, strict=True)] for row in section["rows"]]
-        if section.get("totals"):
-            totals = section["totals"]
-            data.append([_p(format_value(totals.get(col["key"]), col["type"]) if col["key"] in totals else " ", aligned[("head", r)]) for col, r in zip(columns, right, strict=True)])
-        table = Table(data, repeatRows=1, colWidths=[doc.width / len(columns)] * len(columns))
-        style = [("BACKGROUND", (0, 0), (-1, 0), TINT), ("LINEBELOW", (0, 0), (-1, 0), 0.75, GREEN), ("LINEBELOW", (0, 1), (-1, -1), 0.3, LINE),
-                 ("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]
-        if section.get("totals"):
-            style.append(("LINEABOVE", (0, -1), (-1, -1), 0.75, GREEN))
-        table.setStyle(TableStyle(style))
-        story += [table, Spacer(1, 4)]
+        numeric = {i for i, col in enumerate(columns) if col["type"] in {"money", "int", "percent"}}
+        rows = [[format_value(row.get(col["key"]), col["type"]) for col in columns] for row in section["rows"]]
+        totals = section.get("totals")
+        if totals:
+            totals = [format_value(totals.get(col["key"]), col["type"]) if col["key"] in totals else " " for col in columns]
+            totals[0] = totals[0] if totals[0].strip() else "Total"
+        story.append(theme.data_table(s, [col["label"] for col in columns], rows, [width / len(columns)] * len(columns), numeric=numeric, totals=totals, zebra=True))
         if section.get("truncated"):
-            story.append(_p("Daftar dipotong pada 500 baris; persempit filter untuk rincian lengkap.", s["small"]))
-        story.append(Spacer(1, 10))
+            story += [Spacer(1, 4), theme.p("Daftar dipotong pada 500 baris; persempit filter untuk rincian lengkap.", s["small"])]
+        story.append(Spacer(1, 16))
     if report.get("checks"):
-        story.append(_p("Rekonsiliasi terhadap catatan sumber", s["label"]))
-        for check in report["checks"]:
-            story.append(_p(f"{'Sesuai' if check['ok'] else 'Selisih'} — {check['label']} ({check['detail']})", s["small"]))
-    decor = _page_decor(meta)
-    doc.build(story, onFirstPage=decor, onLaterPages=decor)
+        rows = [[theme.badge(s, "Sesuai" if check["ok"] else "Selisih", "success" if check["ok"] else "danger"), check["label"], check["detail"]] for check in report["checks"]]
+        story += [theme.p("Rekonsiliasi terhadap catatan sumber", s["h2"]), Spacer(1, 6),
+                  theme.data_table(s, ["Hasil", "Pemeriksaan", "Rincian"], rows, [70, (width - 70) * 0.45, (width - 70) * 0.55])]
+    theme.build(doc, story, _decor(meta))
     return output.getvalue()
+
+
+def _decor(meta):
+    return theme.page_decor(footer_left=f"{meta['title']} · {meta['travel']} · dicetak {meta['printed_at']} oleh {meta['printed_by']}",
+                            demo=meta.get("demo"), demo_text="DEMO — BUKAN DOKUMEN RESMI", demo_size=44)
+
+
+def _kpi_cards(kpis, s, width, gap=10):
+    """Kartu KPI berbingkai berjarak, seperti kartu ringkasan di layar Laporan."""
+    card = (width - gap * (len(kpis) - 1)) / len(kpis)
+    cells, widths, commands = [], [], [("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                                       ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 10)]
+    for index, kpi in enumerate(kpis):
+        if index:
+            cells.append("")
+            widths.append(gap)
+        column = len(cells)
+        cells.append([theme.p(kpi["label"], s["small"]), Spacer(1, 3), theme.p(format_value(kpi["value"], kpi["type"]), s["kpi"])])
+        widths.append(card)
+        commands += [("BOX", (column, 0), (column, 0), 0.75, theme.LINE), ("LINEABOVE", (column, 0), (column, 0), 2, theme.PRIMARY)]
+    table = Table([cells], colWidths=widths)
+    table.setStyle(TableStyle(theme.squared(commands)))
+    return table
 
 
 def to_xlsx(report, meta, labels) -> bytes:

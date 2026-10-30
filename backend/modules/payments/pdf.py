@@ -1,15 +1,12 @@
 """PDF lokal dari snapshot; teks di-escape, tidak mengambil URL/aset remote."""
 from datetime import datetime
 from io import BytesIO
-from xml.sax.saxutils import escape
 from zoneinfo import ZoneInfo
 
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Spacer
 
-from modules.documents.pdf_fonts import register_pdf_fonts
+from modules.documents import pdf_theme as theme
 from modules.documents.render import TEMPLATE_VERSION, format_idr
 
 MONTHS = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
@@ -23,77 +20,90 @@ def document_date(value, zone="Asia/Jakarta", *, with_time=False):
     return f"{label} · {date:%H:%M} ({zone})" if with_time else label
 
 
+def _split_time(value, zone):
+    """"29 Oktober 2026 · 14:05 (Asia/Jakarta)" → tanggal + jam sebagai keterangan sel."""
+    day, _, time = document_date(value, zone, with_time=True).partition(" · ")
+    return day, time
+
+
 def render_financial_pdf(snapshot, *, receipt=False):
-    register_pdf_fonts()
-    styles = getSampleStyleSheet()
-    normal = ParagraphStyle("UmroviaNormal", parent=styles["Normal"], fontName="Umrovia", fontSize=10, leading=15, spaceAfter=8)
-    heading = ParagraphStyle("UmroviaHeading", parent=normal, fontSize=20, leading=26, textColor=colors.HexColor("#0e6b5c"))
-    small = ParagraphStyle("UmroviaSmall", parent=normal, fontSize=8, leading=12)
-
-    def text(value, style=normal):
-        return Paragraph(escape(str(value)).replace("\n", "<br/>"), style)
-
+    s = theme.styles()
     output = BytesIO()
-    number = snapshot["number"]
-    title = "KUITANSI" if receipt else "INVOICE"
-    doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=42, rightMargin=42, topMargin=48, bottomMargin=60, title=f"{title} {number}", author=snapshot["issuer"]["legal_name"])
-    version = snapshot.get("version", 1)
-    story = [text(f"{title} {number}" + (f" · Revisi {version}" if not receipt and version > 1 else ""), heading), text(snapshot["issuer"]["legal_name"]), text(snapshot["issuer"].get("address", "-"), small)]
+    number, issuer = snapshot["number"], snapshot["issuer"]
     zone = snapshot.get("timezone", "Asia/Jakarta")
-    if snapshot.get("branch"):
-        story.append(text(f"Cabang: {snapshot['branch']}", small))
-    story.extend([Spacer(1, 12), text(f"Booking: {snapshot['booking_code']}"), text(f"Pelanggan: {snapshot['buyer_name']}"), text(f"{'Tanggal verifikasi' if receipt else 'Tanggal terbit'}: {document_date(snapshot['issued_at'], zone, with_time=True)}")])
-    if receipt:
-        method = {"CASH": "Tunai", "TRANSFER": "Transfer bank"}.get(snapshot["method"], snapshot["method"])
-        kind = {"DP": "DP", "INSTALLMENT": "Cicilan", "BALANCE": "Pelunasan"}.get(snapshot["kind"], snapshot["kind"])
-        story.extend([text(f"Tanggal penerimaan: {document_date(snapshot['received_at'], zone, with_time=True)}"), text(f"Invoice: {snapshot['invoice_number']}"), text(f"Metode penerimaan: {method}"), text(f"Untuk: {kind}"), text(f"Diverifikasi oleh: {snapshot['verified_by']}"), Spacer(1, 12), text(f"Diterima: {format_idr(snapshot['amount_idr'])}", heading)])
-    else:
-        story.append(text(f"Jatuh tempo: {document_date(snapshot['due_at'])}"))
-    rows = [[text("Uraian"), text("Jumlah (IDR)")]]
-    rows.extend([[text(line["description"]), text(format_idr(line["amount_idr"]))] for line in snapshot["lines"]])
-    table = Table(rows, colWidths=[355, 155], repeatRows=1, hAlign="LEFT")
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eaf3ef")),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.75, colors.HexColor("#0e6b5c")),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.3, colors.HexColor("#d3ddda")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    story.extend([Spacer(1, 12), table])
-    if not receipt:
-        if snapshot.get("discount_idr") or snapshot.get("extra_idr"):
-            story.extend([Spacer(1, 10), text(f"Harga paket: {format_idr(snapshot['gross_idr'])}")])
-            if snapshot.get("discount_idr"):
-                story.append(text(f"Diskon: -{format_idr(snapshot['discount_idr'])}"))
-            if snapshot.get("extra_idr"):
-                story.append(text(f"Biaya tambahan: {format_idr(snapshot['extra_idr'])}"))
-        story.extend([Spacer(1, 16), text(f"Total tagihan: {format_idr(snapshot['total_idr'])}", heading)])
-        if snapshot.get("revision"):
-            story.append(text(f"Revisi {snapshot['revision']['version']} menggantikan versi sebelumnya (total {format_idr(snapshot['revision']['previous_total_idr'])}). Alasan: {snapshot['revision']['reason']}", small))
-        story.extend([text(f"Terbayar saat terbit: {format_idr(snapshot['paid_idr'])}"), text(f"Sisa tagihan saat terbit: {format_idr(snapshot['outstanding_idr'])}"), text("Sisa tagihan terkini dapat dilihat pada halaman Invoice.", small)])
-        for account in snapshot.get("bank_accounts", []):
-            story.append(text(f"{account['bank_name']} · {account['account_name']} · {account['account_masked']}", small))
-        if snapshot.get("notes"):
-            story.append(text(snapshot["notes"], small))
-    if snapshot["issuer"].get("phone"):
-        story.append(text(f"Bantuan pembayaran: {snapshot['issuer']['phone']}", small))
-    if snapshot["environment"] == "demo":
-        story.extend([Spacer(1, 16), text("DOKUMEN DEMO - TIDAK BERLAKU SEBAGAI BUKTI PEMBAYARAN", small)])
-
-    def decorate(canvas, document):
-        canvas.saveState()
-        canvas.setFont("Umrovia", 8)
-        canvas.setFillColor(colors.HexColor("#6f7377"))
-        canvas.drawString(42, 30, f"Dokumen travel · Umrovia · Template {TEMPLATE_VERSION}")
-        canvas.drawRightString(A4[0] - 42, 30, f"Halaman {document.page}")
-        if snapshot["environment"] == "demo":
-            canvas.translate(A4[0] / 2, A4[1] / 2)
-            canvas.rotate(35)
-            canvas.setFillColor(colors.Color(0.7, 0.1, 0.1, alpha=0.10))
-            canvas.setFont("Umrovia", 70)
-            canvas.drawCentredString(0, 0, "DEMO")
-        canvas.restoreState()
-
-    doc.build(story, onFirstPage=decorate, onLaterPages=decorate)
+    demo = snapshot["environment"] == "demo"
+    title = "KUITANSI" if receipt else "INVOICE"
+    doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=42, rightMargin=42, topMargin=44, bottomMargin=58, title=f"{title} {number}", author=issuer["legal_name"])
+    width = doc.width
+    version = snapshot.get("version", 1)
+    badges = [("Terverifikasi", "success")] if receipt else ([(f"Revisi {version}", "warning")] if version > 1 else [])
+    if demo:
+        badges.append(("Demo", "danger"))
+    story = [theme.kop(s, width=width, name=issuer["legal_name"], lines=[issuer.get("address"), issuer.get("phone") and f"Telepon {issuer['phone']}"],
+                       kind="Kuitansi pembayaran" if receipt else "Invoice", number=number, badges=badges), Spacer(1, 16)]
+    story += _receipt_body(snapshot, s, width, zone) if receipt else _invoice_body(snapshot, s, width, zone)
+    if demo:
+        story += [Spacer(1, 12), theme.notice(s, "DOKUMEN DEMO — TIDAK BERLAKU SEBAGAI BUKTI PEMBAYARAN", width, kind="danger")]
+    decor = theme.page_decor(footer_left=f"{issuer['legal_name']} · dibuat dengan Umrovia · template {TEMPLATE_VERSION}", demo=demo)
+    theme.build(doc, story, decor)
     return output.getvalue()
+
+
+def _lines_table(snapshot, s, width, *, total=None):
+    rows = [[str(index), line["description"], format_idr(line["amount_idr"])] for index, line in enumerate(snapshot["lines"], 1)]
+    totals = [" ", total[0], total[1]] if total else None
+    return theme.data_table(s, ["No", "Uraian", "Jumlah"], rows, [28, width - 28 - 130, 130], numeric={2}, totals=totals, body="body", pad=6)
+
+
+def _invoice_body(snapshot, s, width, zone):
+    issued, issued_time = _split_time(snapshot["issued_at"], zone)
+    cells = [("Ditagihkan kepada", snapshot["buyer_name"], snapshot.get("branch") and f"Cabang {snapshot['branch']}"),
+             ("Kode booking", snapshot["booking_code"]), ("Tanggal terbit", issued, issued_time),
+             ("Jatuh tempo", document_date(snapshot["due_at"]))]
+    story = [theme.info_grid(s, cells, width, cols=4), Spacer(1, 14), _lines_table(snapshot, s, width), Spacer(1, 14)]
+
+    summary = []
+    if snapshot.get("discount_idr") or snapshot.get("extra_idr"):
+        summary.append(("Harga paket", format_idr(snapshot["gross_idr"]), ""))
+        if snapshot.get("discount_idr"):
+            summary.append(("Diskon", f"−{format_idr(snapshot['discount_idr'])}", ""))
+        if snapshot.get("extra_idr"):
+            summary.append(("Biaya tambahan", format_idr(snapshot["extra_idr"]), ""))
+    summary += [("Total tagihan", format_idr(snapshot["total_idr"]), "grand"),
+                ("Terbayar saat terbit", format_idr(snapshot["paid_idr"]), ""),
+                ("Sisa tagihan saat terbit", format_idr(snapshot["outstanding_idr"]), "strong")]
+
+    pay_width = width * 0.5
+    accounts = []
+    for account in snapshot.get("bank_accounts", []):
+        accounts += [theme.p(account["bank_name"], s["bold"]), theme.p(f"{account['account_name']} · {account['account_masked']}", s["body"]), Spacer(1, 5)]
+    accounts = accounts or [theme.p("Hubungi travel untuk instruksi pembayaran.", s["body"]), Spacer(1, 5)]
+    accounts.append(theme.p("Sisa tagihan terkini dapat dilihat pada halaman Invoice.", s["small"]))
+    if snapshot["issuer"].get("phone"):
+        accounts.append(theme.p(f"Bantuan pembayaran: {snapshot['issuer']['phone']}", s["small"]))
+    story.append(theme.columns([pay_width, width - pay_width - 14],
+                               [theme.card(s, "Pembayaran ke rekening", accounts, pay_width), theme.totals_box(s, summary, width - pay_width - 14)], gap=14))
+    if snapshot.get("revision"):
+        revision = snapshot["revision"]
+        story += [Spacer(1, 12), theme.notice(s, f"Revisi {revision['version']} menggantikan versi sebelumnya (total {format_idr(revision['previous_total_idr'])}). Alasan: {revision['reason']}", width, kind="warning")]
+    if snapshot.get("notes"):
+        story += [Spacer(1, 12), theme.card(s, "Catatan", theme.p(snapshot["notes"], s["body"]), width)]
+    return story
+
+
+def _receipt_body(snapshot, s, width, zone):
+    method = {"CASH": "Tunai", "TRANSFER": "Transfer bank"}.get(snapshot["method"], snapshot["method"])
+    kind = {"DP": "DP", "INSTALLMENT": "Cicilan", "BALANCE": "Pelunasan"}.get(snapshot["kind"], snapshot["kind"])
+    received, received_time = _split_time(snapshot["received_at"], zone)
+    verified, verified_time = _split_time(snapshot["issued_at"], zone)
+    hero = theme.info_grid(s, [("Jumlah diterima", theme.p(format_idr(snapshot["amount_idr"]), s["amount"]), f"Untuk {kind} · {method}"),
+                               ("Invoice", snapshot["invoice_number"], f"Booking {snapshot['booking_code']}")], width, cols=2)
+    hero.setStyle([("BACKGROUND", (0, 0), (0, 0), theme.TINT)])
+    cells = [("Diterima dari", snapshot["buyer_name"]), ("Tanggal penerimaan", received, received_time),
+             ("Tanggal verifikasi", verified, verified_time), ("Diverifikasi oleh", snapshot["verified_by"])]
+    story = [hero, Spacer(1, 12), theme.info_grid(s, cells, width, cols=4), Spacer(1, 16), theme.p("Rincian alokasi", s["h2"]), Spacer(1, 6),
+             _lines_table(snapshot, s, width, total=("Total diterima", format_idr(snapshot["amount_idr"]))), Spacer(1, 10),
+             theme.p("Kuitansi diterbitkan otomatis oleh sistem setelah pembayaran diverifikasi.", s["small"])]
+    if snapshot["issuer"].get("phone"):
+        story.append(theme.p(f"Bantuan pembayaran: {snapshot['issuer']['phone']}", s["small"]))
+    return story
