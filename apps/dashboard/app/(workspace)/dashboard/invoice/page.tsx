@@ -7,6 +7,7 @@ import { API_BASE, apiFetch, problemMessage, type Booking, type Paginated, type 
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 type LineEdit = {discount: string; extra: string; note: string};
 const rupiah = (value: string) => Number(value.replace(/\D/g, "")) || 0;
@@ -52,6 +53,7 @@ export default function InvoicePage() {
     const result = await apiFetch<TravelInvoice>(`/bookings/${bookingId}/issue-invoice`, {method:"POST", body: JSON.stringify({...(dueAt ? {due_at: dueAt} : {}), ...(buyerName.trim() ? {buyer_name: buyerName.trim()} : {})})});
     setBusy(false);
     if (!result.ok) { setError(problemMessage(result.error)); return; }
+    focusRecord(result.data.id);
     setMessage(`Invoice ${result.data.invoice_number} terbit sebesar ${formatIdr(result.data.total_idr)}.`);
     setBookingId(""); setBuyerName(""); load();
   }
@@ -86,6 +88,7 @@ export default function InvoicePage() {
     const result = await apiFetch<TravelInvoice>(`/invoices/${revising.id}/revise`, {method: "POST", body: JSON.stringify(body)});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(result.data.id);
     setMessage(`Invoice ${result.data.invoice_number} direvisi ke versi ${result.data.version}: total ${formatIdr(result.data.total_idr)}. Versi lama tetap tersimpan.`);
     setRevising(null); load();
   }
@@ -104,14 +107,14 @@ export default function InvoicePage() {
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Invoice</RevealText>
     <p className="mt-1 text-sm text-muted">Tagihan dari harga booking yang sudah tersimpan. Pembayaran terverifikasi memperbarui sisa tagihan.</p>
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
     <div className="workspace-columns mt-6">
       <section className="card p-6">
         <h2 className="font-semibold">Daftar invoice</h2>
         {invoices === null ? <LoadingState /> : invoices.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada invoice" description="Invoice terbit otomatis saat booking direservasi." /></div> :
           <ul className="mt-4 divide-y divide-border">
-            {invoices.map((invoice) => <li key={invoice.id} className="py-4 text-sm">
+            {invoices.map((invoice) => <li key={invoice.id} data-record={invoice.id} className="py-4 text-sm">
               <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{invoice.invoice_number}</span>{invoice.version > 1 ? <StatusBadge tone="warning">Revisi {invoice.version}</StatusBadge> : null}<StatusBadge tone={invoice.status === "PAID" ? "success" : invoice.status === "VOIDED" ? "danger" : "neutral"}>{LABELS[invoice.status] ?? invoice.status}</StatusBadge>{invoice.overdue ? <StatusBadge tone="danger">Lewat jatuh tempo</StatusBadge> : null}</div>
               <p className="mt-1 text-muted">{invoice.booking_code} · {invoice.buyer_name} · jatuh tempo {formatDate(invoice.due_at)}</p>
               <p className="mt-2">Total <strong>{formatIdr(invoice.total_idr)}</strong> · terbayar {formatIdr(invoice.paid_idr)}</p>

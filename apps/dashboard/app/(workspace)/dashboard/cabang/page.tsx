@@ -5,6 +5,7 @@ import { Btn, EmptyState, ErrorState, FormField, FormSelect, LoadingState, Statu
 import { apiFetch, problemMessage, type Branch, type MembershipRow } from "@/lib/api";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const EMPTY = {code: "", name: "", manager_name: "", phone: "", address: ""};
 
@@ -35,6 +36,7 @@ export default function BranchesPage() {
     const result = await apiFetch<Branch>(editing ? `/branches/${editing.id}` : "/branches", {method: editing ? "PATCH" : "POST", body: JSON.stringify(form)});
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(result.data.id);
     setMessage(editing ? `Cabang ${result.data.code} diperbarui.` : `Cabang ${result.data.code} · ${result.data.name} ditambahkan.`);
     setEditing(null); setForm(EMPTY); void load();
   }
@@ -43,6 +45,7 @@ export default function BranchesPage() {
     setError(null); setMessage(null);
     const result = await apiFetch<Branch>(`/branches/${branch.id}`, {method: "PATCH", body: JSON.stringify({active: !branch.active})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
+    focusRecord(branch.id);
     setMessage(branch.active ? `${branch.code} dinonaktifkan; transaksi lama tetap tercatat.` : `${branch.code} diaktifkan kembali.`);
     void load();
   }
@@ -52,6 +55,7 @@ export default function BranchesPage() {
     const result = await apiFetch<{branch: Branch | null; branches: Branch[]}>(`/memberships/${member.id}/branch`, {method: "POST", body: JSON.stringify({branches, branch})});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
     setMembers((prev) => prev.map((m) => m.id === member.id ? {...m, branch: result.data.branch, branches: result.data.branches} : m));
+    focusRecord(member.id);
     setMessage(`Penugasan cabang ${member.user.full_name || member.user.email} disimpan.`);
     void load();
   }
@@ -64,12 +68,12 @@ export default function BranchesPage() {
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Cabang</RevealText>
     <p className="mt-1 max-w-3xl text-sm text-muted">Kantor cabang atau unit kerja. Booking, lead, pengeluaran dan transfer kas ditandai per cabang. Peran berakses “cabang sendiri” (default: Sales, Operations, Document Reviewer) hanya melihat cabang yang ditugaskan; Owner, Admin dan Finance melihat semua cabang. Atur cakupan peran di Pengguna & Role.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6">
         <h2 className="font-semibold">Daftar cabang</h2>
         {rows === null ? <LoadingState /> : rows.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada cabang" description="Tanpa cabang, semua transaksi tercatat untuk kantor pusat." /></div> :
-          <ul className="mt-4 divide-y divide-border">{rows.map((branch) => <li key={branch.id} className="py-4 text-sm">
+          <ul className="mt-4 divide-y divide-border">{rows.map((branch) => <li key={branch.id} data-record={branch.id} className="py-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2"><span className="font-semibold">{branch.code}</span><span>{branch.name}</span>{branch.active ? null : <StatusBadge tone="neutral">Nonaktif</StatusBadge>}</p>
@@ -90,7 +94,7 @@ export default function BranchesPage() {
               const next = on ? [...assigned, id] : assigned.filter((x) => x !== id);
               void assign(member, next, member.branch && next.includes(member.branch.id) ? member.branch.id : next[0] ?? null);
             };
-            return <li key={member.id} className="py-3 text-sm">
+            return <li key={member.id} data-record={member.id} className="py-3 text-sm">
               <p className="flex flex-wrap items-center gap-2"><span className="font-medium">{member.user.full_name || member.user.email}</span><span className="text-xs text-muted">{member.role ?? "-"}</span>
                 <StatusBadge tone={member.branch_scope === "OWN" ? "warning" : "neutral"}>{member.branch_scope === "OWN" ? "Cabang sendiri" : "Semua cabang"}</StatusBadge></p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">{active.map((branch) => <label key={branch.id} className="flex items-center gap-1.5">

@@ -93,6 +93,27 @@
   box-shadow: none;
 }
 
+/* Notifikasi melayang (FloatingNotice) + sorotan baris data yang baru disimpan (focusRecord) */
+.floating-notice {
+  animation: floating-notice-in 0.45s var(--ease-editorial) both;
+}
+@keyframes floating-notice-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.record-flash {
+  animation: record-flash 3s ease-out;
+}
+@keyframes record-flash {
+  /* Tint melebar 10px ke luar baris (box-shadow spread) agar teks di tepi tidak menempel/tertimpa */
+  0%, 45% { background-color: rgb(14 107 92 / 0.1); box-shadow: 0 0 0 10px rgb(14 107 92 / 0.1); }
+  100% { background-color: transparent; box-shadow: 0 0 0 10px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .floating-notice { animation: none; }
+  .record-flash { animation-timing-function: steps(1, end); }
+}
+
 /* ==========================================================================
    Tombol — PORT 1:1 dari sistem `.btn` web_template (global.css, tema light).
    Fakta sumber yang dipetakan persis:

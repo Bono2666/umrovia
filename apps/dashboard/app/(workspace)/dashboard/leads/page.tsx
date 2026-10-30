@@ -6,6 +6,7 @@ import { apiFetch, problemMessage, type Departure, type Lead, type LeadStage, ty
 import { formatDate } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const SOURCES: [string, string][] = [
   ["WHATSAPP", "WhatsApp"], ["INSTAGRAM", "Instagram"], ["FACEBOOK", "Facebook"], ["TIKTOK", "TikTok"], ["WEBSITE", "Website"],
@@ -73,7 +74,7 @@ export default function LeadsPage() {
   }, [loading, canRead]);
 
   function filter(next: Partial<typeof filters>) {setPage(1); setFilters((value) => ({...value, ...next}));}
-  function done(text: string, lead?: Lead) {setMessage(text); setError(null); if (lead) setSelected(lead); loadList();}
+  function done(text: string, lead?: Lead) {setMessage(text); setError(null); if (lead) setSelected(lead); loadList(); focusRecord(lead?.id);}
 
   async function open(id: string) {
     setMode("view"); setMessage(null); setError(null); setDuplicates(null);
@@ -141,7 +142,7 @@ export default function LeadsPage() {
     </div>
     <p className="mt-1 max-w-3xl text-sm text-muted">Kelola calon jamaah dari pertama menghubungi hingga terdaftar. Lead gratis — biaya layanan hanya untuk jamaah dengan DP terverifikasi.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     {summary ? <>
       <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-6" aria-label="Funnel lead">
@@ -178,7 +179,7 @@ export default function LeadsPage() {
         </form>
         {filters.follow_up ? <p className="mt-4 text-sm">Menampilkan follow-up {filters.follow_up === "overdue" ? "terlambat" : "jatuh tempo hari ini"}. <button type="button" className="text-primary underline" onClick={() => filter({follow_up: "", stage: "open"})}>Tampilkan semua</button></p> : null}
         {list === null ? <LoadingState /> : list.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada lead" description="Tambahkan calon jamaah dari WhatsApp, media sosial, referensi atau kunjungan kantor." /></div> : <>
-          <ul className="mt-4 divide-y divide-border">{list.results.map((lead) => <li key={lead.id}>
+          <ul className="mt-4 divide-y divide-border">{list.results.map((lead) => <li key={lead.id} data-record={lead.id}>
             <button type="button" aria-current={selected?.id === lead.id} onClick={() => void open(lead.id)} className={`w-full py-3 text-left text-sm ${selected?.id === lead.id ? "text-primary" : ""}`}>
               <span className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{lead.name}{lead.pax > 1 ? ` · ${lead.pax} orang` : ""}</span><StatusBadge tone={TONE[lead.stage]}>{lead.stage_label}</StatusBadge></span>
               <span className="mt-1 block text-xs text-muted">{lead.code} · {lead.source_label}{lead.phone ? ` · ${lead.phone}` : ""}{lead.owner?.name ? ` · ${lead.owner.name}` : ""}</span>
@@ -214,8 +215,8 @@ export default function LeadsPage() {
           {duplicates ? <div className="mb-4 border border-warning/40 bg-warning/10 p-4 text-sm" role="alert">
             <p className="font-semibold">Telepon/email ini sudah terdaftar</p>
             <ul className="mt-2 space-y-1">
-              {duplicates.leads.map((row) => <li key={row.id}><button type="button" className="text-primary underline" onClick={() => void open(row.id)}>{row.name}</button> <span className="text-xs text-muted">lead {row.code}</span></li>)}
-              {duplicates.pilgrims.map((row) => <li key={row.id}>{row.name} <span className="text-xs text-muted">jamaah {row.code} — cari di menu Jamaah</span></li>)}
+              {duplicates.leads.map((row) => <li key={row.id} data-record={row.id}><button type="button" className="text-primary underline" onClick={() => void open(row.id)}>{row.name}</button> <span className="text-xs text-muted">lead {row.code}</span></li>)}
+              {duplicates.pilgrims.map((row) => <li key={row.id} data-record={row.id}>{row.name} <span className="text-xs text-muted">jamaah {row.code} — cari di menu Jamaah</span></li>)}
             </ul>
             <Btn className="mt-3" size="xs" variant="tint" disabled={busy} onClick={(event) => void save(event as unknown as React.FormEvent, true)}>Tetap simpan sebagai lead baru</Btn>
           </div> : null}
@@ -268,7 +269,7 @@ export default function LeadsPage() {
         </> : <p className="mt-5 text-sm text-muted">Workspace ini hanya-baca.</p>}
 
         <div className="mt-6 border-t border-border pt-5"><p className="text-sm font-medium">Riwayat</p>
-          <ol className="mt-3 space-y-3">{(selected.activities ?? []).map((item) => <li key={item.id} className="text-sm">
+          <ol className="mt-3 space-y-3">{(selected.activities ?? []).map((item) => <li key={item.id} data-record={item.id} className="text-sm">
             <p className="text-xs text-muted"><span className="font-semibold text-foreground">{item.kind_label}</span> · {item.actor ?? "sistem"} · {when(item.created_at)}</p>
             {item.body ? <p className="mt-1 whitespace-pre-wrap">{item.body}</p> : null}
           </li>)}</ol>

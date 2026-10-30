@@ -8,6 +8,7 @@ import { STATE_TONE } from "@/components/platform/tone";
 import { Btn, ErrorState, FormField, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage, type PlatformTenantDetail } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 type Pending = {kind: "suspend" | "reactivate" | "termination" | "extend" | "approve" | "reject"; requestId?: string} | null;
 const ACTION_TEXT: Record<string, {title: string; hint: string; button: string; danger?: boolean}> = {
@@ -61,7 +62,7 @@ export default function PlatformTenantDetailPage() {
     <p className="mt-1 text-sm text-muted">{tenant.legal_name} · {tenant.slug} · dibuat {formatDate(tenant.created_at)} · lingkungan {tenant.environments.join(", ") || "—"}</p>
     {tenant.suspended_at ? <p className="mt-3 border border-danger/30 bg-danger/10 p-3 text-sm text-danger">Ditangguhkan {when(tenant.suspended_at)} — {tenant.suspension_reason}</p> : null}
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[["Saldo wallet", tenant.usage ? formatIdr(tenant.usage.wallet_balance_idr) : "—"], ["Charge tertunda", `${tenant.usage?.pending_charges ?? 0} · ${formatIdr(tenant.usage?.pending_charge_idr ?? 0)}`],

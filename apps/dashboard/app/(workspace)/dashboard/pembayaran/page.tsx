@@ -6,6 +6,7 @@ import { API_BASE, apiFetch, problemMessage, type ChargePreview, type Paginated,
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 type Account = {id:string;bank_name:string;account_name:string;account_masked:string};
 const STATUS: Record<string,string> = {DRAFT:"Draf",SUBMITTED:"Menunggu verifikasi",VERIFIED:"Terverifikasi",REJECTED:"Ditolak",REVERSED:"Direversal"};
@@ -101,6 +102,7 @@ export default function PaymentsPage() {
     const result=await apiFetch<TravelPayment>("/payments",{method:"POST",headers:{"Idempotency-Key":operationKey("record",body)},body:JSON.stringify(body)});
     setBusy(false);
     if(!result.ok){setError(problemMessage(result.error));return;}
+    focusRecord(result.data.id);
     setMessage("Pembayaran tercatat dan diajukan untuk verifikasi.");
     keys.current.delete("record");setAmount("");setAllocations({});setReference("");setEvidence("");load();
   }
@@ -113,6 +115,7 @@ export default function PaymentsPage() {
       const result=await apiFetch<TravelPayment>(`/payments/${payment.id}`,{method:"PATCH",body:JSON.stringify({evidence_ref:evidenceRef})});
       setBusy(false);
       if(!result.ok){setError(problemMessage(result.error));return;}
+      focusRecord(payment.id);
       setMessage("Referensi bukti tersimpan.");load();return;
     }
     const body:Record<string,string>={};
@@ -128,6 +131,7 @@ export default function PaymentsPage() {
     setBusy(false);
     if(!result.ok){setError(problemMessage(result.error));return;}
     const pending=action==="verify"&&result.data.participants.some((row)=>row.saas_charge_status?.startsWith("PENDING"));
+    focusRecord(result.data.id);
     setMessage(action==="verify"?(pending?"Pembayaran terverifikasi dan kuitansi diterbitkan. Biaya layanan menunggu saldo SaaS Wallet.":"Pembayaran terverifikasi dan kuitansi diterbitkan."):action==="reverse"?"Reversal tercatat; sisa tagihan diperbarui.":action==="reject"?"Pembayaran ditolak dengan alasan.":"Pembayaran diajukan.");load();
   }
 
@@ -136,11 +140,11 @@ export default function PaymentsPage() {
   return <div className="workspace-page">
     <RevealText as="h1" variant="title" className="text-2xl font-bold">Pembayaran</RevealText>
     <p className="mt-1 text-sm text-muted">Catat DP, cicilan, atau pelunasan dan alokasikan nominal ke masing-masing jamaah. Kuitansi diterbitkan setelah dana diverifikasi.</p>
-    {message?<p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p>:null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     {error?<div className="mt-4"><ErrorState message={error}/></div>:null}
     <div className="workspace-columns mt-6">
       <section className="card p-6"><h2 className="font-semibold">Riwayat pembayaran</h2>
-        {visiblePayments===null?<LoadingState/>:visiblePayments.length===0?<div className="mt-4"><EmptyState title="Belum ada pembayaran"/></div>:<ul className="mt-4 divide-y divide-border">{visiblePayments.map((payment)=><li key={payment.id} className="py-4 text-sm">
+        {visiblePayments===null?<LoadingState/>:visiblePayments.length===0?<div className="mt-4"><EmptyState title="Belum ada pembayaran"/></div>:<ul className="mt-4 divide-y divide-border">{visiblePayments.map((payment)=><li key={payment.id} data-record={payment.id} className="py-4 text-sm">
           <div className="flex flex-wrap items-center gap-2"><strong>{formatIdr(payment.amount_idr)}</strong><StatusBadge tone={payment.status==="VERIFIED"?"success":["REJECTED","REVERSED"].includes(payment.status)?"danger":"warning"}>{STATUS[payment.status]}</StatusBadge>{payment.simulated?<StatusBadge tone="warning">DEMO</StatusBadge>:null}</div>
           <p className="mt-1 text-xs text-muted">{payment.booking_code} · {payment.invoice_number} · {payment.kind} · {formatDate(payment.received_at)}</p>
           <p className="mt-1 text-xs text-muted">Referensi: {payment.reference||payment.evidence_ref}</p>

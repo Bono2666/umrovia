@@ -5,6 +5,7 @@ import { usePlatform } from "@/components/platform/PlatformShell";
 import { Btn, EmptyState, ErrorState, FormField, LoadingState } from "@/components/workspace/ui";
 import { apiFetch, problemMessage } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 type Topup = {tenant_id: string; tenant: string; id: string; number: string; amount_idr: number; provider: string; payment_reference: string; evidence_ref: string; requested_by: string; requested_at: string};
 type Refund = {tenant_id: string; tenant: string; id: string; amount_idr: number; booking_code: string; reason: string; requested_by: string; requested_at: string};
@@ -33,7 +34,7 @@ export default function PlatformBillingPage() {
     <h1 className="text-2xl font-bold">Billing</h1>
     <p className="mt-1 text-sm text-muted">Verifikasi top-up SaaS Wallet terhadap mutasi rekening platform dan putuskan refund biaya layanan. Petugas tidak dapat memproses permintaan miliknya sendiri.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     {queue === null ? <div className="mt-6"><LoadingState /></div> : <>
       <section className="card mt-6 p-6"><h2 className="font-semibold">Top-up menunggu settlement ({queue.topups.length})</h2>
         {queue.topups.length === 0 ? <div className="mt-4"><EmptyState title="Tidak ada top-up menunggu" /></div> : <ul className="mt-3 divide-y divide-border">{queue.topups.map((t) => <li key={t.id} className="py-4 text-sm">

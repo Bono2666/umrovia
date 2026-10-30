@@ -5,6 +5,7 @@ import { Btn, EmptyState, ErrorState, FormField, FormSelect, FormTextarea, Loadi
 import { TICKET_TONE, TicketThread } from "@/components/support/TicketThread";
 import { apiFetch, problemMessage, type Paginated, type SupportTicket } from "@/lib/api";
 import { RevealText } from "@/components/marketing/RevealText";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const CATEGORIES = [["TECHNICAL", "Kendala teknis"], ["BILLING", "SaaS Wallet & tagihan"], ["ACCOUNT", "Akun & akses"], ["DATA", "Data & privasi"], ["OTHER", "Lainnya"]];
 const EMPTY = {subject: "", category: "TECHNICAL", body: ""};
@@ -37,6 +38,7 @@ export default function SupportPage() {
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
     setForm(EMPTY); setCreating(false); setSelected(result.data);
+    focusRecord(result.data.id);
     setMessage(`Tiket ${result.data.number} terkirim. Tim Umrovia akan membalas di sini dan lewat email.`);
     void load();
   }
@@ -55,7 +57,7 @@ export default function SupportPage() {
     if (!selected) return;
     const result = await apiFetch<SupportTicket>(`/support/tickets/${selected.id}/resolve`, {method: "POST"});
     if (!result.ok) {setError(problemMessage(result.error)); return;}
-    setSelected(result.data); setMessage("Tiket ditandai selesai. Balas kapan saja untuk membukanya kembali."); void load();
+    setSelected(result.data); focusRecord(result.data.id); setMessage("Tiket ditandai selesai. Balas kapan saja untuk membukanya kembali."); void load();
   }
 
   return <div className="workspace-page">
@@ -65,11 +67,11 @@ export default function SupportPage() {
     </div>
     <p className="mt-1 max-w-3xl text-sm text-muted">Hubungi tim Umrovia untuk kendala akun, SaaS Wallet atau teknis. Tim dukungan hanya melihat isi tiket dan ringkasan workspace, bukan data jamaah Anda.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6"><h2 className="font-semibold">Tiket travel</h2>
         {list === null ? <LoadingState /> : list.results.length === 0 ? <div className="mt-4"><EmptyState title="Belum ada tiket" description="Buat tiket bila Anda butuh bantuan tim Umrovia." /></div> : (
-          <ul className="mt-3 divide-y divide-border">{list.results.map((ticket) => <li key={ticket.id}>
+          <ul className="mt-3 divide-y divide-border">{list.results.map((ticket) => <li key={ticket.id} data-record={ticket.id}>
             <button type="button" aria-current={selected?.id === ticket.id} onClick={() => void open(ticket.id)} className={`w-full py-3 text-left text-sm ${selected?.id === ticket.id ? "text-primary" : ""}`}>
               <span className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{ticket.subject}</span><StatusBadge tone={TICKET_TONE[ticket.status] ?? "neutral"}>{ticket.status_label}</StatusBadge></span>
               <span className="mt-1 block text-xs text-muted">{ticket.number} · {ticket.category_label} · {ticket.opened_by} · {new Date(ticket.last_message_at).toLocaleString("id-ID", {dateStyle: "medium", timeStyle: "short"})}</span>

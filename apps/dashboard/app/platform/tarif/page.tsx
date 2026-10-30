@@ -5,6 +5,7 @@ import { usePlatform } from "@/components/platform/PlatformShell";
 import { Btn, ErrorState, FormField, FormTextarea, LoadingState, StatusBadge } from "@/components/workspace/ui";
 import { apiFetch, problemMessage } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
+import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
 type Price = {id: string; code: string; unit_price_idr: number; effective_from: string; current: boolean; scheduled: boolean};
 
@@ -33,7 +34,7 @@ export default function PlatformPricingPage() {
     <h1 className="text-2xl font-bold">Tarif SaaS</h1>
     <p className="mt-1 text-sm text-muted">Tarif per booking-jamaah dengan DP terverifikasi. Setiap biaya menyimpan versi tarif saat dibuat; versi baru hanya berlaku ke depan.</p>
     {error ? <div className="mt-4"><ErrorState message={error} /></div> : null}
-    {message ? <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">{message}</p> : null}
+    <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
     <div className="workspace-columns mt-6">
       <section className="card min-w-0 p-6"><h2 className="font-semibold">Versi tarif</h2>
         {rows === null ? <LoadingState /> : <ul className="mt-3 divide-y divide-border">{rows.map((row) => <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">

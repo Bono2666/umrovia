@@ -16,6 +16,7 @@ import { changedFields, focusForm, formErrors as apiFormErrors } from "@/lib/for
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
 import { CashPanel } from "@/components/workspace/CashPanel";
+import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
 
 /**
  * Kas & Bank (S06, §5.3): daftar rekening bank resmi travel (nomor hanya
@@ -79,6 +80,7 @@ export default function RekeningPage() {
       return;
     }
     resetForm();
+    focusRecord(result.data.bank_account.id);
     setMessage(
       `Rekening tersimpan (tersimpan sebagai nomor masked ${result.data.bank_account.account_masked}).`,
     );
@@ -143,11 +145,7 @@ export default function RekeningPage() {
         disimpan dan ditampilkan.
       </p>
 
-      {message ? (
-        <p className="mt-4 border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
-          {message}
-        </p>
-      ) : null}
+      <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
       {error ? (
         <div className="mt-4">
           <ErrorState message={error} />
@@ -171,7 +169,7 @@ export default function RekeningPage() {
         ) : (
           <ul className="mt-4 divide-y divide-border/60">
             {rows.map((account) => (
-              <li key={account.id} className="py-4 text-sm">
+              <li key={account.id} data-record={account.id} className="py-4 text-sm">
                 <p className="flex flex-wrap items-center gap-2 font-semibold">
                   {account.bank_name}
                   <StatusBadge tone={account.active ? "success" : "neutral"}>
