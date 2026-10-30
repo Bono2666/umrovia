@@ -2,18 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { apiFetch, problemMessage, type UserPayload } from "@/lib/api";
-import { landingPath, nextParam } from "@/lib/landing";
+import { isPortalNext, landingPath, nextParam } from "@/lib/landing";
 import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { Btn, FormField } from "@/components/workspace/ui";
 
 /**
  * Login (S02) — POST /auth/login (session cookie + rate limit, Spec §8.1).
  * Bila sudah sesi aktif, langsung arahkan ke /dashboard.
+ *
+ * Dipakai bersama staf travel dan jamaah. Dari portal (`?next=/portal…`) tidak ada
+ * tautan daftar: akun portal hanya dibuat lewat undangan travel.
  */
+const noSubscribe = () => () => {};
+
 export default function LoginPage() {
   const router = useRouter();
+  // Dibaca dari URL tanpa useSearchParams (butuh Suspense); server selalu false → tanpa mismatch hidrasi.
+  const portal = useSyncExternalStore(noSubscribe, () => isPortalNext(nextParam()), () => false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -56,7 +63,7 @@ export default function LoginPage() {
       <div className="card w-full max-w-md p-8">
         <h1 aria-label="Umrovia"><UmroviaLogo /></h1>
         <p className="mt-3 text-sm text-muted">
-          Masuk ke workspace travel atau portal jamaah
+          {portal ? "Masuk ke portal jamaah" : "Masuk ke workspace travel atau portal jamaah"}
         </p>
         {/* Struktur form = form kontak web_template 1:1: form-group per
             field, error-message, form-footer--narrow, submit circle-xl
@@ -101,12 +108,19 @@ export default function LoginPage() {
             </Btn>
           </div>
         </form>
-        <p className="mt-6 text-sm text-muted">
-          Belum punya akun?{" "}
-          <Link href="/register" className="font-semibold text-primary">
-            Coba gratis 30 hari
-          </Link>
-        </p>
+        {portal ? (
+          <p className="mt-6 text-sm text-muted">
+            Akses portal diberikan lewat undangan email dari travel Anda. Belum menerima
+            undangan? Hubungi travel tempat Anda mendaftar.
+          </p>
+        ) : (
+          <p className="mt-6 text-sm text-muted">
+            Belum punya akun?{" "}
+            <Link href="/register" className="font-semibold text-primary">
+              Coba gratis 30 hari
+            </Link>
+          </p>
+        )}
       </div>
     </main>
   );
