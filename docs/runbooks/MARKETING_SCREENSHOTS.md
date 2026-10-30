@@ -9,7 +9,7 @@ Perbarui gambar bila tampilan halaman yang dipotret berubah.
 
 | Berkas | Sumber di aplikasi |
 |---|---|
-| `ringkasan.webp` (pita gelap) | Ringkasan workspace |
+| `tur-aplikasi.mp4` / `.webm` + `tur-aplikasi-poster.webp` (pita gelap) | Video tur ±50 detik: Ringkasan → Leads → Jamaah → Booking → Invoice → Manifest → Laporan |
 | `kanal-leads.webp` | Leads — daftar lead |
 | `profil-jamaah.webp` | Jamaah — panel Detail |
 | `termin.webp` | Invoice — dibayar sebagian + rincian |
@@ -21,7 +21,7 @@ Perbarui gambar bila tampilan halaman yang dipotret berubah.
 
 ## Langkah
 
-Prasyarat laptop: Postgres lokal, Chrome, Python dengan Playwright, Pillow, PyMuPDF.
+Prasyarat laptop: Postgres lokal, Chrome, Python dengan Playwright, Pillow, PyMuPDF, dan ffmpeg (libx264 + libvpx-vp9).
 
 ```bash
 cd backend
@@ -42,7 +42,13 @@ cd ../apps/dashboard && npx next dev -p 3000
 
 # 3. Potret → langsung ditulis sebagai WebP ke public/marketing/
 python3 infra/marketing/capture.py
+
+# 4. Video tur (±2 menit termasuk encode) → MP4 + WebM + poster di public/marketing/
+python3 infra/marketing/record_tour.py
 ```
+
+Video direkam lewat screencast Chrome (retina), jadi kursor digambar oleh skrip. Periksa
+durasi (±50 detik) dan ukuran file (target < 4 MB per format) sebelum commit.
 
 Periksa semua gambar sebelum commit. Bila tanggal demo sudah lewat (follow-up tampil
 "terlambat", keberangkatan sudah berangkat), geser tanggal di `seed_demo.py` dulu.
