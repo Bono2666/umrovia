@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Btn,
   EmptyState,
@@ -126,6 +126,8 @@ export default function BookingPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Kode booking yang bentrok (jamaah sudah punya booking aktif): digulir setelah daftar memuatnya.
+  const pendingFocus = useRef<string | null>(null);
 
   // form tambah booking (UI-07)
   const [departureId, setDepartureId] = useState("");
@@ -165,6 +167,21 @@ export default function BookingPage() {
   useEffect(() => {
     load(query);
   }, [load, query]);
+
+  useEffect(() => {
+    const row = rows?.find((booking) => booking.code === pendingFocus.current);
+    if (!row) return;
+    pendingFocus.current = null;
+    focusRecord(row.id, "danger");
+  }, [rows]);
+
+  /** Tampilkan booking yang bentrok: gulir ke barisnya, atau cari dulu bila tidak ada di daftar (filter/halaman lain). */
+  function showConflict(code: string) {
+    const row = rows?.find((booking) => booking.code === code);
+    if (row) { focusRecord(row.id, "danger"); return; }
+    pendingFocus.current = code;
+    setStatusFilter(""); setPage(1); setQuery(code);
+  }
 
   useEffect(() => {
     // Keberangkatan OPEN saja yang menerima pendaftaran (MOD-06) — bila gagal
@@ -307,7 +324,9 @@ export default function BookingPage() {
     });
     setBusy(false);
     if (!result.ok) {
-      setFormErrors(apiFormErrors(result.error)); focusError();
+      setFormErrors(apiFormErrors(result.error));
+      const conflict = result.error.field_errors?.conflicting_bookings?.[0];
+      if (conflict) showConflict(conflict); else focusError();
       return;
     }
     focusRecord(result.data.id);

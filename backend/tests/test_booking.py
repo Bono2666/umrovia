@@ -304,7 +304,20 @@ def test_duplicate_active_booking_per_pilgrim_mod07(auth_client, tenant_a):
 
     clash = _create(auth_client, dep, [a])
     assert clash.status_code == 400
-    assert "booking aktif" in str(clash.json())
+    problem = clash.json()
+    code = first.json()["code"]
+    assert problem["field_errors"]["participants"] == [
+        f"{a.name} sudah punya booking aktif {code} di keberangkatan ini. Pilih jamaah atau keberangkatan lain, "
+        "atau batalkan booking tersebut terlebih dahulu."
+    ]
+    assert problem["field_errors"]["conflicting_bookings"] == [code]
+    assert "allow_duplicate" not in str(problem)
+
+    b = _seed_pilgrim(tenant_a, "B")
+    b_code = _create(auth_client, dep, [b]).json()["code"]
+    both = _create(auth_client, dep, [a, b]).json()["field_errors"]
+    assert both["participants"][0].startswith(f"A ({code}) dan B ({b_code}) sudah punya booking aktif di keberangkatan ini.")
+    assert both["conflicting_bookings"] == sorted([code, b_code])
 
     override = _create(auth_client, dep, [a], allow_duplicate=True)
     assert override.status_code == 201

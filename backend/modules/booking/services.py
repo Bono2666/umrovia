@@ -237,15 +237,21 @@ def _check_duplicate_active(
     )
     if exclude_booking is not None:
         qs = qs.exclude(booking=exclude_booking)
-    taken = list(qs)
+    taken = sorted(qs, key=lambda t: (t.pilgrim.name, t.booking.code))
     if taken:
-        names = ", ".join(sorted({t.pilgrim.name for t in taken}))
+        if len(taken) == 1:
+            who = f"{taken[0].pilgrim.name} sudah punya booking aktif {taken[0].booking.code}"
+        else:
+            pairs = [f"{t.pilgrim.name} ({t.booking.code})" for t in taken]
+            who = f"{', '.join(pairs[:-1])} dan {pairs[-1]} sudah punya booking aktif"
         raise ValidationError(
             {
                 "participants": (
-                    f"Jamaah sudah memiliki booking aktif pada keberangkatan ini: {names} "
-                    "(MOD-07). Gunakan allow_duplicate bila memang disengaja."
-                )
+                    f"{who} di keberangkatan ini. Pilih jamaah atau keberangkatan lain, "
+                    "atau batalkan booking tersebut terlebih dahulu."
+                ),
+                # Kode booking yang bentrok — klien menggulir ke barisnya.
+                "conflicting_bookings": sorted({t.booking.code for t in taken}),
             }
         )
 

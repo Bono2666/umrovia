@@ -110,13 +110,13 @@ export function focusError() {
 
 /**
  * Gulir halus ke baris data `[data-record="<id>"]` lalu sorot sebentar, agar pengguna melihat
- * data yang baru dibuat/diubah. Bila baris tidak tampil (mis. tersaring filter atau di
- * halaman lain), tidak terjadi apa-apa.
+ * data yang baru dibuat/diubah (hijau) atau data yang menjadi penyebab penolakan (`danger`,
+ * merah). Bila baris tidak tampil (mis. tersaring filter atau di halaman lain), tidak terjadi apa-apa.
  */
-export function focusRecord(id: string | number | null | undefined) {
+export function focusRecord(id: string | number | null | undefined, tone: "success" | "danger" = "success") {
   if (id === null || id === undefined) return;
   const selector = `[data-record="${CSS.escape(String(id))}"]`;
-  reveal(() => document.querySelector(selector), "center", "success");
+  reveal(() => document.querySelector(selector), "center", tone);
 }
 
 /**
