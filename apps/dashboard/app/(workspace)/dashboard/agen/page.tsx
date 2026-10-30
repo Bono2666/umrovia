@@ -149,7 +149,7 @@ export default function AgentsPage() {
         </>}
       </section>
       {canManage ? <section className="card min-w-0 p-6"><h2 className="font-semibold">{editing ? `Ubah ${editing.name}` : "Tambah agen"}</h2>
-        <form className="mt-5" onSubmit={saveAgent}>
+        <form className="mt-6" onSubmit={saveAgent}>
           <FormField label="Nama" htmlFor="agent-name" maxLength={160} value={form.name} onChange={(event) => setForm({...form, name: event.target.value})} required />
           <FormField label="Kode (opsional)" htmlFor="agent-code" maxLength={32} value={form.code} onChange={(event) => setForm({...form, code: event.target.value})} hint={editing ? undefined : "Kosongkan untuk kode otomatis AG-xxxxxx."} />
           <FormField label="Telepon" htmlFor="agent-phone" maxLength={32} value={form.phone} onChange={(event) => setForm({...form, phone: event.target.value})} />

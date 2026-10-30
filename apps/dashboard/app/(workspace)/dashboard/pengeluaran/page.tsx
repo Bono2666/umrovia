@@ -162,7 +162,7 @@ export default function ExpensesPage() {
         </>}
       </section>
       {canWrite ? <section className="card min-w-0 p-6"><h2 className="font-semibold">Catat pengeluaran</h2>
-        <form className="mt-5" onSubmit={submit}>
+        <form className="mt-6" onSubmit={submit}>
           <FormField label="Tanggal" htmlFor="expense-date" type="date" max={today()} value={form.spent_on || today()} onChange={(event) => setForm({...form, spent_on: event.target.value})} required />
           <FormSelect label="Kategori" htmlFor="expense-category" value={form.category} onChange={(event) => setForm({...form, category: event.target.value})}>
             {CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}

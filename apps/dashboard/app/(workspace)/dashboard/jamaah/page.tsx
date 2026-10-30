@@ -425,7 +425,7 @@ export default function JamaahPage() {
 
             <h4 className="mt-4 text-sm font-semibold">Dokumen</h4>
             {documents.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">
+              <p className="mt-2 pb-3 text-sm text-muted">
                 Belum ada dokumen untuk jamaah ini.
               </p>
             ) : (
@@ -494,7 +494,7 @@ export default function JamaahPage() {
                 ) : null}
                 {!portal.accesses.some((row) => row.status === "ACTIVE") && !portal.pending_invite ? <p className="text-muted">Jamaah belum memiliki akses portal.</p> : null}
                 {can("pilgrims.write") && canEditEnvironment(selected.environment) ? (
-                  <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex flex-wrap items-end gap-3 pt-4">
                     <FormField label="Email jamaah" htmlFor="portal-invite-email" type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} hint="Jamaah menerima tautan sekali pakai untuk melihat jadwal, pembayaran dan mengunggah dokumen." />
                     <Btn size="xs" disabled={docBusy || !inviteEmail.trim()} onClick={() => void sendInvite(selected)}>{portal.pending_invite || portal.accesses.length ? "Kirim ulang undangan" : "Undang ke portal"}</Btn>
                   </div>

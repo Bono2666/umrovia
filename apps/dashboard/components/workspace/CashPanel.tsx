@@ -62,7 +62,7 @@ export function CashPanel({accounts}: {accounts: BankAccount[]}) {
     <FloatingNotice message={message} onDismiss={() => setMessage(null)} />
 
     {tab === "book" ? <>
-      <div className="expense-form mt-5 grid items-end gap-x-4 gap-y-8 sm:grid-cols-3">
+      <div className="expense-form mt-6 grid items-end gap-x-4 gap-y-8 sm:grid-cols-3">
         <FormField label="Dari" htmlFor="cash-from" type="date" value={range.from} max={range.to} onChange={(e) => e.target.value && setRange({...range, from: e.target.value})} />
         <FormField label="Sampai" htmlFor="cash-to" type="date" value={range.to} min={range.from} onChange={(e) => e.target.value && setRange({...range, to: e.target.value})} />
         {book ? <FormCheckbox id="cash-maker-checker" label="Maker-checker kas: pengeluaran & koreksi saldo awal disetujui staf lain" checked={book.rules.maker_checker} disabled={!canApprove || busy}
