@@ -322,7 +322,7 @@ function DocumentsPanel({ accessId }: { accessId: string }) {
           })}
         </ul>
       )}
-      <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-border/60 pt-4">
+      <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-border/60 pt-6">
         <FormSelect label="Unggah dokumen lain" htmlFor={`extra-kind-${accessId}`} value={extra} onChange={(event) => setExtraKind(event.target.value)}>
           {extraOptions.map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
         </FormSelect>

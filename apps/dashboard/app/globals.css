@@ -1210,6 +1210,11 @@
 .workspace-shell .form-group--unlabelled {
   margin-block: 0;
 }
+/* Field di baris horizontal (mis. select + tombol "Pilih berkas" dengan items-end):
+   margin vertikal membuat garis bawah field naik 24px dari dasar tombol di sebelahnya. */
+.workspace-shell .flex:not(.flex-col) > .form-group {
+  margin-block: 0;
+}
 /* Grid spacing replaces the vertical margins used by stacked fields. */
 .workspace-shell .manifest-filters > .form-group,
 .workspace-shell .notification-filters > .form-group,
