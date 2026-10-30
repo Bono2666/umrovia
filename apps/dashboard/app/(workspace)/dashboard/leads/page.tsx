@@ -6,7 +6,7 @@ import { apiFetch, problemMessage, type Departure, type Lead, type LeadStage, ty
 import { formatDate } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusDetail, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const SOURCES: [string, string][] = [
   ["WHATSAPP", "WhatsApp"], ["INSTAGRAM", "Instagram"], ["FACEBOOK", "Facebook"], ["TIKTOK", "TikTok"], ["WEBSITE", "Website"],
@@ -79,7 +79,7 @@ export default function LeadsPage() {
   async function open(id: string) {
     setMode("view"); setMessage(null); setError(null); setDuplicates(null);
     const result = await apiFetch<Lead>(`/leads/${id}`);
-    if (result.ok) setSelected(result.data); else setError(problemMessage(result.error));
+    if (result.ok) {setSelected(result.data); focusDetail();} else setError(problemMessage(result.error));
   }
 
   function startCreate() {setMode("create"); setSelected(null); setForm(EMPTY_FORM); setDuplicates(null); setMessage(null); setError(null);}
@@ -222,7 +222,7 @@ export default function LeadsPage() {
           </div> : null}
           <div className="flex flex-wrap gap-2"><Btn type="submit" loading={busy} disabled={!form.name.trim()}>Simpan</Btn><Btn variant="link" onClick={() => {setMode("view"); setDuplicates(null);}}>Batal</Btn></div>
         </form>
-      </section> : selected ? <section className="card min-w-0 p-6">
+      </section> : selected ? <section data-detail className="card min-w-0 p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="text-xs text-muted">{selected.code} · {selected.source_label} · dibuat {formatDate(selected.created_at)}</p><h2 className="mt-1 text-lg font-semibold">{selected.name}</h2></div>
           <StatusBadge tone={TONE[selected.stage]}>{selected.stage_label}</StatusBadge>

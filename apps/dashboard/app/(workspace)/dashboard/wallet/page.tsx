@@ -6,7 +6,7 @@ import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasCharge, ty
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
-import { FloatingNotice, focusRecord } from "@/components/workspace/FloatingNotice";
+import { FloatingNotice, focusDetail, focusRecord } from "@/components/workspace/FloatingNotice";
 
 const LABELS: Record<string, string> = {CREATED: "Menunggu transfer", PENDING: "Menunggu verifikasi platform", PAID: "Saldo telah masuk", EXPIRED: "Kedaluwarsa", REJECTED: "Ditolak"};
 const ONLINE_LABELS: Record<string, string> = {CREATED: "Menunggu pembayaran", PENDING: "Menunggu konfirmasi Midtrans", PAID: "Saldo telah masuk", EXPIRED: "Kedaluwarsa", REJECTED: "Gagal / dibatalkan"};
@@ -142,7 +142,7 @@ export default function WalletPage() {
     setMessage("Permintaan refund diajukan untuk ditinjau platform. Saldo belum berubah."); void load();
   }
 
-  function pick(topup: WalletTopup) {setSelected(topup); setReference(topup.payment_reference); setEvidence(topup.evidence_ref);}
+  function pick(topup: WalletTopup) {setSelected(topup); focusDetail(); setReference(topup.payment_reference); setEvidence(topup.evidence_ref);}
 
   if (loading) return <LoadingState />;
   if (!canRead) return <EmptyState title="Anda tidak memiliki akses SaaS Wallet" />;
@@ -184,7 +184,7 @@ export default function WalletPage() {
               </div>
             </form> : <p className="mt-3 text-sm text-muted">{wallet.environment === "demo" ? "Top-up nyata tidak tersedia di mode demo." : "Top-up belum tersedia. Hubungi dukungan platform."}</p>}
           </section> : null}
-          {selected ? <section className="card p-6"><h2 className="font-semibold">Rincian top-up</h2><p className="mt-2 break-all text-xs text-muted">{selected.number}</p>
+          {selected ? <section data-detail className="card p-6"><h2 className="font-semibold">Rincian top-up</h2><p className="mt-2 break-all text-xs text-muted">{selected.number}</p>
             <p className="mt-3 text-xl font-semibold">{formatIdr(selected.amount_idr)}</p><p className="mt-1 text-sm">{topupLabel(selected)}</p>
             {selected.provider === "midtrans" ? <div className="mt-4 space-y-2 break-all text-sm">
               <p className="text-muted">Pembayaran online Midtrans{selected.payment_type ? ` · ${selected.payment_type.replace(/_/g, " ")}` : ""}</p>
