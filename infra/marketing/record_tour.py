@@ -255,7 +255,7 @@ async def main():
             total += duration
     rows.append(f"file '{shots[-1][2]}'")
     listing.write_text("\n".join(rows) + "\n")
-    source = ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-vf", f"scale={SIZE}:flags=lanczos,fps=30", "-an"]
+    source = ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing), "-vf", f"scale={SIZE}:flags=lanczos:out_range=tv,format=yuv420p,fps=30", "-color_range", "tv", "-an"]
     subprocess.run([*source, "-c:v", "libx264", "-preset", "slow", "-crf", "27", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(OUT / "tur-aplikasi.mp4")], check=True)
     subprocess.run([*source, "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "40", "-row-mt", "1", "-deadline", "good", "-cpu-used", "4", str(OUT / "tur-aplikasi.webm")], check=True)
     width, height = map(int, SIZE.split(":"))
