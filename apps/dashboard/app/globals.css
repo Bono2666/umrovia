@@ -83,6 +83,15 @@
   h3 {
     letter-spacing: -0.03em;
   }
+
+  /* Tailwind v4 mengembalikan kursor <button> ke panah; semua elemen yang bisa diklik
+     (tombol teks seperti "Revisi", baris lead/tiket, tutup notifikasi, "Rincian tagihan")
+     memakai kursor tangan. Tombol nonaktif tetap panah. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
 }
 
 /* Komponen dasar */
