@@ -104,7 +104,17 @@ export default function PaymentsPage() {
     if(!result.ok){setError(problemMessage(result.error));return;}
     focusRecord(result.data.id);
     setMessage("Pembayaran tercatat dan diajukan untuk verifikasi.");
-    keys.current.delete("record");setAmount("");setAllocations({});setReference("");setEvidence("");load();
+    resetForm();load();
+  }
+
+  // Form kembali kosong setelah dicatat agar pembayaran yang sama tidak terajukan dua kali.
+  function resetForm(){
+    keys.current.delete("record");
+    setInvoiceSearch("");setInvoiceId("");setAmount("");setKind("DP");setMethod("TRANSFER");setReceivedAt("");
+    setAccountId("");setReference("");setEvidence("");setAllocations({});setSimulate(false);
+    // ?invoice= dari tautan "Lihat pembayaran" akan memilih ulang invoice saat daftar dimuat ulang.
+    const url=new URL(window.location.href);
+    if(url.searchParams.has("invoice")){url.searchParams.delete("invoice");window.history.replaceState(null,"",url);}
   }
 
   async function act(payment:TravelPayment,action:string){
