@@ -259,6 +259,31 @@ def booking_reserved(booking):
 
 
 @hook
+def booking_canceled(booking):
+    """Pesan umum ke jamaah; alasan pembatalan bisa bersifat internal sehingga tidak dicantumkan."""
+    values = {"kode_booking": booking.code, **_departure_values(booking.departure, booking.tenant.timezone)}
+    rows = []
+    for participant in booking.participants.select_related("pilgrim"):
+        rows += notify_pilgrim(pilgrim=participant.pilgrim, environment=booking.environment, event_type="booking.canceled", source_key=f"booking:{booking.pk}", key="booking.canceled", values=values)
+    return rows
+
+
+@hook
+def invoice_revised(invoice):
+    """Revisi menggantikan invoice lama: jamaah diberi tahu tagihan barunya, bukan "invoice terbit" lagi."""
+    zone = invoice.tenant.timezone
+    rows = []
+    for line in invoice.lines.select_related("participant__pilgrim"):
+        rows += notify_pilgrim(
+            pilgrim=line.participant.pilgrim, environment=invoice.environment, event_type="invoice.revised",
+            source_key=f"invoice:{invoice.pk}:v{invoice.version}", key="invoice.revised",
+            values={"nomor_invoice": invoice.invoice_number, "kode_booking": invoice.booking.code, "versi": str(invoice.version),
+                    "tagihan": format_idr(line.amount_idr), "jatuh_tempo": format_date(invoice.due_at, zone)},
+        )
+    return rows
+
+
+@hook
 def invoice_issued(invoice):
     zone = invoice.tenant.timezone
     rows = []

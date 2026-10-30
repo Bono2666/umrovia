@@ -17,7 +17,7 @@ from modules.agents.services import sync_commission
 from modules.audit.services import log_event
 from modules.billing.services import charge_verified_booking, lock_wallet, void_pending_for_booking
 from modules.booking.models import Booking, BookingParticipant
-from modules.notifications.services import invoice_issued, payment_verified
+from modules.notifications.services import invoice_issued, invoice_revised, payment_verified
 from modules.payments.dates import tenant_today
 from modules.payments.models import (
     FinancialSequence,
@@ -268,7 +268,7 @@ def revise_invoice(*, invoice_id, actor, reason, buyer_name=None, due_at=None, a
     invoice.refresh_from_db()
     _create_invoice_lines(invoice, participants, lines)
     sync_commission(booking)
-    invoice_issued(invoice)
+    invoice_revised(invoice)
     log_event(action="invoice.revised", tenant=booking.tenant, actor=actor, object_type="invoice", object_id=invoice.pk, changes={"number": invoice.invoice_number, "version": version, "reason": reason, "previous_total_idr": snapshot["revision"]["previous_total_idr"], "total_idr": total})
     return invoice
 
