@@ -43,10 +43,10 @@ export default function PlatformBillingPage() {
               <p className="mt-1 break-all text-xs text-muted">{t.number} · ref {t.payment_reference || "—"} · bukti {t.evidence_file ? <a className="text-primary underline" href={`${API_BASE}/api/v1/platform/tenants/${t.tenant_id}/wallet/topups/${t.id}/evidence`} target="_blank" rel="noreferrer">lihat berkas</a> : t.evidence_ref || "—"} · {t.requested_by} · {when(t.requested_at)}</p></div>
             {can("wallet.settle_topup") ? <Btn size="xs" onClick={() => setSettle({id: t.id, amount: String(t.amount_idr), ref: ""})}>Verifikasi dana</Btn> : null}
           </div>
-          {settle?.id === t.id ? <form className="mt-4 grid items-end gap-x-4 gap-y-6 sm:grid-cols-3" onSubmit={(event) => {event.preventDefault(); void call(`/platform/tenants/${t.tenant_id}/wallet/topups/${t.id}/settle`, {amount_idr: Number(settle.amount), provider_txn_id: settle.ref}, `Top-up ${t.number} terverifikasi; saldo travel bertambah.`);}}>
+          {settle?.id === t.id ? <form className="settle-form mt-6 grid items-end gap-x-4 gap-y-8 sm:grid-cols-3" onSubmit={(event) => {event.preventDefault(); void call(`/platform/tenants/${t.tenant_id}/wallet/topups/${t.id}/settle`, {amount_idr: Number(settle.amount), provider_txn_id: settle.ref}, `Top-up ${t.number} terverifikasi; saldo travel bertambah.`);}}>
             <FormField label="Nominal diterima (Rp)" htmlFor={`amount-${t.id}`} inputMode="numeric" value={settle.amount} onChange={(event) => setSettle({...settle, amount: event.target.value.replace(/\D/g, "")})} required />
             <FormField label="Referensi mutasi bank" htmlFor={`ref-${t.id}`} maxLength={160} value={settle.ref} onChange={(event) => setSettle({...settle, ref: event.target.value})} required />
-            <div className="flex gap-2"><Btn type="submit" loading={busy} disabled={!settle.ref.trim() || !settle.amount}>Konfirmasi</Btn><Btn variant="link" onClick={() => setSettle(null)}>Batal</Btn></div>
+            <div className="flex items-center gap-2"><Btn type="submit" loading={busy} disabled={!settle.ref.trim() || !settle.amount}>Konfirmasi</Btn><Btn variant="link" onClick={() => setSettle(null)}>Batal</Btn></div>
           </form> : null}
         </li>)}</ul>}
       </section>
@@ -56,9 +56,9 @@ export default function PlatformBillingPage() {
             <div className="min-w-0"><p className="font-medium">{r.tenant} · {formatIdr(r.amount_idr)} · booking {r.booking_code}</p><p className="mt-1 text-xs text-muted">{r.reason} · {r.requested_by} · {when(r.requested_at)}</p></div>
             {can("billing.approve_adjustment") ? <div className="flex gap-2"><Btn size="xs" onClick={() => setDecision({id: r.id, tenant_id: r.tenant_id, decision: "APPROVED", reason: ""})}>Setujui</Btn><Btn size="xs" variant="tint" onClick={() => setDecision({id: r.id, tenant_id: r.tenant_id, decision: "REJECTED", reason: ""})}>Tolak</Btn></div> : null}
           </div>
-          {decision?.id === r.id ? <form className="mt-4 grid items-end gap-x-4 gap-y-6 sm:grid-cols-[1fr_auto]" onSubmit={(event) => {event.preventDefault(); void call(`/platform/tenants/${r.tenant_id}/wallet/refunds/${r.id}/decide`, {decision: decision.decision, reason: decision.reason}, decision.decision === "APPROVED" ? "Refund disetujui; saldo wallet travel dikreditkan." : "Refund ditolak.");}}>
+          {decision?.id === r.id ? <form className="settle-form mt-6 grid items-end gap-x-4 gap-y-8 sm:grid-cols-[1fr_auto]" onSubmit={(event) => {event.preventDefault(); void call(`/platform/tenants/${r.tenant_id}/wallet/refunds/${r.id}/decide`, {decision: decision.decision, reason: decision.reason}, decision.decision === "APPROVED" ? "Refund disetujui; saldo wallet travel dikreditkan." : "Refund ditolak.");}}>
             <FormField label={decision.decision === "APPROVED" ? "Alasan persetujuan" : "Alasan penolakan"} htmlFor={`decision-${r.id}`} maxLength={500} value={decision.reason} onChange={(event) => setDecision({...decision, reason: event.target.value})} required />
-            <div className="flex gap-2"><Btn type="submit" variant={decision.decision === "APPROVED" ? "solid" : "danger"} loading={busy} disabled={!decision.reason.trim()}>Konfirmasi</Btn><Btn variant="link" onClick={() => setDecision(null)}>Batal</Btn></div>
+            <div className="flex items-center gap-2"><Btn type="submit" variant={decision.decision === "APPROVED" ? "solid" : "danger"} loading={busy} disabled={!decision.reason.trim()}>Konfirmasi</Btn><Btn variant="link" onClick={() => setDecision(null)}>Batal</Btn></div>
           </form> : null}
         </li>)}</ul>}
       </section>
