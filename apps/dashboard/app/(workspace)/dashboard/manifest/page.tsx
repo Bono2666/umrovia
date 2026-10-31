@@ -67,8 +67,10 @@ const PARTICIPANT_LABEL: Record<string, string> = {
   REVIEW_REQUIRED: "Perlu review",
 };
 
+/* Status biaya layanan SaaS per jamaah (tagihan travel ke Umrovia, bukan pembayaran jamaah —
+   itu tampil di baris "Terbayar"). `not_eligible` (belum dikenai biaya, mis. sebelum DP atau
+   di mode demo) tidak ditampilkan agar tidak terbaca sebagai "jamaah belum bayar". */
 const CHARGE_LABEL: Record<string, string> = {
-  not_eligible: "Belum ada DP",
   pending_charge: "Biaya layanan tertunda",
   charged: "Biaya layanan lunas",
   waived: "Biaya dibebaskan",
@@ -458,8 +460,8 @@ export default function ManifestPage() {
                       {docSummary(row)}
                     </StatusBadge>
                     <span className="ml-auto text-xs text-muted">
-                      {PARTICIPANT_LABEL[row.participant_status] ?? row.participant_status} ·{" "}
-                      {CHARGE_LABEL[row.saas_charge_state] ?? row.saas_charge_state}
+                      {PARTICIPANT_LABEL[row.participant_status] ?? row.participant_status}
+                      {row.saas_charge_state !== "not_eligible" ? ` · ${CHARGE_LABEL[row.saas_charge_state] ?? row.saas_charge_state}` : null}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
