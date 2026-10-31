@@ -64,7 +64,7 @@ function VerifyEmailInner() {
             <p className="text-sm text-success">
               Email terverifikasi — workspace travel Anda sudah aktif.
             </p>
-            <BtnLink href="/login" className="w-full">
+            <BtnLink href="/login">
               Lanjut masuk
             </BtnLink>
           </div>
