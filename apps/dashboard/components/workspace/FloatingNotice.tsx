@@ -122,9 +122,12 @@ export function focusRecord(id: string | number | null | undefined, tone: "succe
 /**
  * Gulir halus ke panel detail `[data-detail]` yang baru dibuka (mis. tombol Detail jamaah),
  * sehingga panel yang muncul di bawah daftar atau di kolom lain langsung terlihat.
+ * `fieldId` opsional: kursor langsung ke isian yang harus dilengkapi berikutnya.
  */
-export function focusDetail() {
-  reveal(() => document.querySelector("[data-detail]"), "start", false);
+export function focusDetail(fieldId?: string) {
+  reveal(() => document.querySelector("[data-detail]"), "start", false, fieldId
+    ? (panel) => panel.querySelector<HTMLElement>(`#${CSS.escape(fieldId)}`)?.focus({ preventScroll: true })
+    : undefined);
 }
 
 /**

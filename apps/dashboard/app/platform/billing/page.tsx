@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePlatform } from "@/components/platform/PlatformShell";
 import { Btn, EmptyState, FormField, LoadingState } from "@/components/workspace/ui";
-import { apiFetch, problemMessage } from "@/lib/api";
+import { API_BASE, apiFetch, problemMessage } from "@/lib/api";
 import { formatIdr } from "@/lib/format";
 import { FloatingNotice } from "@/components/workspace/FloatingNotice";
 
-type Topup = {tenant_id: string; tenant: string; id: string; number: string; amount_idr: number; provider: string; payment_reference: string; evidence_ref: string; requested_by: string; requested_at: string};
+type Topup = {tenant_id: string; tenant: string; id: string; number: string; amount_idr: number; provider: string; payment_reference: string; evidence_ref: string; evidence_file: boolean; requested_by: string; requested_at: string};
 type Refund = {tenant_id: string; tenant: string; id: string; amount_idr: number; booking_code: string; reason: string; requested_by: string; requested_at: string};
 const when = (value: string) => new Date(value).toLocaleString("id-ID", {dateStyle: "medium", timeStyle: "short"});
 
@@ -40,7 +40,7 @@ export default function PlatformBillingPage() {
         {queue.topups.length === 0 ? <div className="mt-4"><EmptyState title="Tidak ada top-up menunggu" /></div> : <ul className="mt-3 divide-y divide-border">{queue.topups.map((t) => <li key={t.id} className="py-4 text-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0"><p className="font-medium">{t.tenant} · {formatIdr(t.amount_idr)}</p>
-              <p className="mt-1 break-all text-xs text-muted">{t.number} · ref {t.payment_reference || "—"} · bukti {t.evidence_ref || "—"} · {t.requested_by} · {when(t.requested_at)}</p></div>
+              <p className="mt-1 break-all text-xs text-muted">{t.number} · ref {t.payment_reference || "—"} · bukti {t.evidence_file ? <a className="text-primary underline" href={`${API_BASE}/api/v1/platform/tenants/${t.tenant_id}/wallet/topups/${t.id}/evidence`} target="_blank" rel="noreferrer">lihat berkas</a> : t.evidence_ref || "—"} · {t.requested_by} · {when(t.requested_at)}</p></div>
             {can("wallet.settle_topup") ? <Btn size="xs" onClick={() => setSettle({id: t.id, amount: String(t.amount_idr), ref: ""})}>Verifikasi dana</Btn> : null}
           </div>
           {settle?.id === t.id ? <form className="mt-4 grid items-end gap-x-4 gap-y-6 sm:grid-cols-3" onSubmit={(event) => {event.preventDefault(); void call(`/platform/tenants/${t.tenant_id}/wallet/topups/${t.id}/settle`, {amount_idr: Number(settle.amount), provider_txn_id: settle.ref}, `Top-up ${t.number} terverifikasi; saldo travel bertambah.`);}}>
