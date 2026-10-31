@@ -15,6 +15,7 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 import Link from "next/link";
+import { groupThousands, stripThousands } from "@/lib/format";
 
 export function LoadingState({ label = "Memuat…" }: { label?: string }) {
   return (
@@ -184,7 +185,14 @@ function ControlShell({
   );
 }
 
-/** Input teks float-label (email, password, nama, dst.). */
+/**
+ * Input teks float-label (email, password, nama, dst.).
+ *
+ * `thousands`: nominal/jumlah ditampilkan bertitik ribuan ("1.500.000") sementara
+ * `value` dan `event.target.value` di `onChange` tetap angka mentah ("1500000"),
+ * sehingga halaman tetap menghitung dan mengirim angka biasa. `"signed"` mengizinkan
+ * minus di depan. Bukan untuk nomor identitas (NIK, rekening, kode OTP).
+ */
 export function FormField({
   label,
   htmlFor,
@@ -196,10 +204,13 @@ export function FormField({
   onFocus,
   onBlur,
   onInput,
+  onChange,
+  thousands,
   ...rest
 }: Omit<InputHTMLAttributes<HTMLInputElement>, "children"> &
   FormControlLabelProps & {
     suffix?: ReactNode;
+    thousands?: boolean | "signed";
   }) {
   const [focused, setFocused] = useState(false);
   const [typed, setTyped] = useState(false);
@@ -221,7 +232,22 @@ export function FormField({
       <input
         id={htmlFor}
         className={className}
-        value={value}
+        value={thousands && value !== undefined ? groupThousands(String(value)) : value}
+        onChange={thousands ? (event) => {
+          // Teruskan angka mentah ke halaman, lalu kembalikan kursor ke posisi digit yang sama
+          // setelah titik ribuan disisipkan/dihapus (React menaruh kursor di akhir).
+          const input = event.currentTarget;
+          const before = input.value.slice(0, input.selectionStart ?? input.value.length);
+          const keep = before.replace(/\D/g, "").length + (thousands === "signed" && before.trim().startsWith("-") ? 1 : 0);
+          input.value = stripThousands(input.value, thousands === "signed");
+          onChange?.(event);
+          requestAnimationFrame(() => {
+            if (document.activeElement !== input) return;
+            let at = 0;
+            for (let seen = 0; at < input.value.length && seen < keep; at += 1) if (/[\d-]/.test(input.value[at])) seen += 1;
+            input.setSelectionRange(at, at);
+          });
+        } : onChange}
         aria-invalid={error ? true : undefined}
         onFocus={(event) => {
           setFocused(true);

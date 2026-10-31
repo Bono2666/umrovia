@@ -190,7 +190,7 @@ export default function AgentsPage() {
             <option value="FIXED_PER_PAX">Nominal tetap per jamaah</option><option value="PERCENT_NET">Persentase harga bersih</option>
           </FormSelect>
           {policyForm.kind === "FIXED_PER_PAX"
-            ? <FormField label="Nominal per jamaah (Rp)" htmlFor="policy-amount" inputMode="numeric" value={policyForm.amount} onChange={(event) => setPolicyForm({...policyForm, amount: event.target.value})} required hint={digits(policyForm.amount) > 0 ? formatIdr(digits(policyForm.amount)) : "Tanpa titik atau koma"} />
+            ? <FormField label="Nominal per jamaah (Rp)" htmlFor="policy-amount" inputMode="numeric" thousands value={policyForm.amount} onChange={(event) => setPolicyForm({...policyForm, amount: event.target.value})} required />
             : <FormField label="Persentase (%)" htmlFor="policy-percent" inputMode="decimal" value={policyForm.percent} onChange={(event) => setPolicyForm({...policyForm, percent: event.target.value.replace(",", ".")})} required hint="Dari harga bersih setelah diskon, mis. 2.5" />}
           <FormSelect label="Layak dibayar" htmlFor="policy-trigger" value={policyForm.trigger} onChange={(event) => setPolicyForm({...policyForm, trigger: event.target.value})}>
             <option value="DP_VERIFIED">Setelah DP terverifikasi</option><option value="FULLY_PAID">Setelah lunas</option>

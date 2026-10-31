@@ -45,7 +45,7 @@ export default function PlatformPricingPage() {
       {can("platform.pricing_manage") ? <section className="card min-w-0 p-6"><h2 className="font-semibold">Jadwalkan versi baru</h2>
         <form className="mt-5" onSubmit={submit}>
           <FormField label="Kode versi (mis. STD-2027)" htmlFor="price-code" maxLength={32} value={form.code} onChange={(event) => setForm({...form, code: event.target.value})} required />
-          <FormField label="Tarif per jamaah (Rp)" htmlFor="price-amount" inputMode="numeric" value={form.price} onChange={(event) => setForm({...form, price: event.target.value.replace(/\D/g, "")})} required hint={form.price ? formatIdr(Number(form.price)) : undefined} />
+          <FormField label="Tarif per jamaah (Rp)" htmlFor="price-amount" inputMode="numeric" thousands value={form.price} onChange={(event) => setForm({...form, price: event.target.value.replace(/\D/g, "")})} required />
           <FormField label="Berlaku mulai" htmlFor="price-effective" type="datetime-local" value={form.effective} onChange={(event) => setForm({...form, effective: event.target.value})} required hint="Paling cepat 1 jam dari sekarang." />
           <FormTextarea label="Alasan & dasar persetujuan" htmlFor="price-reason" rows={3} maxLength={240} value={form.reason} onChange={(event) => setForm({...form, reason: event.target.value})} required />
           <Btn type="submit" loading={busy} disabled={!form.code || !form.price || !form.effective || form.reason.trim().length < 10}>Jadwalkan tarif</Btn>

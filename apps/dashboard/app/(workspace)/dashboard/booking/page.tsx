@@ -662,9 +662,9 @@ export default function BookingPage() {
                   <p className="mt-2 text-xs text-muted">{canDiscount ? "Isi per jamaah bila ada potongan harga atau layanan tambahan; alasan wajib dan tercetak di invoice." : "Biaya tambahan dapat diisi; diskon memerlukan izin Owner/Admin."}</p>
                   {picked.map((person) => <div key={person.id} className="mt-4 border-t border-border/60 pt-4">
                     <p className="text-sm font-medium">{person.name}</p>
-                    {canDiscount ? <FormField label="Diskon (Rp)" htmlFor={`discount-${person.id}`} inputMode="numeric" value={adjustments[person.id]?.discount ?? ""} onChange={(event) => setAdjustment(person.id, {discount: event.target.value})}
+                    {canDiscount ? <FormField label="Diskon (Rp)" htmlFor={`discount-${person.id}`} inputMode="numeric" thousands value={adjustments[person.id]?.discount ?? ""} onChange={(event) => setAdjustment(person.id, {discount: event.target.value})}
                       hint={rupiah(adjustments[person.id]?.discount ?? "") ? formatIdr(rupiah(adjustments[person.id]?.discount ?? "")) : undefined} /> : null}
-                    <FormField label="Biaya tambahan (Rp)" htmlFor={`extra-${person.id}`} inputMode="numeric" value={adjustments[person.id]?.extra ?? ""} onChange={(event) => setAdjustment(person.id, {extra: event.target.value})}
+                    <FormField label="Biaya tambahan (Rp)" htmlFor={`extra-${person.id}`} inputMode="numeric" thousands value={adjustments[person.id]?.extra ?? ""} onChange={(event) => setAdjustment(person.id, {extra: event.target.value})}
                       hint={rupiah(adjustments[person.id]?.extra ?? "") ? formatIdr(rupiah(adjustments[person.id]?.extra ?? "")) : "Mis. upgrade hotel, kursi khusus."} />
                     <FormField label="Alasan" htmlFor={`adjustment-note-${person.id}`} maxLength={200} value={adjustments[person.id]?.note ?? ""} onChange={(event) => setAdjustment(person.id, {note: event.target.value})} />
                   </div>)}

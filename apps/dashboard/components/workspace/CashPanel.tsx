@@ -105,7 +105,7 @@ export function CashPanel({accounts}: {accounts: BankAccount[]}) {
         <h3 className="font-semibold">Isi / koreksi saldo awal</h3>
         <FormSelect label="Rekening" htmlFor="opening-account" value={openingForm.bank_account} onChange={(e) => setOpeningForm({...openingForm, bank_account: e.target.value})}>{accountOptions}</FormSelect>
         <FormField label="Berlaku per tanggal" htmlFor="opening-date" type="date" max={iso(new Date())} value={openingForm.as_of} onChange={(e) => setOpeningForm({...openingForm, as_of: e.target.value})} required hint="Transaksi sebelum tanggal ini dianggap sudah tercakup saldo awal." />
-        <FormField label="Saldo (Rp)" htmlFor="opening-amount" inputMode="numeric" value={openingForm.amount} onChange={(e) => setOpeningForm({...openingForm, amount: e.target.value})} required hint={openingForm.amount ? formatIdr(digits(openingForm.amount)) : "Boleh negatif untuk cerukan."} />
+        <FormField label="Saldo (Rp)" htmlFor="opening-amount" inputMode="numeric" thousands="signed" value={openingForm.amount} onChange={(e) => setOpeningForm({...openingForm, amount: e.target.value})} required hint="Boleh negatif untuk cerukan." />
         <FormField label="Alasan (wajib untuk koreksi)" htmlFor="opening-reason" maxLength={240} value={openingForm.reason} onChange={(e) => setOpeningForm({...openingForm, reason: e.target.value})} />
         <Btn type="submit" loading={busy} disabled={!openingForm.amount}>Simpan saldo awal</Btn>
       </form> : null}
@@ -132,7 +132,7 @@ export function CashPanel({accounts}: {accounts: BankAccount[]}) {
         <FormSelect label="Dari" htmlFor="transfer-from" value={transferForm.from_account} onChange={(e) => setTransferForm({...transferForm, from_account: e.target.value})}>{accountOptions}</FormSelect>
         <FormSelect label="Ke" htmlFor="transfer-to" value={transferForm.to_account} onChange={(e) => setTransferForm({...transferForm, to_account: e.target.value})}>{accountOptions}</FormSelect>
         <FormField label="Tanggal" htmlFor="transfer-date" type="date" max={iso(new Date())} value={transferForm.transferred_on} onChange={(e) => setTransferForm({...transferForm, transferred_on: e.target.value})} required />
-        <FormField label="Nominal (Rp)" htmlFor="transfer-amount" inputMode="numeric" value={transferForm.amount} onChange={(e) => setTransferForm({...transferForm, amount: e.target.value})} required hint={transferForm.amount ? formatIdr(digits(transferForm.amount)) : undefined} />
+        <FormField label="Nominal (Rp)" htmlFor="transfer-amount" inputMode="numeric" thousands value={transferForm.amount} onChange={(e) => setTransferForm({...transferForm, amount: e.target.value})} required />
         <FormField label="Keterangan" htmlFor="transfer-description" maxLength={240} value={transferForm.description} onChange={(e) => setTransferForm({...transferForm, description: e.target.value})} />
         <FormField label="Referensi" htmlFor="transfer-reference" maxLength={120} value={transferForm.reference} onChange={(e) => setTransferForm({...transferForm, reference: e.target.value})} />
         <Btn type="submit" loading={busy} disabled={!transferForm.amount || transferForm.from_account === transferForm.to_account}>Simpan transfer</Btn>

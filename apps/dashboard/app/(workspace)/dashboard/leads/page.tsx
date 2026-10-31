@@ -207,7 +207,7 @@ export default function LeadsPage() {
             <option value="">Belum menentukan</option>
             {departures.filter((dep) => !form.interest_package || dep.package_id === form.interest_package).map((dep) => <option key={dep.id} value={dep.id}>{dep.code} · {formatDate(dep.start_at)} · {dep.package_name}</option>)}
           </FormSelect>
-          <FormField label="Jumlah orang" htmlFor="lead-pax" inputMode="numeric" value={form.pax} onChange={(event) => setForm({...form, pax: event.target.value.replace(/\D/g, "")})} />
+          <FormField label="Jumlah orang" htmlFor="lead-pax" inputMode="numeric" thousands value={form.pax} onChange={(event) => setForm({...form, pax: event.target.value.replace(/\D/g, "")})} />
           <FormSelect label="Pemilik lead" htmlFor="lead-form-owner" value={form.owner} onChange={(event) => setForm({...form, owner: event.target.value})}>
             <option value="">Saya</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}
           </FormSelect>
