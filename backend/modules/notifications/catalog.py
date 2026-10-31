@@ -41,6 +41,35 @@ TEMPLATES = {t.key: t for t in [
         ("kode_booking", "tanggal_berangkat"),
     ),
     TemplateDef(
+        "booking.confirmed", "Booking dikonfirmasi", "pilgrim",
+        "Booking {{ kode_booking }} dikonfirmasi — {{ nama_travel }}",
+        "Assalamu'alaikum {{ nama_jamaah }},\n\n"
+        "Alhamdulillah, booking {{ kode_booking }} untuk paket {{ paket }} telah dikonfirmasi oleh {{ nama_travel }}.\n"
+        "Keberangkatan: {{ tanggal_berangkat }} dari {{ kota_asal }}.\n\n"
+        "Langkah berikutnya adalah melengkapi dokumen perjalanan. Cek dokumen yang diminta di portal jamaah:\n{{ tautan_portal }}",
+        _vars(kode_booking="Kode booking", paket="Nama paket", tanggal_berangkat="Tanggal berangkat", kota_asal="Kota keberangkatan"),
+        ("kode_booking",),
+    ),
+    TemplateDef(
+        "booking.document_process", "Dokumen sedang diproses", "pilgrim",
+        "Dokumen perjalanan booking {{ kode_booking }} sedang diproses — {{ nama_travel }}",
+        "Assalamu'alaikum {{ nama_jamaah }},\n\n"
+        "Booking {{ kode_booking }} untuk paket {{ paket }} kini memasuki tahap pengurusan dokumen perjalanan oleh {{ nama_travel }}.\n\n"
+        "Pastikan semua dokumen yang diminta sudah Anda kirim, dan pantau statusnya di portal jamaah:\n{{ tautan_portal }}",
+        _vars(kode_booking="Kode booking", paket="Nama paket"),
+        ("kode_booking",),
+    ),
+    TemplateDef(
+        "booking.ready_to_depart", "Siap berangkat", "pilgrim",
+        "Booking {{ kode_booking }} siap berangkat — {{ nama_travel }}",
+        "Assalamu'alaikum {{ nama_jamaah }},\n\n"
+        "Alhamdulillah, persiapan booking {{ kode_booking }} untuk paket {{ paket }} telah selesai dan Anda dinyatakan siap berangkat.\n\n"
+        "Berangkat: {{ tanggal_berangkat }}\nKota keberangkatan: {{ kota_asal }}\nTitik kumpul: {{ titik_kumpul }}\n\n"
+        "Informasi perjalanan selengkapnya di portal jamaah:\n{{ tautan_portal }}",
+        _vars(kode_booking="Kode booking", paket="Nama paket", tanggal_berangkat="Tanggal berangkat", kota_asal="Kota keberangkatan", titik_kumpul="Titik kumpul"),
+        ("kode_booking", "tanggal_berangkat"),
+    ),
+    TemplateDef(
         "booking.canceled", "Booking dibatalkan", "pilgrim",
         "Booking {{ kode_booking }} dibatalkan — {{ nama_travel }}",
         "Assalamu'alaikum {{ nama_jamaah }},\n\n"

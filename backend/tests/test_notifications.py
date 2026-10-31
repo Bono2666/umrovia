@@ -129,6 +129,36 @@ def test_canceling_draft_booking_sends_nothing(prod):
     ok(post(s["client"], f"/api/v1/bookings/{draft['id']}/transition", {"target": "CANCELED", "reason": "Salah input"}))
     assert not rows(template_key="booking.canceled").exists()  # draf belum pernah diumumkan ke jamaah
 
+
+def test_booking_progress_notifies_each_stage_once(auth_client, tenant_a, settle_demo_dp):
+    from .test_manifest import (
+        _approve_doc,
+        _create_booking,
+        _requirement,
+        _seed_departure,
+        _seed_env,
+        _seed_pilgrim,
+        _transition_booking,
+    )
+
+    _seed_env(tenant_a)
+    pilgrim = _seed_pilgrim(tenant_a, "Rina")
+    booking = _create_booking(auth_client, _seed_departure(tenant_a), [pilgrim])
+    _requirement(tenant_a, kind="ktp")
+    assert _transition_booking(auth_client, booking["id"], "RESERVED").status_code == 200
+    settle_demo_dp(auth_client, booking["id"])
+    for target in ("CONFIRMED", "DOCUMENT_PROCESS"):
+        assert _transition_booking(auth_client, booking["id"], target).status_code == 200
+    assert _transition_booking(auth_client, booking["id"], "READY_TO_DEPART").status_code == 400
+    assert not rows(template_key="booking.ready_to_depart").exists()  # ditolak gerbang dokumen: tidak diumumkan
+
+    _approve_doc(tenant_a, pilgrim, "ktp")
+    assert _transition_booking(auth_client, booking["id"], "READY_TO_DEPART").status_code == 200
+    for key, word in [("booking.confirmed", "dikonfirmasi"), ("booking.document_process", "diproses"), ("booking.ready_to_depart", "siap berangkat")]:
+        row = rows(template_key=key).get()  # demo tanpa akun portal → portal saja, satu per jamaah
+        assert row.channel == "IN_APP" and row.recipient_id == pilgrim.pk
+        assert booking["code"] in row.subject and word in row.subject and row.subject.startswith("[DEMO]")
+
 def test_payment_verified_queues_email_once_and_worker_sends(prod):
     line = prod["invoice"]["lines"][0]
     payment, _ = pay(prod, 0, line["amount_idr"])

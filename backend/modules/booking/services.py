@@ -783,6 +783,10 @@ def transition_booking(
         from modules.payments.services import auto_issue_invoice
 
         auto_issue_invoice(booking, actor)  # INV-01: invoice otomatis saat booking sah
+    if target in (BookingStatus.CONFIRMED, BookingStatus.DOCUMENT_PROCESS, BookingStatus.READY_TO_DEPART):
+        from modules.notifications.services import booking_progressed
+
+        booking_progressed(booking)
     if target in (BookingStatus.CANCELED, BookingStatus.EXPIRED):
         from modules.billing.services import void_pending_for_booking
         from modules.payments.services import cancel_booking_invoice

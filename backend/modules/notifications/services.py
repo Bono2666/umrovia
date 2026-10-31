@@ -268,6 +268,26 @@ def booking_canceled(booking):
     return rows
 
 
+# Status lanjutan yang diumumkan ke jamaah; key template = event.
+PROGRESS_TEMPLATES = {
+    "CONFIRMED": "booking.confirmed",
+    "DOCUMENT_PROCESS": "booking.document_process",
+    "READY_TO_DEPART": "booking.ready_to_depart",
+}
+
+
+@hook
+def booking_progressed(booking):
+    key = PROGRESS_TEMPLATES.get(booking.status)
+    if not key:
+        return []
+    values = {"kode_booking": booking.code, **_departure_values(booking.departure, booking.tenant.timezone)}
+    rows = []
+    for participant in booking.participants.exclude(participant_status="CANCELED").select_related("pilgrim"):
+        rows += notify_pilgrim(pilgrim=participant.pilgrim, environment=booking.environment, event_type=key, source_key=f"booking:{booking.pk}", key=key, values=values)
+    return rows
+
+
 @hook
 def invoice_revised(invoice):
     """Revisi menggantikan invoice lama: jamaah diberi tahu tagihan barunya, bukan "invoice terbit" lagi."""
