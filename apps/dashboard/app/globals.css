@@ -1261,6 +1261,7 @@
 .workspace-shell .notification-filters > .form-group,
 .workspace-shell .report-filters > .form-group,
 .workspace-shell .expense-form > .form-group,
+.workspace-shell .settle-form > .form-group,
 .workspace-shell .wallet-filters > .form-group {
   margin-block: 0;
 }
