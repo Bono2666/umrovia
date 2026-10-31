@@ -352,7 +352,7 @@ export default function PaketPage() {
               error={formErrors.duration_days}
               value={durationDays}
               onChange={(event) => setDurationDays(event.target.value)}
-              inputMode="numeric"
+              inputMode="numeric" thousands
               placeholder="12"
             />
             <FormField
@@ -362,22 +362,22 @@ export default function PaketPage() {
               error={formErrors.price_idr}
               value={price}
               onChange={(event) => setPrice(event.target.value)}
-              inputMode="numeric"
-              placeholder="28500000"
+              inputMode="numeric" thousands
+              placeholder="28.500.000"
             />
             <fieldset className="my-6 border-t border-border pt-6">
               <legend className="text-sm font-semibold">Harga per tipe kamar (Rp / jamaah)</legend>
               <p className="mt-2 text-xs text-muted">Isi tipe kamar yang tersedia. Kosongkan tipe yang tidak ditawarkan.</p>
               {(Object.keys(ROOM_LABELS) as RoomType[]).map((room) => (
-                <FormField key={room} label={`Harga ${ROOM_LABELS[room]}`} htmlFor={`price-${room.toLowerCase()}`} inputMode="numeric" value={roomPrices[room]} onChange={(event) => setRoomPrices((prev) => ({...prev, [room]: event.target.value}))} />
+                <FormField key={room} label={`Harga ${ROOM_LABELS[room]}`} htmlFor={`price-${room.toLowerCase()}`} inputMode="numeric" thousands value={roomPrices[room]} onChange={(event) => setRoomPrices((prev) => ({...prev, [room]: event.target.value}))} />
               ))}
               {formErrors.room_prices ? <p className="error-message" role="alert">{formErrors.room_prices}</p> : null}
             </fieldset>
             <fieldset className="my-6 border-t border-border pt-6">
               <legend className="text-sm font-semibold">Varian anak & bayi (opsional)</legend>
               <p className="mt-2 text-xs text-muted">Anak tanpa kasur: usia di bawah 12 tahun saat berangkat. Bayi: di bawah 2 tahun. Kosongkan bila tidak ditawarkan.</p>
-              <FormField label="Anak tanpa kasur (Rp)" htmlFor="price-child" inputMode="numeric" value={childPrice} onChange={(event) => setChildPrice(event.target.value)} hint={childPrice ? formatIdr(digits(childPrice)) : undefined} />
-              <FormField label="Bayi (Rp)" htmlFor="price-infant" inputMode="numeric" value={infantPrice} onChange={(event) => setInfantPrice(event.target.value)} hint={infantPrice ? formatIdr(digits(infantPrice)) : undefined} />
+              <FormField label="Anak tanpa kasur (Rp)" htmlFor="price-child" inputMode="numeric" thousands value={childPrice} onChange={(event) => setChildPrice(event.target.value)} />
+              <FormField label="Bayi (Rp)" htmlFor="price-infant" inputMode="numeric" thousands value={infantPrice} onChange={(event) => setInfantPrice(event.target.value)} />
             </fieldset>
             <FormTextarea label="Layanan tambahan" htmlFor="package-addons" hint="Satu per baris: KODE | Nama | harga per jamaah, mis. KERETA | Kereta cepat Makkah–Madinah | 1200000" value={addonsText} onChange={(event) => setAddonsText(event.target.value)} error={formErrors.addons} />
             <FormTextarea label="Estimasi biaya per jamaah" htmlFor="package-costs" hint="Satu per baris: Kategori | Uraian | jumlah, mis. HOTEL | Hotel Makkah 5 malam | 9000000. Dipakai untuk estimasi margin." value={costsText} onChange={(event) => setCostsText(event.target.value)} error={formErrors.estimated_costs} />

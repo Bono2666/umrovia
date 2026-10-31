@@ -11,6 +11,18 @@ export function formatIdr(amount: number): string {
   return `${value < 0 ? "−" : ""}Rp${digits}`;
 }
 
+/** Angka mentah ("-1500000") → tampilan bertitik ribuan ("-1.500.000"). */
+export function groupThousands(raw: string): string {
+  const sign = raw.startsWith("-") ? "-" : "";
+  return sign + raw.slice(sign.length).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/** Teks ketikan/tempelan ("Rp 1.500.000") → angka mentah ("1500000"); `signed` mempertahankan minus di depan. */
+export function stripThousands(text: string, signed = false): string {
+  const sign = signed && text.trim().startsWith("-") ? "-" : "";
+  return sign + text.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+}
+
 /** Tanggal absolut, contoh: "20 November 2026". */
 export function formatDate(iso: string): string {
   const date = new Date(iso);

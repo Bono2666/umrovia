@@ -167,8 +167,7 @@ export default function ExpensesPage() {
           <FormSelect label="Kategori" htmlFor="expense-category" value={form.category} onChange={(event) => setForm({...form, category: event.target.value})}>
             {CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </FormSelect>
-          <FormField label="Nominal (Rp)" htmlFor="expense-amount" inputMode="numeric" value={form.amount} onChange={(event) => setForm({...form, amount: event.target.value})} required
-            hint={Number(form.amount.replace(/\D/g, "")) > 0 ? formatIdr(Number(form.amount.replace(/\D/g, ""))) : "Tanpa titik atau koma"} />
+          <FormField label="Nominal (Rp)" htmlFor="expense-amount" inputMode="numeric" thousands value={form.amount} onChange={(event) => setForm({...form, amount: event.target.value})} required />
           <FormField label="Keterangan" htmlFor="expense-description" maxLength={240} value={form.description} onChange={(event) => setForm({...form, description: event.target.value})} required />
           <FormSelect label="Keberangkatan" htmlFor="expense-departure" value={form.departure} onChange={(event) => setForm({...form, departure: event.target.value})}>
             <option value="">Umum / kantor (tanpa keberangkatan)</option>

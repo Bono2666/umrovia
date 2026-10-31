@@ -141,8 +141,8 @@ export default function InvoicePage() {
               const update = (patch: Partial<LineEdit>) => setRevision({...revision, lines: {...revision.lines, [line.participant_id]: {...edit, ...patch}}});
               return <div key={line.participant_id} className="border-t border-border/60 pt-4">
                 <p className="text-sm font-medium">{line.pilgrim_name} <span className="text-xs text-muted">· harga paket {formatIdr(line.gross_idr ?? line.amount_idr)}</span></p>
-                {canDiscount ? <FormField label="Diskon (Rp)" htmlFor={`revise-discount-${line.participant_id}`} inputMode="numeric" value={edit.discount} onChange={(event) => update({discount: event.target.value})} /> : null}
-                <FormField label="Biaya tambahan (Rp)" htmlFor={`revise-extra-${line.participant_id}`} inputMode="numeric" value={edit.extra} onChange={(event) => update({extra: event.target.value})} />
+                {canDiscount ? <FormField label="Diskon (Rp)" htmlFor={`revise-discount-${line.participant_id}`} inputMode="numeric" thousands value={edit.discount} onChange={(event) => update({discount: event.target.value})} /> : null}
+                <FormField label="Biaya tambahan (Rp)" htmlFor={`revise-extra-${line.participant_id}`} inputMode="numeric" thousands value={edit.extra} onChange={(event) => update({extra: event.target.value})} />
                 <FormField label="Alasan penyesuaian" htmlFor={`revise-note-${line.participant_id}`} maxLength={200} value={edit.note} onChange={(event) => update({note: event.target.value})} hint="Wajib bila ada diskon atau biaya tambahan." />
               </div>;
             })}
@@ -167,7 +167,7 @@ export default function InvoicePage() {
         <section className="card p-6"><h2 className="font-semibold">Aturan DP travel</h2>
           <p className="mt-2 text-sm text-muted">Setiap alokasi pembayaran terverifikasi di atas Rp0 memenuhi syarat DP. Target minimum bersifat opsional; pembayaran di bawah target tetap dapat dicatat dan diverifikasi.</p>
           {can("tenant.settings.write") ? <form className="mt-6" onSubmit={saveRules}>
-            <FormField label="Target minimum DP per jamaah (Rp)" htmlFor="dp-target" inputMode="numeric" value={target} onChange={(event) => setTarget(event.target.value)} hint="Kosongkan bila tidak ada target. Perubahan berlaku untuk invoice berikutnya." />
+            <FormField label="Target minimum DP per jamaah (Rp)" htmlFor="dp-target" inputMode="numeric" thousands value={target} onChange={(event) => setTarget(event.target.value)} hint="Kosongkan bila tidak ada target. Perubahan berlaku untuk invoice berikutnya." />
             <FormCheckbox id="payment-maker-checker" label="Verifikator harus berbeda dari pencatat pembayaran" checked={!!rules.maker_checker} onChange={(checked) => setRules((prev) => ({...prev,maker_checker:checked}))} />
             <Btn type="submit" className="mt-4" disabled={busy}>Simpan aturan</Btn>
           </form> : <p className="mt-3 text-sm">Target saat ini: {rules.dp_minimum_idr ? formatIdr(rules.dp_minimum_idr) : "Tidak ditentukan"}</p>}

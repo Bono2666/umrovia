@@ -462,7 +462,7 @@ export default function KeberangkatanPage() {
               error={formErrors.seat_capacity}
               value={seatCapacity}
               onChange={(event) => setSeatCapacity(event.target.value)}
-              inputMode="numeric"
+              inputMode="numeric" thousands
               placeholder="40"
             />
             <FormField
@@ -473,7 +473,7 @@ export default function KeberangkatanPage() {
               error={formErrors.seats_blocked}
               value={seatsBlocked}
               onChange={(event) => setSeatsBlocked(event.target.value)}
-              inputMode="numeric"
+              inputMode="numeric" thousands
               placeholder="0"
             />
             <FormField

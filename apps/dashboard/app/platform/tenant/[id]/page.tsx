@@ -110,7 +110,7 @@ export default function PlatformTenantDetailPage() {
             <p className="font-semibold">{ACTION_TEXT[pending.kind].title}</p>
             <p className="mt-1 text-sm text-muted">{ACTION_TEXT[pending.kind].hint}</p>
             <div className="mt-4">
-              {pending.kind === "extend" ? <FormField label="Jumlah hari (1–30)" htmlFor="extend-days" inputMode="numeric" value={days} onChange={(event) => setDays(event.target.value.replace(/\D/g, ""))} required /> : null}
+              {pending.kind === "extend" ? <FormField label="Jumlah hari (1–30)" htmlFor="extend-days" inputMode="numeric" thousands value={days} onChange={(event) => setDays(event.target.value.replace(/\D/g, ""))} required /> : null}
               <FormTextarea label="Alasan (dicatat di audit)" htmlFor="action-reason" rows={3} maxLength={240} value={reason} onChange={(event) => setReason(event.target.value)} required hint="Minimal 10 karakter." />
             </div>
             <div className="flex flex-wrap gap-2">

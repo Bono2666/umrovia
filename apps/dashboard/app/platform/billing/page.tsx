@@ -44,7 +44,7 @@ export default function PlatformBillingPage() {
             {can("wallet.settle_topup") ? <Btn size="xs" onClick={() => setSettle({id: t.id, amount: String(t.amount_idr), ref: ""})}>Verifikasi dana</Btn> : null}
           </div>
           {settle?.id === t.id ? <form className="settle-form mt-6 grid items-end gap-x-4 gap-y-8 sm:grid-cols-3" onSubmit={(event) => {event.preventDefault(); void call(`/platform/tenants/${t.tenant_id}/wallet/topups/${t.id}/settle`, {amount_idr: Number(settle.amount), provider_txn_id: settle.ref}, `Top-up ${t.number} terverifikasi; saldo travel bertambah.`);}}>
-            <FormField label="Nominal diterima (Rp)" htmlFor={`amount-${t.id}`} inputMode="numeric" value={settle.amount} onChange={(event) => setSettle({...settle, amount: event.target.value.replace(/\D/g, "")})} required />
+            <FormField label="Nominal diterima (Rp)" htmlFor={`amount-${t.id}`} inputMode="numeric" thousands value={settle.amount} onChange={(event) => setSettle({...settle, amount: event.target.value.replace(/\D/g, "")})} required />
             <FormField label="Referensi mutasi bank" htmlFor={`ref-${t.id}`} maxLength={160} value={settle.ref} onChange={(event) => setSettle({...settle, ref: event.target.value})} required />
             <div className="flex items-center gap-2"><Btn type="submit" loading={busy} disabled={!settle.ref.trim() || !settle.amount}>Konfirmasi</Btn><Btn variant="link" onClick={() => setSettle(null)}>Batal</Btn></div>
           </form> : null}

@@ -197,7 +197,7 @@ export default function ProfilPage() {
             <FormField
               label="Jatuh tempo bawaan (hari)"
               htmlFor="profile-due-days"
-              inputMode="numeric"
+              inputMode="numeric" thousands
               value={draft.dueDays}
               readOnly={readOnly}
               error={errors.dueDays}
