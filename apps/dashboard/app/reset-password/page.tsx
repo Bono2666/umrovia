@@ -38,7 +38,7 @@ function ResetPasswordInner() {
         <p className="text-sm text-danger">
           Tautan reset tidak memiliki token. Minta tautan baru.
         </p>
-        <BtnLink href="/forgot-password" className="w-full">
+        <BtnLink href="/forgot-password">
           Minta tautan baru
         </BtnLink>
       </div>
@@ -51,7 +51,7 @@ function ResetPasswordInner() {
         <p className="text-sm text-success">
           Password berhasil diperbarui. Silakan masuk dengan password baru.
         </p>
-        <BtnLink href="/login" className="w-full">
+        <BtnLink href="/login">
           Lanjut masuk
         </BtnLink>
       </div>
