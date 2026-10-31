@@ -17,6 +17,12 @@ export function isPortalNext(next: string | null): boolean {
   return !!next && /^\/portal(\/|\?|$)/.test(next);
 }
 
+/** Login konsol platform: host admin (admin.umrovia.com) atau `?next=/platform…`. Tanpa pendaftaran. */
+export function isPlatformLogin(next: string | null): boolean {
+  if (next && /^\/platform(\/|\?|$)/.test(next)) return true;
+  return typeof window !== "undefined" && window.location.hostname.startsWith("admin.");
+}
+
 export function nextParam(): string | null {
   return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("next");
 }

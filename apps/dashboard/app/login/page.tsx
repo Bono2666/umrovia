@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { apiFetch, problemMessage, type UserPayload } from "@/lib/api";
-import { isPortalNext, landingPath, nextParam } from "@/lib/landing";
+import { isPlatformLogin, isPortalNext, landingPath, nextParam } from "@/lib/landing";
 import { UmroviaLogo } from "@/components/UmroviaLogo";
 import { Btn, FormField } from "@/components/workspace/ui";
 
@@ -12,15 +12,22 @@ import { Btn, FormField } from "@/components/workspace/ui";
  * Login (S02) — POST /auth/login (session cookie + rate limit, Spec §8.1).
  * Bila sudah sesi aktif, langsung arahkan ke /dashboard.
  *
- * Dipakai bersama staf travel dan jamaah. Dari portal (`?next=/portal…`) tidak ada
- * tautan daftar: akun portal hanya dibuat lewat undangan travel.
+ * Dipakai bersama staf travel, jamaah dan staf platform. Dari portal (`?next=/portal…`)
+ * dan konsol platform (host admin) tidak ada tautan daftar: akun portal hanya lewat
+ * undangan travel, akun platform hanya dibuat tim internal.
  */
 const noSubscribe = () => () => {};
+
+/** Tujuan login: `next` dari URL; di host admin tanpa `next` → konsol platform. */
+function loginNext(): string | null {
+  return nextParam() ?? (isPlatformLogin(null) ? "/platform" : null);
+}
 
 export default function LoginPage() {
   const router = useRouter();
   // Dibaca dari URL tanpa useSearchParams (butuh Suspense); server selalu false → tanpa mismatch hidrasi.
   const portal = useSyncExternalStore(noSubscribe, () => isPortalNext(nextParam()), () => false);
+  const platform = useSyncExternalStore(noSubscribe, () => isPlatformLogin(nextParam()), () => false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -29,7 +36,7 @@ export default function LoginPage() {
   useEffect(() => {
     let active = true;
     apiFetch<UserPayload>("/me").then((result) => {
-      if (active && result.ok) router.replace(landingPath(result.data, nextParam()));
+      if (active && result.ok) router.replace(landingPath(result.data, loginNext()));
     });
     return () => {
       active = false;
@@ -53,7 +60,7 @@ export default function LoginPage() {
       body: JSON.stringify({ email, password }),
     });
     if (result.ok) {
-      router.push(landingPath(result.data, nextParam()));
+      router.push(landingPath(result.data, loginNext()));
       return;
     }
     setBusy(false);
@@ -71,7 +78,7 @@ export default function LoginPage() {
       <div className="card w-full max-w-md p-8">
         <h1 aria-label="Umrovia"><UmroviaLogo /></h1>
         <p className="mt-3 text-sm text-muted">
-          {portal ? "Masuk ke portal jamaah" : "Masuk ke workspace travel atau portal jamaah"}
+          {platform ? "Masuk ke konsol platform" : portal ? "Masuk ke portal jamaah" : "Masuk ke workspace travel atau portal jamaah"}
         </p>
         {/* Struktur form = form kontak web_template 1:1: form-group per
             field, error-message, form-footer--narrow, submit circle-xl
@@ -116,7 +123,11 @@ export default function LoginPage() {
             </Btn>
           </div>
         </form>
-        {portal ? (
+        {platform ? (
+          <p className="mt-6 text-sm text-muted">
+            Konsol platform hanya untuk tim internal Umrovia.
+          </p>
+        ) : portal ? (
           <p className="mt-6 text-sm text-muted">
             Akses portal diberikan lewat undangan email dari travel Anda. Belum menerima
             undangan? Hubungi travel tempat Anda mendaftar.
