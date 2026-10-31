@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Btn, BtnLink, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
-import { API_BASE, apiFetch, problemMessage, type Paginated, type SaasCharge, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
+import { Btn, BtnFile, BtnLink, EmptyState, FormField, FormSelect, LoadingState, StatusBadge } from "@/components/workspace/ui";
+import { API_BASE, apiFetch, apiUpload, problemMessage, type Paginated, type SaasCharge, type SaasWallet, type WalletLedger, type WalletTopup } from "@/lib/api";
 import { formatDate, formatIdr } from "@/lib/format";
 import { useWorkspacePermissions } from "@/lib/useWorkspacePermissions";
 import { RevealText } from "@/components/marketing/RevealText";
@@ -33,7 +33,7 @@ export default function WalletPage() {
   const [amount, setAmount] = useState("");
   const [selected, setSelected] = useState<WalletTopup | null>(null);
   const [reference, setReference] = useState("");
-  const [evidence, setEvidence] = useState("");
+  const [evidence, setEvidence] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,9 +81,9 @@ export default function WalletPage() {
       window.location.assign(result.data.payment_url);
       return;
     }
-    setBusy(false); setSelected(result.data); setAmount(""); setReference(""); setEvidence("");
-    focusRecord(result.data.id);
-    setMessage("Instruksi top-up dibuat. Saldo bertambah setelah dana diterima dan diverifikasi platform.");
+    setBusy(false); setSelected(result.data); setAmount(""); setReference(""); setEvidence(null);
+    focusDetail("topup-reference"); // langkah berikutnya: transfer lalu ajukan referensi & bukti
+    setMessage("Instruksi top-up dibuat. Transfer sesuai rincian, lalu ajukan referensi dan bukti transfer agar dana bisa diverifikasi platform.");
     setTopupPage(1); void load();
   }
 
@@ -116,7 +116,9 @@ export default function WalletPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if (!selected) return;
     setBusy(true); setError(null); setMessage(null);
-    const result = await apiFetch<WalletTopup>(`/wallet/topups/${selected.id}/submit`, {method:"POST", body:JSON.stringify({payment_reference:reference, evidence_ref:evidence})});
+    if (!evidence) return;
+    const form = new FormData(); form.append("payment_reference", reference); form.append("file", evidence);
+    const result = await apiUpload<WalletTopup>(`/wallet/topups/${selected.id}/submit`, form);
     setBusy(false);
     if (!result.ok) {setError(problemMessage(result.error)); return;}
     setSelected(result.data); focusRecord(result.data.id); setMessage("Bukti diajukan. Menunggu verifikasi dana oleh platform."); void load();
@@ -144,7 +146,7 @@ export default function WalletPage() {
     setMessage("Permintaan refund diajukan untuk ditinjau platform. Saldo belum berubah."); void load();
   }
 
-  function pick(topup: WalletTopup) {setSelected(topup); focusDetail(); setReference(topup.payment_reference); setEvidence(topup.evidence_ref);}
+  function pick(topup: WalletTopup) {setSelected(topup); focusDetail(); setReference(topup.payment_reference); setEvidence(null);}
 
   if (loading) return <LoadingState />;
   if (!canRead) return <EmptyState title="Anda tidak memiliki akses SaaS Wallet" />;
@@ -198,8 +200,8 @@ export default function WalletPage() {
               </div> : null}
             </div> : selected.status === "CREATED" ? <>
               <dl className="mt-4 space-y-2 text-sm"><div><dt className="text-muted">Bank penerima platform</dt><dd>{selected.instructions.bank_name}</dd></div><div><dt className="text-muted">Nama rekening</dt><dd>{selected.instructions.account_name}</dd></div><div><dt className="text-muted">Nomor rekening</dt><dd className="break-all font-semibold">{selected.instructions.account_number}</dd></div><div><dt className="text-muted">Batas transfer</dt><dd>{dateTime(selected.expires_at)}</dd></div></dl>
-              {can("wallet.topup") ? <form className="mt-5" onSubmit={submit}><FormField label="Referensi transfer" htmlFor="topup-reference" maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} required /><FormField label="Lokasi bukti transfer" htmlFor="topup-evidence" maxLength={512} value={evidence} onChange={(event) => setEvidence(event.target.value)} required hint="Cantumkan referensi dokumen atau lokasi bukti untuk diperiksa petugas platform." /><Btn type="submit" disabled={busy || !reference.trim() || !evidence.trim()}>Ajukan verifikasi</Btn></form> : null}
-            </> : <div className="mt-4 space-y-2 break-all text-sm"><p>Referensi: {selected.payment_reference || "—"}</p><p>Bukti: {selected.evidence_ref || "—"}</p>{selected.provider_txn_id ? <p>Referensi settlement: {selected.provider_txn_id}</p> : null}{selected.reason ? <p className="text-danger">{selected.reason}</p> : null}{selected.status === "EXPIRED" ? <p>Hubungi dukungan bila dana sudah dikirim.</p> : null}</div>}
+              {can("wallet.topup") ? <form className="mt-5" onSubmit={submit}><FormField label="Referensi transfer" htmlFor="topup-reference" maxLength={120} value={reference} onChange={(event) => setReference(event.target.value)} required /><div className="mb-8"><p className="text-sm">Bukti transfer</p><div className="mt-2 flex flex-wrap items-center gap-3"><BtnFile size="xs" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(event) => {const file = event.target.files?.[0]; event.target.value = ""; if (file) setEvidence(file);}}>{evidence ? "Ganti berkas" : "Pilih berkas"}</BtnFile><span className="min-w-0 break-all text-sm text-muted">{evidence ? evidence.name : "Foto atau PDF bukti transfer (JPG, PNG, PDF)."}</span></div></div><Btn type="submit" disabled={busy || !reference.trim() || !evidence}>Ajukan verifikasi</Btn></form> : null}
+            </> : <div className="mt-4 space-y-2 break-all text-sm"><p>Referensi: {selected.payment_reference || "—"}</p><p>Bukti: {selected.evidence_file ? <a className="text-primary underline" href={`${API_BASE}/api/v1/wallet/topups/${selected.id}/evidence`} target="_blank" rel="noreferrer">Lihat bukti transfer</a> : selected.evidence_ref || "—"}</p>{selected.provider_txn_id ? <p>Referensi settlement: {selected.provider_txn_id}</p> : null}{selected.reason ? <p className="text-danger">{selected.reason}</p> : null}{selected.status === "EXPIRED" ? <p>Hubungi dukungan bila dana sudah dikirim.</p> : null}</div>}
           </section> : null}
         </div>
       </div>

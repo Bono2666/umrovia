@@ -20,7 +20,7 @@ from modules.platform.models import SupportTicket, TenantLifecycleRequest
 from modules.tenants.models import MembershipStatus, Tenant, TenantMembership, TenantState
 from modules.trial.models import TenantTrial, TrialEventType, TrialStatus
 from modules.wallet.models import Wallet, WalletTopup
-from modules.wallet.services import platform_tenant_context
+from modules.wallet.services import evidence_file_key, platform_tenant_context
 
 SUSPENDABLE = {TenantState.TRIAL, TenantState.ACTIVE, TenantState.RESTRICTED}
 INACTIVE_BOOKINGS = {"DRAFT", "CANCELED", "EXPIRED"}
@@ -295,7 +295,7 @@ def billing_queue() -> dict:
         with platform_tenant_context(tenant.pk):
             for t in WalletTopup.objects.filter(status="PENDING").select_related("requested_by").order_by("created_at"):
                 topups.append({"tenant_id": str(tenant.pk), "tenant": tenant.display_name, "id": str(t.pk), "number": f"TOP-{t.pk}", "amount_idr": t.amount_idr, "provider": t.provider,
-                               "payment_reference": t.payment_reference, "evidence_ref": t.evidence_ref, "requested_by": mask_email(t.requested_by.email), "requested_at": t.created_at.isoformat()})
+                               "payment_reference": t.payment_reference, "evidence_ref": t.evidence_ref, "evidence_file": evidence_file_key(t) is not None, "requested_by": mask_email(t.requested_by.email), "requested_at": t.created_at.isoformat()})
             for a in SaaSAdjustment.objects.filter(status="REQUESTED").select_related("charge__booking", "requested_by").order_by("created_at"):
                 refunds.append({"tenant_id": str(tenant.pk), "tenant": tenant.display_name, "id": str(a.pk), "amount_idr": a.amount_idr, "booking_code": a.charge.booking.code,
                                 "reason": a.reason, "requested_by": mask_email(a.requested_by.email), "requested_at": a.created_at.isoformat()})

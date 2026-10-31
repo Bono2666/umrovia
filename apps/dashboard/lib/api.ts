@@ -193,7 +193,7 @@ export type ChargePreview = {
 export type WalletTopup = {
   id: string; number: string; amount_idr: number; status: string; provider: string;
   instructions: {bank_name: string; account_name: string; account_number: string};
-  payment_reference: string; evidence_ref: string; provider_txn_id: string;
+  payment_reference: string; evidence_ref: string; evidence_file: boolean; provider_txn_id: string;
   expires_at: string; created_at: string; paid_at: string | null;
   ledger_entry_id: string | null; reason: string;
   /** Midtrans: last gateway status/method and the Snap page while still payable. */

@@ -184,13 +184,33 @@ def _topup(wallet, topup_id):
 
 
 @transaction.atomic
-def submit_topup(*, topup_id, actor, payment_reference, evidence_ref):
+def _evidence_prefix(topup):
+    return f"tenants/{topup.tenant_id}/environments/production/wallet-topups/{topup.pk}/"
+
+
+def evidence_file_key(topup):
+    """Kunci berkas bukti transfer yang diunggah; None untuk bukti berupa referensi teks lama.
+
+    Kunci disimpan di `evidence_ref` sehingga ikut terkunci trigger begitu top-up diajukan.
+    """
+    return topup.evidence_ref if topup.evidence_ref.startswith(_evidence_prefix(topup)) else None
+
+
+def submit_topup(*, topup_id, actor, payment_reference, evidence_ref="", evidence_file=None):
+    """Ajukan referensi + bukti transfer (berkas PDF/JPG/PNG, atau referensi teks lama)."""
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+
+    from modules.portal.files import inspect_upload
+
     wallet = locked_wallet()
     topup = _topup(wallet, topup_id)
     if topup.provider != "manual":
         raise Conflict("Top-up Midtrans dikonfirmasi otomatis setelah pembayaran; tidak perlu bukti transfer.")
     if topup.status == "PENDING":
-        if (topup.payment_reference, topup.evidence_ref) != (payment_reference, evidence_ref):
+        # Pengajuan ulang identik (mis. klik ganda) idempoten; berkas tidak bisa dibandingkan, cukup referensinya.
+        same_evidence = evidence_file_key(topup) is not None if evidence_file is not None else topup.evidence_ref == evidence_ref
+        if topup.payment_reference != payment_reference or not same_evidence:
             raise Conflict("Top-up sudah diajukan dengan bukti/referensi lain.")
         return topup
     assert_active(wallet)
@@ -198,12 +218,25 @@ def submit_topup(*, topup_id, actor, payment_reference, evidence_ref):
         raise Conflict("Status top-up tidak dapat diajukan lagi.")
     if timezone.now() >= topup.expires_at:
         raise Conflict("Instruksi top-up kedaluwarsa. Hubungi dukungan bila dana sudah dikirim.")
-    if not payment_reference.strip() or not evidence_ref.strip():
-        raise ValidationError({"payment_reference": "Referensi dan lokasi bukti pembayaran wajib diisi."})
-    topup.payment_reference = payment_reference
-    topup.evidence_ref = evidence_ref
-    topup.status = "PENDING"
-    topup.save(update_fields=["payment_reference", "evidence_ref", "status", "updated_at"])
+    if not payment_reference.strip():
+        raise ValidationError({"payment_reference": "Referensi transfer wajib diisi."})
+    if evidence_file is None and not evidence_ref.strip():
+        raise ValidationError({"file": "Unggah bukti transfer (PDF, JPG atau PNG)."})
+    stored = None
+    if evidence_file is not None:
+        data, ext = inspect_upload(evidence_file)
+        stored = default_storage.save(f"{_evidence_prefix(topup)}{uuid4()}.{ext}", ContentFile(data))
+        evidence_ref = stored
+    try:
+        with transaction.atomic():
+            topup.payment_reference = payment_reference
+            topup.evidence_ref = evidence_ref
+            topup.status = "PENDING"
+            topup.save(update_fields=["payment_reference", "evidence_ref", "status", "updated_at"])
+    except Exception:
+        if stored:
+            default_storage.delete(stored)  # jangan tinggalkan berkas yatim bila pencatatan gagal
+        raise
     log_event(action="wallet.topup.submitted", tenant=wallet.tenant, actor=actor, object_type="wallet_topup", object_id=topup.pk)
     return topup
 
