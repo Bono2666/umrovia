@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from modules.wallet.services import evidence_file_key
+
 
 class StrictSerializer(serializers.Serializer):
     def to_internal_value(self, data):
@@ -23,7 +25,8 @@ class TopupCreateSerializer(StrictSerializer):
 
 class TopupSubmitSerializer(StrictSerializer):
     payment_reference = serializers.CharField(max_length=120)
-    evidence_ref = serializers.CharField(max_length=512)
+    # Bukti diunggah sebagai berkas `file` (multipart); referensi teks hanya untuk klien lama.
+    evidence_ref = serializers.CharField(max_length=512, required=False, allow_blank=True, default="")
 
 
 class TopupSettleSerializer(StrictSerializer):
@@ -40,7 +43,8 @@ def topup_payload(topup):
         "id": str(topup.pk), "number": f"TOP-{topup.pk}", "provider": topup.provider,
         "amount_idr": topup.amount_idr, "status": topup.status,
         "instructions": topup.instructions_json, "payment_reference": topup.payment_reference,
-        "evidence_ref": topup.evidence_ref, "provider_txn_id": topup.provider_txn_id,
+        "evidence_ref": topup.evidence_ref, "evidence_file": evidence_file_key(topup) is not None,
+        "provider_txn_id": topup.provider_txn_id,
         "expires_at": topup.expires_at.isoformat(), "created_at": topup.created_at.isoformat(),
         "paid_at": topup.paid_at.isoformat() if topup.paid_at else None,
         "ledger_entry_id": str(topup.ledger_entry_id) if topup.ledger_entry_id else None,

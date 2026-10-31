@@ -186,12 +186,42 @@ class TopupDetailView(APIView):
 class TopupSubmitView(APIView):
     permission_classes = [IsAuthenticated, wallet_permission("wallet.topup")]
 
-    @extend_schema(request=TopupSubmitSerializer, responses=OpenApiTypes.OBJECT, description="Submit transfer evidence. This never credits the wallet. Identical resubmission is idempotent.")
+    @extend_schema(request=TopupSubmitSerializer, responses=OpenApiTypes.OBJECT, description="Submit transfer reference plus evidence file (multipart `file`: PDF/JPG/PNG). This never credits the wallet. Identical resubmission is idempotent.")
     def post(self, request, topup_id):
-        serializer = TopupSubmitSerializer(data=request.data)
+        serializer = TopupSubmitSerializer(data={key: value for key, value in request.data.items() if key != "file"})
         serializer.is_valid(raise_exception=True)
-        topup = services.submit_topup(topup_id=topup_id, actor=request.user, **serializer.validated_data)
+        topup = services.submit_topup(topup_id=topup_id, actor=request.user, evidence_file=request.FILES.get("file"), **serializer.validated_data)
         return Response(topup_payload(topup))
+
+
+def evidence_response(topup):
+    """Berkas bukti transfer, privat (tanpa cache) dan ditampilkan inline."""
+    from django.core.files.storage import default_storage
+
+    from modules.portal.files import CONTENT_TYPES
+
+    key = services.evidence_file_key(topup) if topup else None
+    if not key or not default_storage.exists(key):
+        raise NotFound("Bukti transfer tidak ditemukan.")
+    with default_storage.open(key, "rb") as handle:
+        data = handle.read()
+    ext = key.rsplit(".", 1)[-1]
+    response = HttpResponse(data, content_type=CONTENT_TYPES.get(ext, "application/octet-stream"))
+    response["Content-Disposition"] = f'inline; filename="bukti-transfer-{topup.pk}.{ext}"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+class TopupEvidenceView(APIView):
+    permission_classes = [IsAuthenticated, wallet_permission("wallet.read")]
+
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY}, description="Uploaded transfer evidence of one of this tenant's top-ups.")
+    def get(self, request, topup_id):
+        topup = WalletTopup.objects.filter(pk=topup_id).first() if resolve_active_environment(request.tenant) == "production" else None
+        response = evidence_response(topup)
+        log_event(action="wallet.topup.evidence_downloaded", tenant=request.tenant, actor=request.user, object_type="wallet_topup", object_id=topup.pk)
+        return response
 
 
 class TopupRefreshView(APIView):
@@ -227,6 +257,19 @@ class PlatformTopupSettleView(APIView):
         serializer.is_valid(raise_exception=True)
         topup = services.settle_topup(tenant_id=tenant_id, topup_id=topup_id, actor=request.user, **serializer.validated_data)
         return Response(topup_payload(topup))
+
+
+class PlatformTopupEvidenceView(APIView):
+    permission_classes = [IsAuthenticated, require_platform("wallet.settle_topup")]  # S18: + MFA segar
+
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY}, description="Platform billing: transfer evidence of one tenant top-up, for settlement review.")
+    def get(self, request, tenant_id, topup_id):
+        services.assert_platform_billing(request.user)
+        with services.platform_tenant_context(tenant_id) as tenant:
+            topup = WalletTopup.objects.filter(pk=topup_id).first()
+            response = evidence_response(topup)
+            log_event(action="wallet.topup.evidence_downloaded", tenant=tenant, actor=request.user, object_type="wallet_topup", object_id=topup.pk)
+        return response
 
 
 class PlatformTopupListView(APIView):

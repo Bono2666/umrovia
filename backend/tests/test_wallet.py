@@ -152,6 +152,37 @@ def test_submit_is_idempotent_and_cannot_replace_evidence(wallet_setup):
     assert post(s["client"], url, {"payment_reference": "", "evidence_ref": ""}).status_code == 400
 
 
+def test_submit_with_uploaded_evidence_visible_to_tenant_and_billing(wallet_setup, settings, tmp_path):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    settings.MEDIA_ROOT = tmp_path
+    s = wallet_setup
+    t = topup(s, submit=False)
+    csrf = s["client"].get("/api/v1/auth/csrf").json()["csrfToken"]
+
+    def send(**body):
+        return s["client"].post(f"/api/v1/wallet/topups/{t['id']}/submit", body, HTTP_X_CSRFTOKEN=csrf)
+
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+    assert "file" in send(payment_reference="TRF-1").json()["field_errors"]  # bukti wajib
+    assert send(payment_reference="TRF-1", file=SimpleUploadedFile("bukti.txt", b"bukan gambar")).status_code == 400
+    submitted = ok(send(payment_reference="TRF-1", file=SimpleUploadedFile("bukti.png", png)))
+    assert submitted["status"] == "PENDING" and submitted["evidence_file"]
+    assert ok(send(payment_reference="TRF-1", file=SimpleUploadedFile("bukti.png", png)))["evidence_ref"] == submitted["evidence_ref"]  # klik ganda
+
+    own = s["client"].get(f"/api/v1/wallet/topups/{t['id']}/evidence")
+    assert own.status_code == 200 and own.content == png and own["Content-Type"] == "image/png"
+    review_url = f"/api/v1/platform/tenants/{s['tenant'].pk}/wallet/topups/{t['id']}/evidence"
+    assert s["platform"].get(review_url).content == png
+    assert s["client"].get(review_url).status_code == 403  # travel tidak lewat jalur konsol
+    queue = ok(s["platform"].get(f"/api/v1/platform/tenants/{s['tenant'].pk}/wallet/topups?status=PENDING"))
+    assert queue["results"][0]["evidence_file"]
+    assert ok(settle(s, submitted))["status"] == "PAID"
+
+    legacy = topup(s)  # referensi teks lama: tidak ada berkas untuk diunduh
+    assert not legacy["evidence_file"] and s["client"].get(f"/api/v1/wallet/topups/{legacy['id']}/evidence").status_code == 404
+
+
 def test_rejection_requires_reason_and_never_credits(wallet_setup):
     s = wallet_setup
     t = topup(s)
