@@ -56,7 +56,7 @@ export function PlatformShell({children}: {children: React.ReactNode}) {
   if (state === "loading") return <div className="workspace-shell min-h-screen p-8"><LoadingState label="Memuat konsol platform…" /></div>;
   if (state === "denied" || !session) return <Centered title="Akses konsol platform ditolak">
     <p className="mt-2 text-sm text-muted">Akun ini bukan staf platform Umrovia. Konsol hanya untuk tim internal; role travel (termasuk Owner) tidak memberi akses.</p>
-    <div className="mt-4 flex justify-center gap-3"><Link className="text-sm text-primary underline" href="/dashboard">Ke dashboard travel</Link><LogoutButton /></div>
+    <div className="mt-4 flex items-center justify-center gap-3"><Link className="text-sm text-primary underline" href="/dashboard">Ke dashboard travel</Link><LogoutButton /></div>
   </Centered>;
   if (!session.mfa.enrolled) return <MfaEnroll onDone={refresh} />;
   if (!session.mfa.verified) return <MfaVerify email={session.email} onDone={refresh} />;
